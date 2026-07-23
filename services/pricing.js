@@ -28,13 +28,15 @@ function getSetting(key, fallback = null) {
 }
 
 // Builds the priced line items for a new classified post: the duration tier plus
-// any selected add-ons (strike/featured, oversized). Lost & Found is always free.
-function buildClassifiedCharges({ category, pricingTierId, wantsStrike, wantsOversized }) {
+// any selected add-ons (strike/featured, oversized). Categories flagged "free"
+// (Lost & Found, or any admin-added free custom category) always cost $0.
+function buildClassifiedCharges({ category, categoryDef, pricingTierId, wantsStrike, wantsOversized }) {
   const lineItems = [];
   let tier = null;
 
-  if (category === 'lost-found') {
-    tier = db.prepare("SELECT * FROM pricing_tiers WHERE category = 'lost-found' AND active = 1 LIMIT 1").get();
+  if (categoryDef?.free) {
+    tier = db.prepare('SELECT * FROM pricing_tiers WHERE category = ? AND active = 1 LIMIT 1').get(category)
+      || { name: 'Standard (Free)', duration_days: 30, price_cents: 0 };
   } else {
     tier = getPricingTier(pricingTierId);
     if (!tier || (tier.category && tier.category !== category)) {

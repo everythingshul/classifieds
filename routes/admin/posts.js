@@ -2,11 +2,15 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { formatPostAdmin } = require('../../services/postFormat');
-const { computeExpiry, DAY_MS, sendInvoiceForPost } = require('../../services/postLifecycle');
+const { computeExpiry, DAY_MS, sendInvoiceForPost, insertPost, attachImages, attachSimchaSurprises, recordPayment } = require('../../services/postLifecycle');
 const { sendMail } = require('../../utils/mailer');
 const { POST_STATUSES } = require('../../utils/constants');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
+const { upload, processAndSaveImage } = require('../../middleware/upload');
+const { validateClassifiedPayload, validateSimchaPayload, ValidationError } = require('../../services/postValidation');
+const { getCharLimits } = require('../../services/pricing');
+const { findCategory } = require('../../services/categories');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -15,13 +19,104 @@ function imagesFor(postId) {
   return db.prepare('SELECT * FROM post_images WHERE post_id = ? ORDER BY sort_order').all(postId);
 }
 
+// Admin-created posts skip payment entirely and go straight live with any
+// uploaded images pre-approved (admin is trusted, unlike public submissions).
+router.post('/create', upload.array('images', 6), async (req, res, next) => {
+  try {
+    const type = req.body.type === 'simcha' ? 'simcha' : 'classified';
+    let fields = {};
+    try {
+      fields = req.body.fields ? JSON.parse(req.body.fields) : {};
+    } catch (e) {
+      return res.status(400).json({ error: 'fields must be valid JSON' });
+    }
+
+    const title = String(req.body.title || '').trim();
+    if (type === 'classified' && !title) return res.status(400).json({ error: 'Title is required' });
+
+    const catDef = type === 'classified' ? findCategory(req.body.category) : null;
+    if (type === 'classified' && !catDef) return res.status(400).json({ error: 'Invalid category' });
+
+    const uploaded = [];
+    for (const file of req.files || []) {
+      if (type === 'classified' && !catDef.hasImages) return res.status(400).json({ error: `${catDef.label} does not support images` });
+      uploaded.push({ filename: await processAndSaveImage(file.buffer), originalName: file.originalname });
+    }
+
+    const posterEmail = String(req.body.posterEmail || req.admin.email || '').toLowerCase();
+    if (!posterEmail) return res.status(400).json({ error: 'A poster email is required' });
+
+    const contact = {};
+    if (req.body.contactPhone) contact.phone = req.body.contactPhone;
+    if (req.body.contactPhoneExt) contact.phoneExt = req.body.contactPhoneExt;
+    if (req.body.contactEmail) contact.email = req.body.contactEmail;
+    if (req.body.contactUrl) contact.url = req.body.contactUrl;
+
+    const taxonomyId = req.body.taxonomyId ? Number(req.body.taxonomyId) : null;
+    const payload = {
+      category: type === 'classified' ? req.body.category : 'simcha',
+      taxonomyId,
+      title,
+      description: req.body.description || '',
+      fields,
+      locationText: req.body.locationText || null,
+      locationCity: req.body.locationCity || null,
+      locationState: req.body.locationState || null,
+      locationLat: req.body.locationLat ? Number(req.body.locationLat) : null,
+      locationLng: req.body.locationLng ? Number(req.body.locationLng) : null,
+      locationPlaceId: null,
+      posterFirstName: req.body.posterFirstName || null,
+      posterLastName: req.body.posterLastName || null,
+      posterEmail,
+      posterPhone: req.body.posterPhone || null,
+      contact,
+      pricingTierId: req.body.pricingTierId ? Number(req.body.pricingTierId) : null,
+      wantsStrike: !!req.body.wantsStrike,
+      wantsOversized: false,
+    };
+
+    if (type === 'simcha') {
+      const taxonomy = taxonomyId ? db.prepare('SELECT name FROM taxonomies WHERE id = ?').get(taxonomyId) : null;
+      payload.title = taxonomy ? taxonomy.name : title || 'Simcha';
+    }
+
+    const post = insertPost({ type, category: payload.category, payload, hasImages: uploaded.length > 0 });
+    attachImages(post.id, uploaded);
+    db.prepare('UPDATE post_images SET approved = 1 WHERE post_id = ?').run(post.id);
+
+    if (type === 'simcha' && req.body.surpriseEmail) {
+      attachSimchaSurprises(post.id, [{ email: req.body.surpriseEmail, senderDisplayName: payload.posterFirstName || '' }], payload.posterFirstName);
+    }
+
+    const durationDays = Number(req.body.durationDays) || 30;
+    const now = Date.now();
+    const expiresAt = now + durationDays * DAY_MS;
+    db.prepare('UPDATE posts SET status = ?, published_at = ?, expires_at = ?, boosted_at = ?, updated_at = ? WHERE id = ?').run(
+      'live', now, expiresAt, now, now, post.id
+    );
+    recordPayment({ postId: post.id, kind: 'listing', amountCents: 0, payerEmail: posterEmail, status: 'paid' });
+
+    const finalPost = db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id);
+    res.status(201).json(formatPostAdmin(finalPost, imagesFor(post.id)));
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get('/', (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 25));
 
   const where = [];
   const params = [];
-  if (req.query.status) { where.push('status = ?'); params.push(req.query.status); }
+  if (req.query.status) {
+    where.push('status = ?');
+    params.push(req.query.status);
+  } else {
+    // Abandoned checkouts (never paid) are noise - hide them unless an admin
+    // explicitly filters for that status. They're auto-deleted after 48h anyway.
+    where.push("status != 'pending_payment'");
+  }
   if (req.query.type) { where.push('type = ?'); params.push(req.query.type); }
   if (req.query.category) { where.push('category = ?'); params.push(req.query.category); }
   if (req.query.q) {

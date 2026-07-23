@@ -12,27 +12,18 @@ async function renderHomePage() {
         <a href="/post" class="btn btn-gold" data-i18n="nav_post">Post an Ad</a>
       </div>
 
-      <div class="widgets-grid">
-        <div class="widget-card">
-          <h3 data-i18n="hebrew_date">Hebrew Date</h3>
-          <div class="big">${escapeHtml(c.hebrew.display)}</div>
-          <div class="sub">${escapeHtml(c.english.display)}</div>
+      <div class="combo-widget">
+        <div class="combo-widget-top">
+          <div><span class="combo-label">${escapeHtml(c.hebrew.display)}</span><span class="combo-sub">${escapeHtml(c.english.display)}</span></div>
+          <div><span class="combo-label">${escapeHtml(c.dafYomi.display)}</span><span class="combo-sub">${escapeHtml(c.dafYomi.displayEn)}</span></div>
         </div>
-        <div class="widget-card">
-          <h3 data-i18n="daf_yomi">Daf Yomi</h3>
-          <div class="big">${escapeHtml(c.dafYomi.display)}</div>
-          <div class="sub">${escapeHtml(c.dafYomi.displayEn)}</div>
-        </div>
-        <div class="widget-card">
-          <h3 data-i18n="zmanim_today">Today's Zmanim</h3>
-          <ul class="zman-list">
-            <li><span data-i18n="sunrise">Sunrise</span><span>${formatTime(z.sunrise)}</span></li>
-            <li><span data-i18n="sunset">Sunset</span><span>${formatTime(z.sunset)}</span></li>
-            <li><span data-i18n="tzeit">Tzeit Hakochavim</span><span>${formatTime(z.tzeit72)}</span></li>
-            <li><span data-i18n="chatzot">Chatzot</span><span>${formatTime(z.chatzot)}</span></li>
-            <li><span data-i18n="sof_zman_shma">Sof Zman Shma</span><span>${formatTime(z.sofZmanShma)}</span></li>
-            <li><span data-i18n="plag_hamincha">Plag HaMincha</span><span>${formatTime(z.plagHaMincha)}</span></li>
-          </ul>
+        <div class="combo-zman-row">
+          <span><b data-i18n="sunrise">Sunrise</b> ${formatTime(z.sunrise)}</span>
+          <span><b data-i18n="sunset">Sunset</b> ${formatTime(z.sunset)}</span>
+          <span><b data-i18n="tzeit">Tzeit</b> ${formatTime(z.tzeit72)}</span>
+          <span><b data-i18n="chatzot">Chatzot</b> ${formatTime(z.chatzot)}</span>
+          <span><b data-i18n="sof_zman_shma">Shma</b> ${formatTime(z.sofZmanShma)}</span>
+          <span><b data-i18n="plag_hamincha">Plag</b> ${formatTime(z.plagHaMincha)}</span>
         </div>
       </div>
 

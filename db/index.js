@@ -94,7 +94,7 @@ function seed() {
   seed('simcha_retention_days', 30);
   seed('simcha_retention_max_days', 365);
   seed('admin_notify_email', process.env.ADMIN_NOTIFY_EMAIL || '');
-  seed('char_limits', { title: 80, description: 1200 });
+  seed('char_limits', { title: 80, description: 200 });
   seed('default_location', { label: 'Brooklyn, NY', lat: 40.6782, lng: -73.9442, tzid: 'America/New_York' });
 
   // Integration settings - editable from the admin portal's Settings page so

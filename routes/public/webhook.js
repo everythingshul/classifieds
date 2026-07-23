@@ -3,6 +3,7 @@ const db = require('../../db');
 const { getStripe, getWebhookSecret } = require('../../utils/stripeClient');
 const { finalizePostLive } = require('../../services/postLifecycle');
 const { sendMail } = require('../../utils/mailer');
+const { getActivePromo, recordUse } = require('../../services/promoCodes');
 
 const router = express.Router();
 
@@ -35,6 +36,10 @@ router.post('/', async (req, res) => {
       }
 
       if (meta.kind === 'listing' && meta.postId) {
+        if (meta.promoCode) {
+          const promo = getActivePromo(meta.promoCode);
+          if (promo) recordUse(promo);
+        }
         await finalizePostLive(Number(meta.postId));
       } else if (meta.kind === 'boost' && meta.postId) {
         const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(Number(meta.postId));

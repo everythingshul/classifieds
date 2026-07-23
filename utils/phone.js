@@ -25,6 +25,24 @@ function validatePhone(raw, defaultCountry = 'US') {
   };
 }
 
+// Formats a stored E.164 number for display. US/Canada numbers get the
+// familiar dashed form (347-555-0199); other countries fall back to their
+// own standard national format (which, e.g. for Israel, is dash-separated too).
+function formatPhoneDashed(e164) {
+  if (!e164) return e164;
+  try {
+    const parsed = parsePhoneNumberFromString(e164);
+    if (!parsed) return e164;
+    if (parsed.country === 'US' || parsed.country === 'CA') {
+      const digits = parsed.nationalNumber; // 10-digit NANP significant number
+      if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    return parsed.formatNational();
+  } catch (e) {
+    return e164;
+  }
+}
+
 function validateExtension(ext) {
   if (!ext) return { valid: true, ext: '' };
   const digits = String(ext).replace(/\D/g, '');
@@ -32,4 +50,4 @@ function validateExtension(ext) {
   return { valid: true, ext: digits };
 }
 
-module.exports = { validatePhone, validateExtension };
+module.exports = { validatePhone, validateExtension, formatPhoneDashed };

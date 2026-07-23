@@ -38,6 +38,7 @@ function renderShell() {
           <aside class="admin-sidebar">
             <div class="brand">Admin Portal</div>
             <a href="#/dashboard">Dashboard</a>
+            <a href="#/new-post">+ New Post</a>
             <a href="#/moderation">Moderation Queue</a>
             <a href="#/posts">All Posts</a>
             <a href="#/crm">CRM Search</a>
@@ -66,6 +67,7 @@ function renderShell() {
 document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/login', renderLoginPage);
   AdminRouter.add('#/dashboard', renderDashboardPage);
+  AdminRouter.add('#/new-post', renderCreatePostPage);
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);
   AdminRouter.add('#/crm', renderCrmPage);

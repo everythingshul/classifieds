@@ -2,7 +2,7 @@ const I18N = (() => {
   const DICT = {
     en: {
       nav_home: 'Home', nav_classifieds: 'Classifieds', nav_simchas: 'Simchas',
-      nav_bookmarks: 'Bookmarks', nav_post: 'Post an Ad',
+      nav_bookmarks: 'Bookmarks', nav_post: '+ Post',
       view_all: 'View All', view_all_classifieds: 'View All Classifieds', view_all_simchas: 'View All Simchas',
       recent_classifieds: 'Recent Classifieds', recent_simchas: 'Recent Simchas',
       zmanim_today: "Today's Zmanim", daf_yomi: 'Daf Yomi', hebrew_date: 'Hebrew Date', english_date: 'English Date',
@@ -18,7 +18,7 @@ const I18N = (() => {
     },
     he: {
       nav_home: 'בית', nav_classifieds: 'מודעות', nav_simchas: 'שמחות',
-      nav_bookmarks: 'שמורים', nav_post: 'פרסם מודעה',
+      nav_bookmarks: 'שמורים', nav_post: '+ פרסם',
       view_all: 'הצג הכל', view_all_classifieds: 'כל המודעות', view_all_simchas: 'כל השמחות',
       recent_classifieds: 'מודעות אחרונות', recent_simchas: 'שמחות אחרונות',
       zmanim_today: 'זמנים היום', daf_yomi: 'דף יומי', hebrew_date: 'תאריך עברי', english_date: 'תאריך לועזי',

@@ -1,10 +1,9 @@
-const { CLASSIFIED_CATEGORIES } = require('../utils/constants');
-
-const CATEGORY_BY_KEY = new Map(CLASSIFIED_CATEGORIES.map((c) => [c.key, c]));
+const { formatPhoneDashed } = require('../utils/phone');
+const { findCategory } = require('./categories');
 
 function categoryLabel(category) {
   if (category === 'simcha') return 'Simcha';
-  return CATEGORY_BY_KEY.get(category)?.label || category;
+  return findCategory(category)?.label || category;
 }
 
 function buildContactLinks(post) {
@@ -12,7 +11,7 @@ function buildContactLinks(post) {
   if (post.contact_phone) {
     const ext = post.contact_phone_ext ? `,${post.contact_phone_ext}` : '';
     contact.phone = {
-      display: post.contact_phone,
+      display: formatPhoneDashed(post.contact_phone),
       ext: post.contact_phone_ext || null,
       tel: `tel:${post.contact_phone.replace(/[^\d+]/g, '')}${ext}`,
     };
@@ -55,7 +54,8 @@ function formatPostPublic(post, images = []) {
     isFeatured: !!post.is_featured_strike,
     viewCount: post.view_count,
     publishedAt: post.published_at,
-    expiresAt: post.expires_at,
+    // Expiration is intentionally not exposed on public listings - it's only
+    // ever shown during the posting flow itself (review step + invoice).
     images: images.filter((i) => i.approved).map((i) => `/uploads/${i.filename}`),
   };
 }

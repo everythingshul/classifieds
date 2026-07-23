@@ -1,8 +1,10 @@
 const express = require('express');
 const db = require('../../db');
-const { CLASSIFIED_CATEGORIES, JOB_TYPES, PAY_PERIODS, LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
+const { JOB_TYPES, PAY_PERIODS, LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
 const { getCharLimits, getSetting, getAddon } = require('../../services/pricing');
 const runtimeConfig = require('../../services/runtimeConfig');
+const { getCountryList } = require('../../utils/countries');
+const { getAllClassifiedCategories } = require('../../services/categories');
 
 const router = express.Router();
 
@@ -11,7 +13,8 @@ router.get('/', (req, res) => {
   const pricingTiers = db.prepare('SELECT * FROM pricing_tiers WHERE active = 1 ORDER BY category, sort_order').all();
 
   res.json({
-    categories: CLASSIFIED_CATEGORIES,
+    categories: getAllClassifiedCategories(),
+    countries: getCountryList(),
     jobTypes: JOB_TYPES,
     payPeriods: PAY_PERIODS,
     lostFoundOptions: LOST_FOUND_OPTIONS,

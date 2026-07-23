@@ -1,15 +1,15 @@
 // Fixed, top-level classifieds categories. These drive form schemas and are not
 // admin-editable (unlike taxonomies, which back job/real-estate/simcha sub-lists).
 const CLASSIFIED_CATEGORIES = [
-  { key: 'job-offers', label: 'Job Offers', labelHe: 'משרות פנויות', hasImages: false, free: false, taxonomyGroup: 'job' },
-  { key: 'seeking-a-job', label: 'Seeking A Job', labelHe: 'מחפש עבודה', hasImages: false, free: false, taxonomyGroup: 'job' },
-  { key: 'items-for-sale', label: 'Items For Sale', labelHe: 'למכירה', hasImages: true, free: false, taxonomyGroup: null },
-  { key: 'items-for-rent', label: 'Items For Rent', labelHe: 'להשכרה', hasImages: true, free: false, taxonomyGroup: null },
-  { key: 'free-giveaways', label: 'Free Giveaways', labelHe: 'חינם', hasImages: false, free: false, taxonomyGroup: null },
-  { key: 'lost-found', label: 'Lost & Found', labelHe: 'אבידות ומציאות', hasImages: false, free: true, taxonomyGroup: null },
-  { key: 'wanted', label: 'Wanted', labelHe: 'דרוש', hasImages: false, free: false, taxonomyGroup: null },
-  { key: 'services', label: 'Services', labelHe: 'שירותים', hasImages: false, free: false, taxonomyGroup: null },
-  { key: 'real-estate', label: 'Real Estate', labelHe: 'נדל"ן', hasImages: true, free: false, taxonomyGroup: 'real_estate' },
+  { key: 'job-offers', label: 'Job Offers', labelHe: 'משרות פנויות', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'job', isSystem: true },
+  { key: 'seeking-a-job', label: 'Seeking A Job', labelHe: 'מחפש עבודה', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'job', isSystem: true },
+  { key: 'items-for-sale', label: 'Items For Sale', labelHe: 'למכירה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'items-for-rent', label: 'Items For Rent', labelHe: 'להשכרה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'free-giveaways', label: 'Free Giveaways', labelHe: 'חינם', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'lost-found', label: 'Lost & Found', labelHe: 'אבידות ומציאות', hasImages: false, hasPrice: false, free: true, taxonomyGroup: null, isSystem: true },
+  { key: 'wanted', label: 'Wanted', labelHe: 'דרוש', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'services', label: 'Services', labelHe: 'שירותים', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'real-estate', label: 'Real Estate', labelHe: 'נדל"ן', hasImages: true, hasPrice: true, free: false, taxonomyGroup: 'real_estate', isSystem: true },
 ];
 
 const CLASSIFIED_CATEGORY_KEYS = CLASSIFIED_CATEGORIES.map((c) => c.key);
@@ -22,12 +22,12 @@ const POST_STATUSES = ['pending_payment', 'pending_approval', 'live', 'rejected'
 
 const DEFAULT_CHAR_LIMITS = {
   title: 80,
-  description: 1200,
+  description: 200,
 };
 
 const OVERSIZED_CHAR_LIMITS = {
   title: 140,
-  description: 3000,
+  description: 500,
 };
 
 const DEFAULT_BROOKLYN_LOCATION = {

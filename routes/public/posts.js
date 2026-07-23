@@ -3,7 +3,9 @@ const db = require('../../db');
 const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { validateClassifiedPayload, validateSimchaPayload, ValidationError } = require('../../services/postValidation');
 const { buildClassifiedCharges, buildSimchaCharges, getCharLimits, getAddon } = require('../../services/pricing');
-const { CLASSIFIED_CATEGORIES, DEFAULT_CHAR_LIMITS, OVERSIZED_CHAR_LIMITS } = require('../../utils/constants');
+const { DEFAULT_CHAR_LIMITS, OVERSIZED_CHAR_LIMITS } = require('../../utils/constants');
+const { findCategory } = require('../../services/categories');
+const { getActivePromo, applyDiscount, recordUse } = require('../../services/promoCodes');
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
 const { createCheckoutSession } = require('../../services/checkout');
@@ -11,11 +13,24 @@ const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
 
 const router = express.Router();
-const CATEGORY_BY_KEY = new Map(CLASSIFIED_CATEGORIES.map((c) => [c.key, c]));
 
 const runtimeConfig = require('../../services/runtimeConfig');
 function appUrl() {
   return runtimeConfig.get('app_url', 'APP_URL') || '';
+}
+
+// Mutates `charges` in place: collapses its line items into a single
+// discounted "listing" line so Stripe (and the invoice) show one clean total
+// rather than a per-line discount, and records the promo's use.
+function applyPromoToCharges(charges, code) {
+  if (!code) return null;
+  const promo = getActivePromo(code);
+  if (!promo) throw Object.assign(new Error('That promo code is invalid or expired'), { status: 400 });
+  const discounted = applyDiscount(charges.totalCents, promo);
+  charges.lineItems = [{ kind: 'listing', label: `Listing (promo ${promo.code} applied)`, amount_cents: discounted }];
+  charges.totalCents = discounted;
+  charges.promo = promo;
+  return promo;
 }
 
 async function processUploadedImages(files) {
@@ -54,7 +69,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
 
     if (type === 'classified') {
       const payload = validateClassifiedPayload({ ...req.body, fields: parsedFields, wantsOversized }, charLimits);
-      const catDef = CATEGORY_BY_KEY.get(payload.category);
+      const catDef = findCategory(payload.category);
       const uploaded = await processUploadedImages(req.files);
       if (uploaded.length && !catDef.hasImages) {
         return res.status(400).json({ error: `${catDef.label} does not support image uploads` });
@@ -62,10 +77,12 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
 
       const charges = buildClassifiedCharges({
         category: payload.category,
+        categoryDef: catDef,
         pricingTierId: payload.pricingTierId,
         wantsStrike: payload.wantsStrike,
         wantsOversized: payload.wantsOversized,
       });
+      applyPromoToCharges(charges, req.body.promoCode);
 
       const post = insertPost({ type: 'classified', category: payload.category, payload, hasImages: uploaded.length > 0 });
       attachImages(post.id, uploaded);
@@ -80,8 +97,12 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
       return await finalizeOrCheckout({ res, post, payment, charges, posterEmail: payload.posterEmail, type: 'classified' });
     }
 
-    // simcha
+    // simcha - no title/date/location are collected; the title is the
+    // chosen category name (e.g. "Engagement", "New Home").
     const payload = validateSimchaPayload({ ...req.body, fields: parsedFields, surpriseEmails }, charLimits);
+    const taxonomy = db.prepare('SELECT name FROM taxonomies WHERE id = ? AND grp = ?').get(payload.taxonomyId, 'simcha');
+    if (!taxonomy) return res.status(400).json({ error: 'Validation failed', details: ['a valid simcha category is required'] });
+    payload.title = taxonomy.name;
     const charges = buildSimchaCharges();
     const post = insertPost({ type: 'simcha', category: 'simcha', payload, hasImages: false });
     attachSimchaSurprises(post.id, payload.surpriseEmails, `${payload.posterFirstName || ''} ${payload.posterLastName || ''}`.trim());
@@ -102,6 +123,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
 
 async function finalizeOrCheckout({ res, post, payment, charges, posterEmail, type }) {
   if (charges.totalCents === 0) {
+    if (charges.promo) recordUse(charges.promo);
     const finalPost = await finalizePostLive(post.id);
     return res.json({ requiresPayment: false, post: formatPostPublic(finalPost) });
   }
@@ -111,7 +133,7 @@ async function finalizeOrCheckout({ res, post, payment, charges, posterEmail, ty
     successUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${appUrl()}/post.html?canceled=1`,
     customerEmail: posterEmail,
-    metadata: { kind: 'listing', postId: String(post.id), paymentId: String(payment.id), type },
+    metadata: { kind: 'listing', postId: String(post.id), paymentId: String(payment.id), type, promoCode: charges.promo?.code || '' },
   });
   db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
   return res.json({ requiresPayment: true, checkoutUrl: session.url });

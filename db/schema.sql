@@ -23,6 +23,34 @@ CREATE TABLE IF NOT EXISTS taxonomies (
 CREATE INDEX IF NOT EXISTS idx_taxonomies_grp ON taxonomies(grp);
 CREATE INDEX IF NOT EXISTS idx_taxonomies_parent ON taxonomies(parent_id);
 
+-- Admin-added classifieds category types, on top of the 9 built-in ones. These
+-- use a generic form (description, location, optional price, optional images)
+-- rather than the specialized fields the 9 built-ins have (job type, lost/found, etc).
+CREATE TABLE IF NOT EXISTS custom_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT UNIQUE NOT NULL,
+  label TEXT NOT NULL,
+  label_he TEXT,
+  has_images INTEGER NOT NULL DEFAULT 0,
+  has_price INTEGER NOT NULL DEFAULT 0,
+  free INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  percent_off INTEGER,
+  amount_off_cents INTEGER,
+  max_uses INTEGER,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  expires_at INTEGER,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
 -- Duration/price tiers a poster can choose. category = NULL means it applies to any
 -- classifieds category that doesn't have its own dedicated tiers.
 CREATE TABLE IF NOT EXISTS pricing_tiers (

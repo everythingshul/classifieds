@@ -46,6 +46,16 @@ function getBrowserLocation() {
   });
 }
 
+// Fills a <select> with country calling codes (from the server, backed by
+// libphonenumber-js) so phone validation can check the right digit-count
+// rules per country instead of always assuming US.
+function populateCountrySelect(selectEl, selected) {
+  if (!selectEl) return;
+  const countries = window.SITE_CONFIG?.countries || [{ code: 'US', name: 'United States', dial: '1' }];
+  const value = selected || 'US';
+  selectEl.innerHTML = countries.map((c) => `<option value="${c.code}" ${c.code === value ? 'selected' : ''}>${c.code} +${c.dial}</option>`).join('');
+}
+
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';

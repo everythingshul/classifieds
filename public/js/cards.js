@@ -9,24 +9,31 @@ function categoryLabelFor(post) {
   return def?.labelHe || post.categoryLabel;
 }
 
+// Cards show everything needed to judge relevance at a glance - no image, no
+// contact info (that's a click-through-to-contact action on the detail page).
+function cardMetaLine(post) {
+  const f = post.fields || {};
+  const parts = [];
+  if (f.jobType) parts.push(String(f.jobType).replace('_', ' '));
+  if (f.payAmount) parts.push(`${formatCents(f.payAmount * 100)}/${f.payPeriod}`);
+  if (f.lostOrFound) parts.push(f.lostOrFound.toUpperCase());
+  if (f.experience) parts.push(f.experience);
+  if (post.location?.text) parts.push(post.location.text);
+  return parts.filter(Boolean).join(' • ');
+}
+
 function postCardHtml(post) {
-  const img = post.images && post.images[0];
-  const media = img
-    ? `<img class="thumb" src="${img}" alt="">`
-    : `<div class="thumb-placeholder">${post.type === 'simcha' ? '&#127881;' : '&#128196;'}</div>`;
   const priceField = post.fields && (post.fields.price !== undefined ? post.fields.price : null);
-  const meta = [post.location?.text, post.fields?.simchaDate ? formatDate(new Date(post.fields.simchaDate).getTime()) : null]
-    .filter(Boolean)
-    .join(' • ');
+  const meta = cardMetaLine(post);
   return `
     <a class="card ${post.isFeatured ? 'featured' : ''}" href="${postUrl(post)}">
-      <div class="card-media">
-        ${post.isFeatured ? `<span class="badge-featured">&#9733; Featured</span>` : ''}
-        ${media}
-      </div>
       <div class="body">
-        <span class="cat">${escapeHtml(categoryLabelFor(post))}</span>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+          <span class="cat">${escapeHtml(categoryLabelFor(post))}</span>
+          ${post.isFeatured ? `<span class="badge-featured" style="position:static;margin:0">&#9733;</span>` : ''}
+        </div>
         <span class="title">${escapeHtml(post.title)}</span>
+        ${post.description ? `<p class="card-desc">${escapeHtml(post.description)}</p>` : ''}
         ${meta ? `<span class="meta">${escapeHtml(meta)}</span>` : ''}
         ${priceField !== null && priceField !== undefined ? `<span class="price">${formatCents(priceField * 100)}</span>` : ''}
       </div>

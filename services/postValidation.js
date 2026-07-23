@@ -1,6 +1,7 @@
-const { CLASSIFIED_CATEGORY_KEYS, JOB_TYPES, PAY_PERIODS, LOST_FOUND_OPTIONS } = require('../utils/constants');
+const { JOB_TYPES, PAY_PERIODS, LOST_FOUND_OPTIONS } = require('../utils/constants');
 const { isValidEmail, isValidUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
+const { getClassifiedCategoryKeys, findCategory } = require('./categories');
 
 class ValidationError extends Error {
   constructor(errors) {
@@ -19,7 +20,7 @@ function requireString(v, field, errors, { max } = {}) {
   return v.trim();
 }
 
-function validateCategoryFields(category, fields, errors) {
+function validateCategoryFields(category, fields, errors, categoryDef) {
   const f = fields || {};
   const out = {};
   switch (category) {
@@ -62,27 +63,33 @@ function validateCategoryFields(category, fields, errors) {
     case 'free-giveaways':
     case 'wanted':
     case 'services':
+      break;
     default:
+      // Admin-added custom category - generic optional price field.
+      if (categoryDef?.hasPrice && f.price !== undefined && f.price !== null && f.price !== '') {
+        const price = Number(f.price);
+        if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
+        out.price = price;
+      }
       break;
   }
   return out;
 }
 
-const CATEGORIES_REQUIRING_DESCRIPTION = new Set([
-  'items-for-sale', 'items-for-rent', 'free-giveaways', 'lost-found', 'wanted', 'services', 'real-estate',
-]);
+const CATEGORIES_NOT_REQUIRING_DESCRIPTION = new Set(['job-offers', 'seeking-a-job']);
 const CATEGORIES_REQUIRING_TAXONOMY = new Set(['job-offers', 'seeking-a-job', 'real-estate']);
 
 function validateClassifiedPayload(body, charLimits) {
   const errors = [];
   const category = body.category;
-  if (!CLASSIFIED_CATEGORY_KEYS.includes(category)) {
-    throw new ValidationError([`category must be one of ${CLASSIFIED_CATEGORY_KEYS.join(', ')}`]);
+  const categoryDef = findCategory(category);
+  if (!categoryDef) {
+    throw new ValidationError([`category must be one of ${getClassifiedCategoryKeys().join(', ')}`]);
   }
 
   const title = requireString(body.title, 'title', errors, { max: charLimits.title });
   let description = '';
-  if (CATEGORIES_REQUIRING_DESCRIPTION.has(category)) {
+  if (!CATEGORIES_NOT_REQUIRING_DESCRIPTION.has(category)) {
     description = requireString(body.description, 'description', errors, { max: charLimits.description });
   } else if (body.description) {
     description = String(body.description).slice(0, charLimits.description);
@@ -96,7 +103,7 @@ function validateClassifiedPayload(body, charLimits) {
     if (!taxonomyId) errors.push('a category selection is required');
   }
 
-  const fields = validateCategoryFields(category, body.fields, errors);
+  const fields = validateCategoryFields(category, body.fields, errors, categoryDef);
 
   const posterEmail = requireString(body.posterEmail, 'email', errors);
   if (posterEmail && !isValidEmail(posterEmail)) errors.push('email address is invalid');
@@ -110,7 +117,7 @@ function validateClassifiedPayload(body, charLimits) {
 
   const contact = validateContact(body, errors);
 
-  if (!body.pricingTierId && category !== 'lost-found') {
+  if (!body.pricingTierId && !categoryDef.free) {
     errors.push('a pricing tier must be selected');
   }
 
@@ -169,12 +176,12 @@ function validateContact(body, errors) {
 
 function validateSimchaPayload(body, charLimits) {
   const errors = [];
-  const title = requireString(body.title, 'title', errors, { max: charLimits.title });
+  // Simchas have no title, date, or location field to fill in - just a
+  // category and (optional) details. The title is auto-generated from the
+  // chosen category name once we have DB access (see routes/public/posts.js).
   const description = body.description ? String(body.description).slice(0, charLimits.description) : '';
-  const locationText = requireString(body.locationText, 'location', errors, { max: 200 });
   const taxonomyId = Number(body.taxonomyId);
   if (!taxonomyId) errors.push('a simcha category is required');
-  const simchaDate = (body.fields && body.fields.simchaDate) || body.simchaDate || null;
 
   const posterEmail = requireString(body.posterEmail, 'email', errors);
   if (posterEmail && !isValidEmail(posterEmail)) errors.push('email address is invalid');
@@ -201,30 +208,24 @@ function validateSimchaPayload(body, charLimits) {
     else contact.url = body.contactUrl;
   }
 
+  // Limited to a single surprise recipient by design.
   let surpriseEmails = [];
   if (Array.isArray(body.surpriseEmails)) {
-    surpriseEmails = body.surpriseEmails
-      .filter((s) => s && s.email)
-      .map((s) => {
-        if (!isValidEmail(s.email)) errors.push(`surprise email address "${s.email}" is invalid`);
-        return { email: String(s.email).toLowerCase(), senderDisplayName: String(s.senderDisplayName || '').slice(0, 80) };
-      })
-      .slice(0, 10);
+    surpriseEmails = body.surpriseEmails.filter((s) => s && s.email).slice(0, 1);
+  } else if (body.surpriseEmail) {
+    surpriseEmails = [{ email: body.surpriseEmail, senderDisplayName: body.posterFirstName || '' }];
   }
+  surpriseEmails = surpriseEmails.map((s) => {
+    if (!isValidEmail(s.email)) errors.push(`surprise email address "${s.email}" is invalid`);
+    return { email: String(s.email).toLowerCase(), senderDisplayName: String(s.senderDisplayName || '').slice(0, 80) };
+  });
 
   if (errors.length) throw new ValidationError(errors);
 
   return {
-    title,
     description,
     taxonomyId,
-    locationText,
-    locationCity: body.locationCity || null,
-    locationState: body.locationState || null,
-    locationLat: body.locationLat != null ? Number(body.locationLat) : null,
-    locationLng: body.locationLng != null ? Number(body.locationLng) : null,
-    locationPlaceId: body.locationPlaceId || null,
-    fields: { simchaDate },
+    fields: {},
     posterFirstName: body.posterFirstName || null,
     posterLastName: body.posterLastName || null,
     posterEmail: posterEmail.toLowerCase(),

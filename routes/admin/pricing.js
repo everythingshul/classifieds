@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
-const { CLASSIFIED_CATEGORY_KEYS } = require('../../utils/constants');
+const { getClassifiedCategoryKeys } = require('../../services/categories');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -12,7 +12,7 @@ router.get('/tiers', (req, res) => {
 
 router.post('/tiers', (req, res) => {
   const { category, name, durationDays, priceCents, sortOrder } = req.body;
-  if (category && category !== 'simcha' && !CLASSIFIED_CATEGORY_KEYS.includes(category)) {
+  if (category && category !== 'simcha' && !getClassifiedCategoryKeys().includes(category)) {
     return res.status(400).json({ error: 'Invalid category' });
   }
   if (!name || !durationDays) return res.status(400).json({ error: 'name and durationDays are required' });

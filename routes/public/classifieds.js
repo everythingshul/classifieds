@@ -1,8 +1,8 @@
 const express = require('express');
 const db = require('../../db');
-const { CLASSIFIED_CATEGORY_KEYS } = require('../../utils/constants');
 const { formatPostPublic } = require('../../services/postFormat');
 const { distanceMiles } = require('../../utils/geo');
+const { getClassifiedCategoryKeys } = require('../../services/categories');
 
 const router = express.Router();
 
@@ -27,7 +27,7 @@ function categoryCounts() {
        GROUP BY category`
     )
     .all(now);
-  const map = Object.fromEntries(CLASSIFIED_CATEGORY_KEYS.map((k) => [k, 0]));
+  const map = Object.fromEntries(getClassifiedCategoryKeys().map((k) => [k, 0]));
   rows.forEach((r) => { map[r.category] = r.c; });
   return map;
 }
@@ -47,7 +47,7 @@ router.get('/', (req, res, next) => {
     const params = [now];
 
     if (req.query.category) {
-      if (!CLASSIFIED_CATEGORY_KEYS.includes(req.query.category)) {
+      if (!getClassifiedCategoryKeys().includes(req.query.category)) {
         return res.status(400).json({ error: 'Unknown category' });
       }
       where.push('category = ?');

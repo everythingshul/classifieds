@@ -42,6 +42,9 @@ app.use('/api/posts', require('./routes/public/posts'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
+app.use('/api/admin/custom-categories', require('./routes/admin/customCategories'));
+app.use('/api/admin/promo-codes', require('./routes/admin/promoCodes'));
+app.use('/api/admin/reports', require('./routes/admin/reports'));
 app.use('/api/admin/pricing', require('./routes/admin/pricing'));
 app.use('/api/admin/settings', require('./routes/admin/settings'));
 app.use('/api/admin/posts', require('./routes/admin/posts'));

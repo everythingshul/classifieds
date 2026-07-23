@@ -14,8 +14,10 @@ router.get('/search', (req, res) => {
   const posts = db
     .prepare(
       `SELECT * FROM posts WHERE
-        poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ?
-        OR title LIKE ? OR public_id LIKE ?
+        status != 'pending_payment' AND (
+          poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ?
+          OR title LIKE ? OR public_id LIKE ?
+        )
        ORDER BY created_at DESC LIMIT 500`
     )
     .all(like, like, like, like, like, like);
@@ -52,7 +54,7 @@ router.get('/search', (req, res) => {
 
 router.get('/customer/:email', (req, res) => {
   const email = String(req.params.email).toLowerCase();
-  const posts = db.prepare('SELECT * FROM posts WHERE poster_email = ? ORDER BY created_at DESC').all(email);
+  const posts = db.prepare("SELECT * FROM posts WHERE poster_email = ? AND status != 'pending_payment' ORDER BY created_at DESC").all(email);
   const payments = db.prepare('SELECT * FROM post_payments WHERE payer_email = ? ORDER BY created_at DESC').all(email);
   res.json({ email, posts: posts.map((p) => formatPostAdmin(p)), payments });
 });

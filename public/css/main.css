@@ -86,16 +86,13 @@ p { margin: 0 0 .7em; }
 .btn-sm { padding: 5px 11px; font-size: .78rem; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* ---------- Widgets (home page) ---------- */
-.widgets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0 30px; }
-@media (max-width: 760px) { .widgets-grid { grid-template-columns: 1fr; } }
-.widget-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
-.widget-card h3 { font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--gold); margin-bottom: 6px; font-weight: 700; }
-.widget-card .big { font-size: 1.18rem; font-weight: 700; color: var(--navy); font-family: var(--font-head); }
-.widget-card .sub { color: var(--ink-soft); font-size: .8rem; margin-top: 1px; }
-.zman-list { list-style: none; margin: 6px 0 0; padding: 0; font-size: .8rem; }
-.zman-list li { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed var(--border); }
-.zman-list li:last-child { border-bottom: none; }
+/* ---------- Combo widget (home page: date + daf yomi + zmanim, one compact card) ---------- */
+.combo-widget { background: #fff; border: 1px solid var(--border); padding: 10px 14px; box-shadow: var(--shadow); margin: 14px 0 26px; font-size: .82rem; }
+.combo-widget-top { display: flex; gap: 24px; flex-wrap: wrap; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+.combo-label { display: block; font-weight: 700; color: var(--navy); font-size: .88rem; }
+.combo-sub { display: block; color: var(--ink-soft); font-size: .72rem; }
+.combo-zman-row { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink-soft); font-size: .74rem; }
+.combo-zman-row b { color: var(--ink); font-weight: 600; margin-inline-end: 3px; }
 
 /* ---------- Carousels ---------- */
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 10px; }
@@ -106,21 +103,24 @@ p { margin: 0 0 .7em; }
 .carousel .card { scroll-snap-align: start; flex: 0 0 210px; }
 
 /* ---------- Cards ---------- */
+/* Square corners by design - no image, the card is a compact text summary;
+   full contact info only ever appears after clicking through to the post. */
 .card {
-  background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  background: #fff; border: 1px solid var(--border); border-radius: 0; overflow: hidden;
   box-shadow: var(--shadow); display: flex; flex-direction: column; transition: transform .12s ease;
 }
-.card:hover { transform: translateY(-2px); }
-.card .thumb { width: 100%; height: 120px; object-fit: cover; background: var(--gold-light); }
-.card .thumb-placeholder { width: 100%; height: 120px; background: linear-gradient(135deg, var(--gold-light), #fff); display: flex; align-items: center; justify-content: center; color: var(--gold); font-family: var(--font-head); font-size: 1.3rem; }
-.card .body { padding: 10px 11px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.card:hover { transform: translateY(-2px); border-color: var(--gold); }
+.card .body { padding: 12px 13px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .card .cat { font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; color: var(--gold); font-weight: 700; }
-.card .title { font-weight: 700; color: var(--navy); font-size: .92rem; line-height: 1.3; }
+.card .title { font-weight: 700; color: var(--navy); font-size: .94rem; line-height: 1.3; }
+.card .card-desc {
+  font-size: .8rem; color: var(--ink); margin: 0; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
 .card .meta { font-size: .76rem; color: var(--ink-soft); }
 .card .price { font-weight: 700; color: var(--success); font-size: .88rem; }
 .card.featured { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light); }
-.badge-featured { position: absolute; background: var(--gold); color: var(--navy-dark); font-size: .64rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin: 6px; }
-.card-media { position: relative; }
+.badge-featured { color: var(--gold); font-size: .9rem; }
 
 /* ---------- List/grid pages ---------- */
 .page-header { padding: 20px 0 6px; }

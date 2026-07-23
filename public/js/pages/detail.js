@@ -11,7 +11,6 @@ async function renderDetailPage(id, type) {
   if (post.fields?.simchaDate) fieldRows.push(['Date', formatDate(new Date(post.fields.simchaDate).getTime())]);
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
   fieldRows.push([I18N.t('posted'), formatDate(post.publishedAt)]);
-  if (post.expiresAt) fieldRows.push([I18N.t('expires'), formatDate(post.expiresAt)]);
   fieldRows.push([I18N.t('views'), post.viewCount]);
 
   const contactButtons = [];

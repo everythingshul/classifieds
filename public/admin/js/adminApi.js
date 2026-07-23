@@ -52,5 +52,16 @@ const AdminApi = (() => {
     updateAddon: (key, body) => req(`/pricing/addons/${key}`, { method: 'PUT', body }),
     settings: () => req('/settings'),
     updateSetting: (key, value) => req(`/settings/${key}`, { method: 'PUT', body: { value } }),
+    customCategories: () => req('/custom-categories'),
+    createCustomCategory: (body) => req('/custom-categories', { method: 'POST', body }),
+    updateCustomCategory: (id, body) => req(`/custom-categories/${id}`, { method: 'PUT', body }),
+    deleteCustomCategory: (id) => req(`/custom-categories/${id}`, { method: 'DELETE' }),
+    reports: () => req('/reports'),
+    dismissReport: (id) => req(`/reports/${id}`, { method: 'DELETE' }),
+    promoCodes: () => req('/promo-codes'),
+    createPromoCode: (body) => req('/promo-codes', { method: 'POST', body }),
+    updatePromoCode: (id, body) => req(`/promo-codes/${id}`, { method: 'PUT', body }),
+    deletePromoCode: (id) => req(`/promo-codes/${id}`, { method: 'DELETE' }),
+    createPost: (formData) => req('/posts/create', { method: 'POST', body: formData }),
   };
 })();

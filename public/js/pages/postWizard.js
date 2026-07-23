@@ -72,10 +72,6 @@ function renderPostWizard() {
           ${simchaTax.map((t) => `<option value="${t.id}" ${state.data.taxonomyId == t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
         </select>
       </div>
-      <div class="form-row">
-        <label>Date of Simcha</label>
-        <input type="date" id="simchaDate" value="${escapeHtml(state.data.simchaDate || '')}">
-      </div>
       <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     document.getElementById('backBtn').addEventListener('click', () => go(0));
@@ -83,7 +79,6 @@ function renderPostWizard() {
       const taxonomyId = document.getElementById('taxonomyId').value;
       if (!taxonomyId) return toast('Choose a category');
       state.data.taxonomyId = taxonomyId;
-      state.data.simchaDate = document.getElementById('simchaDate').value;
       go(2);
     });
   }
@@ -115,8 +110,11 @@ function renderPostWizard() {
         return `
           <div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
           <div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>`;
-      default:
-        return '';
+      default: {
+        // Admin-added custom category type.
+        const catDef = cfg.categories.find((c) => c.key === state.category);
+        return catDef?.hasPrice ? `<div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>` : '';
+      }
     }
   }
 
@@ -143,7 +141,7 @@ function renderPostWizard() {
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Contact Info (shown on the listing)</h3>
       <div class="form-cols">
-        <div class="form-row"><label>Phone</label><input type="tel" id="c_phone" value="${escapeHtml(state.data.contactPhone || '')}"></div>
+        <div class="form-row"><label>Phone</label><div style="display:flex;gap:6px"><select id="c_phoneCountry" style="width:90px"></select><input type="tel" id="c_phone" value="${escapeHtml(state.data.contactPhone || '')}"></div></div>
         <div class="form-row"><label>Ext.</label><input type="text" id="c_phoneExt" value="${escapeHtml(state.data.contactPhoneExt || '')}"></div>
       </div>
       <div class="form-cols">
@@ -158,12 +156,14 @@ function renderPostWizard() {
         <div class="form-row"><label>Last Name <span class="hint">(optional)</span></label><input type="text" id="p_last" value="${escapeHtml(state.data.posterLastName || '')}"></div>
       </div>
       <div class="form-cols">
-        <div class="form-row"><label>Phone <span class="hint">(optional)</span></label><input type="tel" id="p_phone" value="${escapeHtml(state.data.posterPhone || '')}"></div>
+        <div class="form-row"><label>Phone <span class="hint">(optional)</span></label><div style="display:flex;gap:6px"><select id="p_phoneCountry" style="width:90px"></select><input type="tel" id="p_phone" value="${escapeHtml(state.data.posterPhone || '')}"></div></div>
         <div class="form-row"><label>Email <span class="hint">(required)</span></label><input type="email" id="p_email" value="${escapeHtml(state.data.posterEmail || '')}" required></div>
       </div>
       <div id="stepError" class="error-list" style="display:none"></div>
       <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
+    populateCountrySelect(document.getElementById('c_phoneCountry'), state.data.contactPhoneCountry);
+    populateCountrySelect(document.getElementById('p_phoneCountry'), state.data.posterPhoneCountry);
     attachLocationAutocomplete(document.getElementById('f_location'), {
       onSelect: (p) => { state.data._locFromMaps = p; },
     });
@@ -212,6 +212,8 @@ function renderPostWizard() {
       } else if (state.category === 'real-estate') {
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
         fields.price = document.getElementById('f_price').value;
+      } else if (document.getElementById('f_price')) {
+        fields.price = document.getElementById('f_price').value;
       }
 
       if (errs.length) {
@@ -229,10 +231,12 @@ function renderPostWizard() {
         locationLat: state.data._locFromMaps?.lat || null,
         locationLng: state.data._locFromMaps?.lng || null,
         locationPlaceId: state.data._locFromMaps?.placeId || null,
-        contactPhone, contactPhoneExt: document.getElementById('c_phoneExt').value.trim(), contactEmail, contactUrl,
+        contactPhone, contactPhoneCountry: document.getElementById('c_phoneCountry').value,
+        contactPhoneExt: document.getElementById('c_phoneExt').value.trim(), contactEmail, contactUrl,
         posterFirstName: document.getElementById('p_first').value.trim(),
         posterLastName: document.getElementById('p_last').value.trim(),
         posterPhone: document.getElementById('p_phone').value.trim(),
+        posterPhoneCountry: document.getElementById('p_phoneCountry').value,
         posterEmail,
         fields: { ...(state.data.fields || {}), ...fields, taxonomyId: fields.taxonomyId },
       });
@@ -243,13 +247,11 @@ function renderPostWizard() {
 
   function renderSimchaDetailsStep() {
     shell(`
-      <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${cfg.charLimits.title}" value="${escapeHtml(state.data.title || '')}" required placeholder="e.g. Mazel Tov on the Engagement of..."></div>
-      <div class="form-row"><label>Details</label><textarea id="f_description" rows="4" maxlength="${cfg.charLimits.description}">${escapeHtml(state.data.description || '')}</textarea></div>
-      <div class="form-row"><label>Location</label><input type="text" id="f_location" placeholder="City, State" value="${escapeHtml(state.data.locationText || '')}" required></div>
+      <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="4" maxlength="${cfg.charLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Contact Info <span class="hint">(optional)</span></h3>
       <div class="form-cols">
-        <div class="form-row"><label>Phone</label><input type="tel" id="c_phone" value="${escapeHtml(state.data.contactPhone || '')}"></div>
+        <div class="form-row"><label>Phone</label><div style="display:flex;gap:6px"><select id="c_phoneCountry" style="width:90px"></select><input type="tel" id="c_phone" value="${escapeHtml(state.data.contactPhone || '')}"></div></div>
         <div class="form-row"><label>Email</label><input type="email" id="c_email" value="${escapeHtml(state.data.contactEmail || '')}"></div>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
@@ -261,31 +263,18 @@ function renderPostWizard() {
       <div class="form-row"><label>Email <span class="hint">(required)</span></label><input type="email" id="p_email" value="${escapeHtml(state.data.posterEmail || '')}" required></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Surprise a Friend! <span class="hint">(optional)</span></h3>
-      <p class="hint">Enter friends' email addresses and we'll surprise them with a Mazel Tov message and a link to this simcha.</p>
-      <div id="surpriseList"></div>
-      <button type="button" class="btn btn-outline btn-sm" id="addSurpriseBtn">+ Add Surprise Email</button>
+      <p class="hint">Enter one friend's email and we'll surprise them with a Mazel Tov message and a link to this simcha.</p>
+      <div class="form-row"><input type="email" id="surpriseEmail" placeholder="friend@example.com" value="${escapeHtml(state.data.surpriseEmails?.[0]?.email || '')}"></div>
       <div id="stepError" class="error-list" style="display:none"></div>
       <div style="margin-top:20px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
-    const list = document.getElementById('surpriseList');
-    function addSurpriseRow(email = '') {
-      const row = document.createElement('div');
-      row.className = 'form-cols';
-      row.innerHTML = `<div class="form-row"><input type="email" class="surprise-email" placeholder="friend@example.com" value="${escapeHtml(email)}"></div><div class="form-row"><button type="button" class="btn btn-outline btn-sm remove-surprise">Remove</button></div>`;
-      row.querySelector('.remove-surprise').addEventListener('click', () => row.remove());
-      list.appendChild(row);
-    }
-    (state.data.surpriseEmails || []).forEach((s) => addSurpriseRow(s.email));
-    document.getElementById('addSurpriseBtn').addEventListener('click', () => addSurpriseRow());
+    populateCountrySelect(document.getElementById('c_phoneCountry'), state.data.contactPhoneCountry);
     document.getElementById('backBtn').addEventListener('click', () => go(1));
     document.getElementById('nextBtn').addEventListener('click', () => {
       const errs = [];
-      const title = document.getElementById('f_title').value.trim();
-      if (!title) errs.push('Title is required');
-      const location = document.getElementById('f_location').value.trim();
-      if (!location) errs.push('Location is required');
       const posterEmail = document.getElementById('p_email').value.trim();
       if (!posterEmail || !posterEmail.includes('@') || !posterEmail.split('@')[1]?.includes('.')) errs.push('A valid email address is required');
+      const surpriseEmailVal = document.getElementById('surpriseEmail').value.trim();
       if (errs.length) {
         const box = document.getElementById('stepError');
         box.style.display = 'block';
@@ -293,10 +282,12 @@ function renderPostWizard() {
         return;
       }
       const senderName = `${document.getElementById('p_first').value.trim()} ${document.getElementById('p_last').value.trim()}`.trim();
-      const surpriseEmails = Array.from(document.querySelectorAll('.surprise-email')).map((i) => i.value.trim()).filter(Boolean).map((email) => ({ email, senderDisplayName: senderName }));
+      const surpriseEmails = surpriseEmailVal ? [{ email: surpriseEmailVal, senderDisplayName: senderName }] : [];
       Object.assign(state.data, {
-        title, description: document.getElementById('f_description').value.trim(), locationText: location,
-        contactPhone: document.getElementById('c_phone').value.trim(), contactEmail: document.getElementById('c_email').value.trim(),
+        description: document.getElementById('f_description').value.trim(),
+        contactPhone: document.getElementById('c_phone').value.trim(),
+        contactPhoneCountry: document.getElementById('c_phoneCountry').value,
+        contactEmail: document.getElementById('c_email').value.trim(),
         posterFirstName: document.getElementById('p_first').value.trim(), posterLastName: document.getElementById('p_last').value.trim(),
         posterEmail, surpriseEmails,
       });
@@ -333,11 +324,15 @@ function renderPostWizard() {
   }
 
   function renderReviewStep() {
+    const simchaCatName = state.postType === 'simcha'
+      ? cfg.taxonomies.find((t) => String(t.id) === String(state.data.taxonomyId))?.name
+      : null;
     shell(`
       <h3 style="margin-top:0">Review Your ${state.postType === 'simcha' ? 'Simcha' : 'Listing'}</h3>
       <ul class="detail-meta-list">
-        <li><span>Title</span><span>${escapeHtml(state.data.title)}</span></li>
-        <li><span>Location</span><span>${escapeHtml(state.data.locationText)}</span></li>
+        ${state.postType === 'simcha'
+          ? `<li><span>Category</span><span>${escapeHtml(simchaCatName || '')}</span></li>`
+          : `<li><span>Title</span><span>${escapeHtml(state.data.title)}</span></li><li><span>Location</span><span>${escapeHtml(state.data.locationText)}</span></li>`}
         <li><span>Email</span><span>${escapeHtml(state.data.posterEmail)}</span></li>
       </ul>
       <p class="hint">By submitting, you agree to our <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</p>
@@ -368,12 +363,14 @@ function renderPostWizard() {
         if (state.data.locationLat) fd.set('locationLat', state.data.locationLat);
         if (state.data.locationLng) fd.set('locationLng', state.data.locationLng);
         fd.set('contactPhone', state.data.contactPhone || '');
+        fd.set('contactPhoneCountry', state.data.contactPhoneCountry || 'US');
         fd.set('contactPhoneExt', state.data.contactPhoneExt || '');
         fd.set('contactEmail', state.data.contactEmail || '');
         fd.set('contactUrl', state.data.contactUrl || '');
         fd.set('posterFirstName', state.data.posterFirstName || '');
         fd.set('posterLastName', state.data.posterLastName || '');
         fd.set('posterPhone', state.data.posterPhone || '');
+        fd.set('posterPhoneCountry', state.data.posterPhoneCountry || 'US');
         fd.set('posterEmail', state.data.posterEmail);
         fd.set('fields', JSON.stringify(state.data.fields || {}));
         if (state.data.taxonomyId) fd.set('taxonomyId', state.data.taxonomyId);
@@ -382,16 +379,14 @@ function renderPostWizard() {
         fd.set('wantsOversized', state.data.wantsOversized ? '1' : '');
         state.files.forEach((f) => fd.append('images', f));
       } else {
-        fd.set('title', state.data.title);
         fd.set('description', state.data.description || '');
-        fd.set('locationText', state.data.locationText);
         fd.set('taxonomyId', state.data.taxonomyId);
         fd.set('contactPhone', state.data.contactPhone || '');
+        fd.set('contactPhoneCountry', state.data.contactPhoneCountry || 'US');
         fd.set('contactEmail', state.data.contactEmail || '');
         fd.set('posterFirstName', state.data.posterFirstName || '');
         fd.set('posterLastName', state.data.posterLastName || '');
         fd.set('posterEmail', state.data.posterEmail);
-        fd.set('fields', JSON.stringify({ simchaDate: state.data.simchaDate || null }));
         fd.set('surpriseEmails', JSON.stringify(state.data.surpriseEmails || []));
       }
 
