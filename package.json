@@ -1,0 +1,35 @@
+{
+  "name": "everythingshul-classifieds",
+  "version": "1.0.0",
+  "description": "Community classifieds & simchas board for Everything Shul",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@hebcal/core": "^6.8.2",
+    "@hebcal/learning": "^6.9.5",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^13.0.1",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "geo-tz": "^8.1.8",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "libphonenumber-js": "^1.13.9",
+    "multer": "^2.0.0",
+    "node-cron": "^4.0.6",
+    "nodemailer": "^9.0.3",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.35.3",
+    "stripe": "^16.8.0"
+  }
+}

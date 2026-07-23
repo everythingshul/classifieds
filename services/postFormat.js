@@ -1,0 +1,114 @@
+const { CLASSIFIED_CATEGORIES } = require('../utils/constants');
+
+const CATEGORY_BY_KEY = new Map(CLASSIFIED_CATEGORIES.map((c) => [c.key, c]));
+
+function categoryLabel(category) {
+  if (category === 'simcha') return 'Simcha';
+  return CATEGORY_BY_KEY.get(category)?.label || category;
+}
+
+function buildContactLinks(post) {
+  const contact = {};
+  if (post.contact_phone) {
+    const ext = post.contact_phone_ext ? `,${post.contact_phone_ext}` : '';
+    contact.phone = {
+      display: post.contact_phone,
+      ext: post.contact_phone_ext || null,
+      tel: `tel:${post.contact_phone.replace(/[^\d+]/g, '')}${ext}`,
+    };
+  }
+  if (post.contact_email) {
+    contact.email = { display: post.contact_email, mailto: `mailto:${post.contact_email}` };
+  }
+  if (post.contact_url && post.contact_url_approved) {
+    contact.url = { display: post.contact_url, href: post.contact_url };
+  }
+  return contact;
+}
+
+function parseFields(post) {
+  try {
+    return JSON.parse(post.fields || '{}');
+  } catch (e) {
+    return {};
+  }
+}
+
+function formatPostPublic(post, images = []) {
+  return {
+    id: post.public_id,
+    type: post.type,
+    category: post.category,
+    categoryLabel: categoryLabel(post.category),
+    taxonomyId: post.taxonomy_id || null,
+    title: post.title,
+    description: post.description,
+    fields: parseFields(post),
+    location: {
+      text: post.location_text,
+      city: post.location_city,
+      state: post.location_state,
+      lat: post.location_lat,
+      lng: post.location_lng,
+    },
+    contact: buildContactLinks(post),
+    isFeatured: !!post.is_featured_strike,
+    viewCount: post.view_count,
+    publishedAt: post.published_at,
+    expiresAt: post.expires_at,
+    images: images.filter((i) => i.approved).map((i) => `/uploads/${i.filename}`),
+  };
+}
+
+function formatPostAdmin(post, images = []) {
+  return {
+    id: post.id,
+    publicId: post.public_id,
+    type: post.type,
+    category: post.category,
+    categoryLabel: categoryLabel(post.category),
+    taxonomyId: post.taxonomy_id || null,
+    title: post.title,
+    description: post.description,
+    fields: parseFields(post),
+    location: {
+      text: post.location_text,
+      city: post.location_city,
+      state: post.location_state,
+      lat: post.location_lat,
+      lng: post.location_lng,
+      placeId: post.location_place_id,
+    },
+    contact: {
+      phone: post.contact_phone,
+      phoneExt: post.contact_phone_ext,
+      email: post.contact_email,
+      url: post.contact_url,
+      urlApproved: !!post.contact_url_approved,
+    },
+    poster: {
+      firstName: post.poster_first_name,
+      lastName: post.poster_last_name,
+      email: post.poster_email,
+      phone: post.poster_phone,
+    },
+    pricingTierId: post.pricing_tier_id,
+    priceCentsPaid: post.price_cents_paid,
+    isFeaturedStrike: !!post.is_featured_strike,
+    isOversized: !!post.is_oversized,
+    status: post.status,
+    hasImages: !!post.has_images,
+    viewCount: post.view_count,
+    boostedAt: post.boosted_at,
+    publishedAt: post.published_at,
+    expiresAt: post.expires_at,
+    savedForever: !!post.saved_forever,
+    adminNotes: post.admin_notes,
+    rejectionReason: post.rejection_reason,
+    createdAt: post.created_at,
+    updatedAt: post.updated_at,
+    images: images.map((i) => ({ id: i.id, url: `/uploads/${i.filename}`, approved: !!i.approved })),
+  };
+}
+
+module.exports = { formatPostPublic, formatPostAdmin, buildContactLinks, categoryLabel, parseFields };
