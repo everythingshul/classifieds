@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Everything Shul Classifieds</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+<div id="adminRoot"></div>
+
+<script src="/admin/js/adminUtils.js"></script>
+<script src="/admin/js/adminApi.js"></script>
+<script src="/admin/js/pages/adminLogin.js"></script>
+<script src="/admin/js/pages/adminDashboard.js"></script>
+<script src="/admin/js/pages/adminCreatePost.js"></script>
+<script src="/admin/js/pages/adminModeration.js"></script>
+<script src="/admin/js/pages/adminPosts.js"></script>
+<script src="/admin/js/pages/adminCrm.js"></script>
+<script src="/admin/js/pages/adminCategories.js"></script>
+<script src="/admin/js/pages/adminPricing.js"></script>
+<script src="/admin/js/pages/adminSettings.js"></script>
+<script src="/admin/js/adminApp.js"></script>
+</body>
+</html>

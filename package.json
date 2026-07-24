@@ -1,35 +1,50 @@
-{
-  "name": "everythingshul-classifieds",
-  "version": "1.0.0",
-  "description": "Community classifieds & simchas board for Everything Shul",
-  "main": "server.js",
-  "private": true,
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "dependencies": {
-    "@hebcal/core": "^6.8.2",
-    "@hebcal/learning": "^6.9.5",
-    "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^13.0.1",
-    "cookie-parser": "^1.4.6",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-rate-limit": "^7.4.0",
-    "geo-tz": "^8.1.8",
-    "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "libphonenumber-js": "^1.13.9",
-    "multer": "^2.0.0",
-    "node-cron": "^4.0.6",
-    "nodemailer": "^9.0.3",
-    "pdf-lib": "^1.17.1",
-    "sharp": "^0.35.3",
-    "stripe": "^16.8.0"
-  }
-}
+// Fixed, top-level classifieds categories. These drive form schemas and are not
+// admin-editable (unlike taxonomies, which back job/real-estate/simcha sub-lists).
+const CLASSIFIED_CATEGORIES = [
+  { key: 'job-offers', label: 'Job Offers', labelHe: 'משרות פנויות', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'job', isSystem: true },
+  { key: 'seeking-a-job', label: 'Seeking A Job', labelHe: 'מחפש עבודה', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'job', isSystem: true },
+  { key: 'items-for-sale', label: 'Items For Sale', labelHe: 'למכירה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'items-for-rent', label: 'Items For Rent', labelHe: 'להשכרה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'free-giveaways', label: 'Free Giveaways', labelHe: 'חינם', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'lost-found', label: 'Lost & Found', labelHe: 'אבידות ומציאות', hasImages: false, hasPrice: false, free: true, taxonomyGroup: null, isSystem: true },
+  { key: 'wanted', label: 'Wanted', labelHe: 'דרוש', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'services', label: 'Services', labelHe: 'שירותים', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'real-estate', label: 'Real Estate', labelHe: 'נדל"ן', hasImages: true, hasPrice: true, free: false, taxonomyGroup: 'real_estate', isSystem: true },
+];
+
+const CLASSIFIED_CATEGORY_KEYS = CLASSIFIED_CATEGORIES.map((c) => c.key);
+
+const JOB_TYPES = ['part_time', 'full_time', 'seasonal', 'one_time'];
+const PAY_PERIODS = ['hour', 'week', 'month', 'season', 'year', 'project'];
+const LOST_FOUND_OPTIONS = ['lost', 'found'];
+
+const POST_STATUSES = ['pending_payment', 'pending_approval', 'live', 'rejected', 'expired', 'removed'];
+
+const DEFAULT_CHAR_LIMITS = {
+  title: 80,
+  description: 200,
+};
+
+const OVERSIZED_CHAR_LIMITS = {
+  title: 140,
+  description: 500,
+};
+
+const DEFAULT_BROOKLYN_LOCATION = {
+  label: 'Brooklyn, NY',
+  lat: 40.6782,
+  lng: -73.9442,
+  tzid: 'America/New_York',
+};
+
+module.exports = {
+  CLASSIFIED_CATEGORIES,
+  CLASSIFIED_CATEGORY_KEYS,
+  JOB_TYPES,
+  PAY_PERIODS,
+  LOST_FOUND_OPTIONS,
+  POST_STATUSES,
+  DEFAULT_CHAR_LIMITS,
+  OVERSIZED_CHAR_LIMITS,
+  DEFAULT_BROOKLYN_LOCATION,
+};

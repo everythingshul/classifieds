@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment Successful</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<div class="container" style="padding:80px 0;text-align:center;max-width:560px">
+  <h1>🎉 Payment Successful</h1>
+  <p>Thank you! Your payment has been received and your post is being finalized.</p>
+  <p>You'll receive an email confirmation with your invoice shortly. If your post included photos, it will go live once approved by our team.</p>
+  <p><a class="btn" href="/">Return to Home</a></p>
+</div>
+</body>
+</html>
