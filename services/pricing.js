@@ -17,9 +17,19 @@ function getAddon(key) {
   return { ...row, config: row.config ? JSON.parse(row.config) : {} };
 }
 
-function getCharLimits() {
-  const row = db.prepare('SELECT value FROM site_settings WHERE key = ?').get('char_limits');
-  return row ? JSON.parse(row.value) : { title: 80, description: 1200 };
+function getSettingJson(key, fallback) {
+  const row = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(key);
+  return row ? JSON.parse(row.value) : fallback;
+}
+
+function getClassifiedCharLimits() {
+  return getSettingJson('classified_char_limits', { title: 80, description: 200 });
+}
+function getSimchaCharLimits() {
+  return getSettingJson('simcha_char_limits', { description: 200 });
+}
+function getOversizedCharLimits() {
+  return getSettingJson('oversized_char_limits', { title: 140, description: 500 });
 }
 
 function getSetting(key, fallback = null) {
@@ -70,7 +80,9 @@ module.exports = {
   getPricingTier,
   getTiersForCategory,
   getAddon,
-  getCharLimits,
+  getClassifiedCharLimits,
+  getSimchaCharLimits,
+  getOversizedCharLimits,
   getSetting,
   buildClassifiedCharges,
   buildSimchaCharges,

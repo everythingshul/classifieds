@@ -9,6 +9,8 @@ async function renderCategoriesPage() {
       <button data-tab="job" class="${_catTab === 'job' ? 'active' : ''}">Job Categories</button>
       <button data-tab="real_estate" class="${_catTab === 'real_estate' ? 'active' : ''}">Real Estate Categories</button>
       <button data-tab="simcha" class="${_catTab === 'simcha' ? 'active' : ''}">Simcha Categories</button>
+      <button data-tab="job_type" class="${_catTab === 'job_type' ? 'active' : ''}">Job Types</button>
+      <button data-tab="pay_period" class="${_catTab === 'pay_period' ? 'active' : ''}">Pay Periods</button>
     </div>
     <div id="catContent"></div>
   `;

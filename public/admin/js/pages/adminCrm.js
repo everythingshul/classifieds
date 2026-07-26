@@ -15,17 +15,17 @@ async function renderCrmPage(query) {
     window.location.hash = `#/crm?q=${encodeURIComponent(q)}`;
     await runSearch(q);
   });
-  if (query.q) await runSearch(query.q);
+  await runSearch(query.q || '');
 }
 
 async function runSearch(q) {
   const results = document.getElementById('crmResults');
-  const { customers } = await AdminApi.crmSearch(q);
+  const { customers, default: isDefault } = await AdminApi.crmSearch(q);
   if (!customers.length) {
     results.innerHTML = '<p>No matches found.</p>';
     return;
   }
-  results.innerHTML = customers.map((c) => `
+  results.innerHTML = (isDefault ? `<p class="hint">Most recently active customers:</p>` : '') + customers.map((c) => `
     <div class="admin-card">
       <h3 style="margin-top:0">${escapeHtml(`${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email)}</h3>
       <p class="hint">${escapeHtml(c.email)} ${c.phone ? '• ' + escapeHtml(c.phone) : ''} • Total paid: ${formatCents(c.totalPaidCents)}</p>

@@ -2,8 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { validateClassifiedPayload, validateSimchaPayload, ValidationError } = require('../../services/postValidation');
-const { buildClassifiedCharges, buildSimchaCharges, getCharLimits, getAddon } = require('../../services/pricing');
-const { DEFAULT_CHAR_LIMITS, OVERSIZED_CHAR_LIMITS } = require('../../utils/constants');
+const { buildClassifiedCharges, buildSimchaCharges, getAddon, getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits } = require('../../services/pricing');
 const { findCategory } = require('../../services/categories');
 const { getActivePromo, applyDiscount, recordUse } = require('../../services/promoCodes');
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive } = require('../../services/postLifecycle');
@@ -62,12 +61,9 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
     }
 
     const wantsOversized = !!req.body.wantsOversized && req.body.wantsOversized !== 'false';
-    const configuredLimits = getCharLimits();
-    const charLimits = wantsOversized
-      ? { title: OVERSIZED_CHAR_LIMITS.title, description: OVERSIZED_CHAR_LIMITS.description }
-      : configuredLimits;
 
     if (type === 'classified') {
+      const charLimits = wantsOversized ? getOversizedCharLimits() : getClassifiedCharLimits();
       const payload = validateClassifiedPayload({ ...req.body, fields: parsedFields, wantsOversized }, charLimits);
       const catDef = findCategory(payload.category);
       const uploaded = await processUploadedImages(req.files);
@@ -99,7 +95,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
 
     // simcha - no title/date/location are collected; the title is the
     // chosen category name (e.g. "Engagement", "New Home").
-    const payload = validateSimchaPayload({ ...req.body, fields: parsedFields, surpriseEmails }, charLimits);
+    const payload = validateSimchaPayload({ ...req.body, fields: parsedFields, surpriseEmails }, getSimchaCharLimits());
     const taxonomy = db.prepare('SELECT name FROM taxonomies WHERE id = ? AND grp = ?').get(payload.taxonomyId, 'simcha');
     if (!taxonomy) return res.status(400).json({ error: 'Validation failed', details: ['a valid simcha category is required'] });
     payload.title = taxonomy.name;
@@ -219,6 +215,20 @@ router.post('/:publicId/report', async (req, res, next) => {
       `Post reported: ${post.title}`,
       `<p><b>Post:</b> ${post.title}</p><p><b>Reason:</b> ${reason || '(none given)'}</p><p><b>Reported by:</b> ${reporterEmail || 'anonymous'}</p><p><a href="${url}">View post</a></p>`
     );
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Views are counted as impressions (shown in a carousel/list/detail page),
+// not gated behind clicking through to the detail page.
+router.post('/impressions', (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String).slice(0, 100) : [];
+    if (!ids.length) return res.json({ ok: true });
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`UPDATE posts SET view_count = view_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
     res.json({ ok: true });
   } catch (e) {
     next(e);

@@ -40,12 +40,21 @@ function postCardHtml(post) {
     </a>`;
 }
 
+// Views are counted as impressions the moment a post is rendered as a card -
+// no click-through required. Fire-and-forget, not awaited by the caller.
+function registerCardImpressions(posts) {
+  const ids = posts.map((p) => p.id);
+  if (ids.length) Api.registerImpressions(ids);
+}
+
 function renderCarousel(posts) {
   if (!posts.length) return `<p class="empty-state" data-i18n="no_results">${I18N.t('no_results')}</p>`;
+  registerCardImpressions(posts);
   return `<div class="carousel">${posts.map(postCardHtml).join('')}</div>`;
 }
 
 function renderGrid(posts) {
   if (!posts.length) return `<p class="empty-state" data-i18n="no_results">${I18N.t('no_results')}</p>`;
+  registerCardImpressions(posts);
   return `<div class="results-grid">${posts.map(postCardHtml).join('')}</div>`;
 }

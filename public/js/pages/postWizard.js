@@ -175,7 +175,7 @@ function renderPostWizard() {
         preview.innerHTML = '';
         state.files.forEach((f) => {
           const img = document.createElement('img');
-          img.style.cssText = 'width:70px;height:70px;object-fit:cover;border-radius:6px';
+          img.style.cssText = 'width:70px;height:70px;object-fit:cover';
           img.src = URL.createObjectURL(f);
           preview.appendChild(img);
         });
@@ -247,7 +247,7 @@ function renderPostWizard() {
 
   function renderSimchaDetailsStep() {
     shell(`
-      <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="4" maxlength="${cfg.charLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
+      <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Contact Info <span class="hint">(optional)</span></h3>
       <div class="form-cols">

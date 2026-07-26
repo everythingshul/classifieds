@@ -5,7 +5,7 @@ const { requireAdmin } = require('../../middleware/adminAuth');
 const router = express.Router();
 router.use(requireAdmin);
 
-const GROUPS = new Set(['job', 'real_estate', 'simcha']);
+const GROUPS = new Set(['job', 'real_estate', 'simcha', 'job_type', 'pay_period']);
 
 router.get('/', (req, res) => {
   const grp = req.query.grp;

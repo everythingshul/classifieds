@@ -16,14 +16,10 @@ async function renderSimchasListPage({ query }) {
         <div class="field"><label data-i18n="category">Category</label>
           <select name="taxonomyId"><option value="">Any</option>${simchaTaxonomies.map((t) => `<option value="${t.id}" ${String(query.taxonomyId) === String(t.id) ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select>
         </div>
-        <div class="field"><label data-i18n="location">City</label><input type="text" name="city" value="${escapeHtml(query.city || '')}"></div>
-        <div class="field"><label>From</label><input type="date" name="dateFrom" value="${escapeHtml(query.dateFrom || '')}"></div>
-        <div class="field"><label>To</label><input type="date" name="dateTo" value="${escapeHtml(query.dateTo || '')}"></div>
-        <button class="btn btn-sm" type="button" id="nearMeBtn">Near Me</button>
         <button class="btn btn-sm" type="submit" data-i18n="filter">Filter</button>
       </form>
 
-      <div class="results-grid">${listData.posts.map(postCardHtml).join('') || `<p class="empty-state">${I18N.t('no_results')}</p>`}</div>
+      ${renderGrid(listData.posts)}
       ${renderSimchaPagination(listData.page, listData.totalPages, query)}
     </div>
   `;
@@ -35,11 +31,6 @@ async function renderSimchasListPage({ query }) {
     const next = {};
     for (const [k, v] of fd.entries()) if (v) next[k] = v;
     Router.navigate(`/simchas?${qs(next)}`);
-  });
-  document.getElementById('nearMeBtn').addEventListener('click', async () => {
-    const loc = await getBrowserLocation();
-    if (!loc) return toast('Location access denied or unavailable');
-    Router.navigate(`/simchas?${qs({ ...query, lat: loc.lat, lng: loc.lng, radius: 25 })}`);
   });
 }
 

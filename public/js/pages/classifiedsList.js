@@ -65,7 +65,7 @@ async function renderClassifiedsListPage({ query }) {
         <button class="btn btn-sm" type="submit" data-i18n="filter">Filter</button>
       </form>
 
-      <div class="results-grid">${listData.posts.map(postCardHtml).join('') || `<p class="empty-state">${I18N.t('no_results')}</p>`}</div>
+      ${renderGrid(listData.posts)}
 
       ${renderPagination(listData.page, listData.totalPages, category)}
     </div>

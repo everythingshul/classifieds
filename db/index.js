@@ -85,6 +85,20 @@ function seed() {
     );
   }
 
+  // Seeded independently (not gated on the whole taxonomies table) so these
+  // two groups still get created on databases that already existed before
+  // job type / pay period became admin-editable.
+  const seedFlatGroup = (grp, names) => {
+    const count = db.prepare('SELECT COUNT(*) AS c FROM taxonomies WHERE grp = ?').get(grp).c;
+    if (count > 0) return;
+    const insert = db.prepare(
+      `INSERT INTO taxonomies (grp, parent_id, name, name_he, sort_order, active) VALUES (?, NULL, ?, NULL, ?, 1)`
+    );
+    names.forEach((name, i) => insert.run(grp, name, i));
+  };
+  seedFlatGroup('job_type', ['Part Time', 'Full Time', 'Seasonal', 'One Time']);
+  seedFlatGroup('pay_period', ['Hour', 'Week', 'Month', 'Season', 'Year', 'Project']);
+
   // INSERT OR IGNORE per key (rather than gating on an empty table) so new
   // settings keys introduced later get seeded into existing databases too,
   // without ever overwriting a value an admin already edited.
@@ -110,6 +124,8 @@ function seed() {
   seed('smtp_user', process.env.SMTP_USER || '');
   seed('smtp_pass', process.env.SMTP_PASS || '');
   seed('mail_from', process.env.MAIL_FROM || '');
+  seed('mail_provider', process.env.MAIL_PROVIDER || 'smtp'); // 'smtp' | 'brevo'
+  seed('brevo_api_key', process.env.BREVO_API_KEY || '');
 
   const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admin_users').get().c;
   if (adminCount === 0 && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {

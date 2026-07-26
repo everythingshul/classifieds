@@ -117,12 +117,17 @@ async function getHomeCalendarData({ lat, lng, tzid, label, now = new Date(), de
     },
     dafYomi: daf,
     zmanim: {
+      // Ordered to match how they're displayed: sunrise -> Shma (early/late)
+      // -> Tfilla (early/late) -> chatzot -> sunset -> tzeit 60 -> tzeit 72.
       sunrise: sunrise.toISOString(),
-      sunset: sunset.toISOString(),
-      tzeit72: tzeit72.toISOString(),
-      chatzot: z.chatzot().toISOString(),
+      sofZmanShmaMGA: z.sofZmanShmaMGA().toISOString(),
       sofZmanShma: z.sofZmanShma().toISOString(),
+      sofZmanTfillaMGA: z.sofZmanTfillaMGA().toISOString(),
       sofZmanTfilla: z.sofZmanTfilla().toISOString(),
+      chatzot: z.chatzot().toISOString(),
+      sunset: sunset.toISOString(),
+      tzeit60: z.sunsetOffset(60, false).toISOString(),
+      tzeit72: tzeit72.toISOString(),
       minchaGedola: z.minchaGedola().toISOString(),
       minchaKetana: z.minchaKetana().toISOString(),
       plagHaMincha: z.plagHaMincha().toISOString(),

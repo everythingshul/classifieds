@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "node server.js"
   },
-  "engines": {https://github.com/everythingshul/classifieds/edit/main/package.json
+  "engines": {
     "node": "20.x"
   },
   "dependencies": {

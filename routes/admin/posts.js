@@ -8,8 +8,6 @@ const { POST_STATUSES } = require('../../utils/constants');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 const { upload, processAndSaveImage } = require('../../middleware/upload');
-const { validateClassifiedPayload, validateSimchaPayload, ValidationError } = require('../../services/postValidation');
-const { getCharLimits } = require('../../services/pricing');
 const { findCategory } = require('../../services/categories');
 
 const router = express.Router();
@@ -120,9 +118,9 @@ router.get('/', (req, res) => {
   if (req.query.type) { where.push('type = ?'); params.push(req.query.type); }
   if (req.query.category) { where.push('category = ?'); params.push(req.query.category); }
   if (req.query.q) {
-    where.push('(title LIKE ? OR description LIKE ? OR poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ?)');
+    where.push('(title LIKE ? OR description LIKE ? OR poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ? OR public_id LIKE ?)');
     const like = `%${req.query.q}%`;
-    params.push(like, like, like, like, like, like);
+    params.push(like, like, like, like, like, like, like);
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 

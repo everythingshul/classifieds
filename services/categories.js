@@ -48,4 +48,11 @@ function findCategory(key) {
   return getAllClassifiedCategories({ includeInactive: true }).find((c) => c.key === key);
 }
 
-module.exports = { getAllClassifiedCategories, getCustomCategories, getClassifiedCategoryKeys, findCategory, slugify, uniqueSlug };
+// Flat, admin-editable option lists (job type, pay period) stored as
+// taxonomies rows. Values are the display name itself (e.g. "Part Time"),
+// not an id, since that's what's stored in a post's `fields` JSON.
+function getOptionNames(grp) {
+  return db.prepare('SELECT name FROM taxonomies WHERE grp = ? AND active = 1 ORDER BY sort_order').all(grp).map((r) => r.name);
+}
+
+module.exports = { getAllClassifiedCategories, getCustomCategories, getClassifiedCategoryKeys, findCategory, slugify, uniqueSlug, getOptionNames };

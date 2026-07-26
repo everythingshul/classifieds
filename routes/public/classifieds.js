@@ -145,8 +145,8 @@ router.get('/:publicId', (req, res, next) => {
   try {
     const post = db.prepare("SELECT * FROM posts WHERE public_id = ? AND type = 'classified'").get(req.params.publicId);
     if (!post || post.status !== 'live') return res.status(404).json({ error: 'Post not found' });
-    db.prepare('UPDATE posts SET view_count = view_count + 1 WHERE id = ?').run(post.id);
-    post.view_count += 1;
+    // View counting happens via POST /api/posts/impressions (fired for any
+    // rendered card/detail page), not gated behind this fetch.
     const images = db.prepare('SELECT * FROM post_images WHERE post_id = ? ORDER BY sort_order').all(post.id);
     res.json(formatPostPublic(post, images));
   } catch (e) {

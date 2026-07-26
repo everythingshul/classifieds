@@ -1,6 +1,14 @@
 const nodemailer = require('nodemailer');
 const runtimeConfig = require('../services/runtimeConfig');
 
+// Parses "Name <email@x.com>" or a bare "email@x.com" into { name, email }.
+function parseFromAddress(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/^(.*)<(.+)>$/);
+  if (m) return { name: m[1].trim().replace(/^"|"$/g, '') || undefined, email: m[2].trim() };
+  return { email: s };
+}
+
 // Not cached: SMTP settings can be changed live from the admin portal.
 function getTransporter() {
   const host = runtimeConfig.get('smtp_host', 'SMTP_HOST');
@@ -21,8 +29,54 @@ function getTransporter() {
   });
 }
 
+function toRecipientList(to) {
+  return String(to)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((email) => ({ email }));
+}
+
+async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments, replyTo }) {
+  const body = {
+    sender: parseFromAddress(from),
+    to: toRecipientList(to),
+    subject,
+    htmlContent: html || undefined,
+    textContent: text || undefined,
+    replyTo: replyTo ? parseFromAddress(replyTo) : undefined,
+  };
+  if (attachments && attachments.length) {
+    body.attachment = attachments.map((a) => ({
+      name: a.filename,
+      content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : Buffer.from(a.content).toString('base64'),
+    }));
+  }
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Brevo send failed (${res.status}): ${errText}`);
+  }
+  return res.json();
+}
+
 async function sendMail({ to, subject, html, text, attachments, replyTo }) {
   const from = runtimeConfig.get('mail_from', 'MAIL_FROM') || 'no-reply@example.com';
+  const provider = runtimeConfig.get('mail_provider', 'MAIL_PROVIDER') || 'smtp';
+
+  if (provider === 'brevo') {
+    const apiKey = runtimeConfig.get('brevo_api_key', 'BREVO_API_KEY');
+    if (!apiKey) {
+      console.log('[mailer] Brevo selected but no API key set, would have sent:', { to, subject });
+      return { messageId: 'dry-run' };
+    }
+    return sendViaBrevo({ apiKey, from, to, subject, html, text, attachments, replyTo });
+  }
+
   return getTransporter().sendMail({ from, to, subject, html, text, attachments, replyTo });
 }
 

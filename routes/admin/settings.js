@@ -7,7 +7,7 @@ router.use(requireAdmin);
 
 // Never send these back to the browser in full once set - only whether a
 // value is currently configured, via a companion "<key>_isSet" flag.
-const SECRET_KEYS = new Set(['stripe_secret_key', 'stripe_webhook_secret', 'smtp_pass']);
+const SECRET_KEYS = new Set(['stripe_secret_key', 'stripe_webhook_secret', 'smtp_pass', 'brevo_api_key']);
 
 router.get('/', (req, res) => {
   const rows = db.prepare('SELECT * FROM site_settings').all();

@@ -52,7 +52,8 @@ function formatPostPublic(post, images = []) {
     },
     contact: buildContactLinks(post),
     isFeatured: !!post.is_featured_strike,
-    viewCount: post.view_count,
+    // View count is tracked (see /api/posts/impressions) but not shown
+    // publicly for now - it's still visible to admins via formatPostAdmin.
     publishedAt: post.published_at,
     // Expiration is intentionally not exposed on public listings - it's only
     // ever shown during the posting flow itself (review step + invoice).

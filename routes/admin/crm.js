@@ -6,22 +6,7 @@ const { formatPostAdmin } = require('../../services/postFormat');
 const router = express.Router();
 router.use(requireAdmin);
 
-// Searches by post title/description OR customer identity (email, phone, name).
-router.get('/search', (req, res) => {
-  const q = String(req.query.q || '').trim();
-  if (!q) return res.json({ customers: [] });
-  const like = `%${q}%`;
-  const posts = db
-    .prepare(
-      `SELECT * FROM posts WHERE
-        status != 'pending_payment' AND (
-          poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ?
-          OR title LIKE ? OR public_id LIKE ?
-        )
-       ORDER BY created_at DESC LIMIT 500`
-    )
-    .all(like, like, like, like, like, like);
-
+function customersFromPosts(posts) {
   const byEmail = new Map();
   posts.forEach((p) => {
     const key = p.poster_email;
@@ -49,7 +34,30 @@ router.get('/search', (req, res) => {
     });
   }
 
-  res.json({ customers: [...byEmail.values()] });
+  return [...byEmail.values()];
+}
+
+// Searches by post title/description OR customer identity (email, phone, name).
+// With no query, shows the most recently active customers instead of nothing.
+router.get('/search', (req, res) => {
+  const q = String(req.query.q || '').trim();
+  let posts;
+  if (!q) {
+    posts = db.prepare("SELECT * FROM posts WHERE status != 'pending_payment' ORDER BY created_at DESC LIMIT 60").all();
+  } else {
+    const like = `%${q}%`;
+    posts = db
+      .prepare(
+        `SELECT * FROM posts WHERE
+          status != 'pending_payment' AND (
+            poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ?
+            OR title LIKE ? OR public_id LIKE ?
+          )
+         ORDER BY created_at DESC LIMIT 500`
+      )
+      .all(like, like, like, like, like, like);
+  }
+  res.json({ customers: customersFromPosts(posts), default: !q });
 });
 
 router.get('/customer/:email', (req, res) => {

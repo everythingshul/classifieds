@@ -1,7 +1,7 @@
-const { JOB_TYPES, PAY_PERIODS, LOST_FOUND_OPTIONS } = require('../utils/constants');
+const { LOST_FOUND_OPTIONS } = require('../utils/constants');
 const { isValidEmail, isValidUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
-const { getClassifiedCategoryKeys, findCategory } = require('./categories');
+const { getClassifiedCategoryKeys, findCategory, getOptionNames } = require('./categories');
 
 class ValidationError extends Error {
   constructor(errors) {
@@ -25,12 +25,14 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
   const out = {};
   switch (category) {
     case 'job-offers': {
-      if (!JOB_TYPES.includes(f.jobType)) errors.push('jobType must be one of ' + JOB_TYPES.join(', '));
+      const jobTypes = getOptionNames('job_type');
+      if (!jobTypes.includes(f.jobType)) errors.push('jobType must be one of ' + jobTypes.join(', '));
       out.jobType = f.jobType;
       if (f.payAmount !== undefined && f.payAmount !== null && f.payAmount !== '') {
         const amt = Number(f.payAmount);
         if (Number.isNaN(amt) || amt < 0) errors.push('payAmount must be a positive number');
-        if (!PAY_PERIODS.includes(f.payPeriod)) errors.push('payPeriod must be one of ' + PAY_PERIODS.join(', '));
+        const payPeriods = getOptionNames('pay_period');
+        if (!payPeriods.includes(f.payPeriod)) errors.push('payPeriod must be one of ' + payPeriods.join(', '));
         out.payAmount = amt;
         out.payPeriod = f.payPeriod;
       }

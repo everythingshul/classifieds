@@ -1,10 +1,10 @@
 const express = require('express');
 const db = require('../../db');
-const { JOB_TYPES, PAY_PERIODS, LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
-const { getCharLimits, getSetting, getAddon } = require('../../services/pricing');
+const { LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
+const { getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getSetting, getAddon } = require('../../services/pricing');
 const runtimeConfig = require('../../services/runtimeConfig');
 const { getCountryList } = require('../../utils/countries');
-const { getAllClassifiedCategories } = require('../../services/categories');
+const { getAllClassifiedCategories, getOptionNames } = require('../../services/categories');
 
 const router = express.Router();
 
@@ -15,8 +15,8 @@ router.get('/', (req, res) => {
   res.json({
     categories: getAllClassifiedCategories(),
     countries: getCountryList(),
-    jobTypes: JOB_TYPES,
-    payPeriods: PAY_PERIODS,
+    jobTypes: getOptionNames('job_type'),
+    payPeriods: getOptionNames('pay_period'),
     lostFoundOptions: LOST_FOUND_OPTIONS,
     taxonomies,
     pricingTiers,
@@ -25,7 +25,9 @@ router.get('/', (req, res) => {
       oversized: getAddon('oversized'),
       boost: getAddon('boost'),
     },
-    charLimits: getCharLimits(),
+    charLimits: getClassifiedCharLimits(),
+    simchaCharLimits: getSimchaCharLimits(),
+    oversizedCharLimits: getOversizedCharLimits(),
     defaultLocation: getSetting('default_location', DEFAULT_BROOKLYN_LOCATION),
     googleMapsApiKey: runtimeConfig.get('google_maps_api_key', 'GOOGLE_MAPS_API_KEY') || null,
     siteName: runtimeConfig.get('site_name', 'SITE_NAME') || 'Everything Shul Classifieds',

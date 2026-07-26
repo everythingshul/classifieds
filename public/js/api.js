@@ -29,5 +29,6 @@ const Api = (() => {
     report: (id, body) => req(`/posts/${id}/report`, { method: 'POST', body }),
     boost: (id, body) => req(`/posts/${id}/boost`, { method: 'POST', body }),
     strike: (id, body) => req(`/posts/${id}/strike`, { method: 'POST', body }),
+    registerImpressions: (ids) => req('/posts/impressions', { method: 'POST', body: { ids } }).catch(() => {}),
   };
 })();

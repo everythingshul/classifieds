@@ -74,8 +74,6 @@ router.get('/:publicId', (req, res, next) => {
   try {
     const post = db.prepare("SELECT * FROM posts WHERE public_id = ? AND type = 'simcha'").get(req.params.publicId);
     if (!post || post.status !== 'live') return res.status(404).json({ error: 'Post not found' });
-    db.prepare('UPDATE posts SET view_count = view_count + 1 WHERE id = ?').run(post.id);
-    post.view_count += 1;
     res.json(formatPostPublic(post));
   } catch (e) {
     next(e);

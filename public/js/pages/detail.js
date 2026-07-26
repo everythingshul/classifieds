@@ -1,6 +1,7 @@
 async function renderDetailPage(id, type) {
   const post = type === 'simcha' ? await Api.simchaDetail(id) : await Api.classifiedDetail(id);
   const isBookmarked = Bookmarks.has(type, id);
+  Api.registerImpressions([id]);
 
   const fieldRows = [];
   if (post.fields?.jobType) fieldRows.push(['Job Type', post.fields.jobType.replace('_', ' ')]);
@@ -11,7 +12,6 @@ async function renderDetailPage(id, type) {
   if (post.fields?.simchaDate) fieldRows.push(['Date', formatDate(new Date(post.fields.simchaDate).getTime())]);
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
   fieldRows.push([I18N.t('posted'), formatDate(post.publishedAt)]);
-  fieldRows.push([I18N.t('views'), post.viewCount]);
 
   const contactButtons = [];
   if (post.contact?.phone) contactButtons.push(`<a class="btn" href="${post.contact.phone.tel}">&#128222; ${I18N.t('call')} ${escapeHtml(post.contact.phone.display)}${post.contact.phone.ext ? ' x' + escapeHtml(post.contact.phone.ext) : ''}</a>`);
