@@ -32,16 +32,7 @@ const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 240, standardHeaders: t
 app.use('/api', apiLimiter);
 
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
-// No build step / no cache-busted filenames, so force revalidation on every
-// load (etag still lets the browser skip the download when unchanged) --
-// otherwise browsers can keep serving pre-deploy JS/CSS/HTML indefinitely.
-app.use(
-  express.static(path.join(__dirname, 'public'), {
-    etag: true,
-    lastModified: true,
-    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
-  })
-);
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/config', require('./routes/public/config'));
 app.use('/api/home', require('./routes/public/home'));
@@ -61,19 +52,16 @@ app.use('/api/admin/crm', require('./routes/admin/crm'));
 app.use('/api/admin/stats', require('./routes/admin/stats'));
 
 app.get('/admin*', (req, res) => {
-  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
 });
 
 // Client-side routed pages (classified/simcha detail, view-all, etc.) all serve the same shell.
 app.get(['/classifieds/*', '/simchas/*'], (req, res) => {
-  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
-  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
