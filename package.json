@@ -6,8 +6,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
-    "postinstall": "cd node_modules/better-sqlite3 && CXXFLAGS=\"$CXXFLAGS -fno-lto\" LDFLAGS=\"$LDFLAGS -fno-lto\" npm run build-release"
+    "dev": "node server.js"
   },
   "engines": {
     "node": "20.x"
