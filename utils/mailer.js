@@ -81,9 +81,20 @@ async function sendMail({ to, subject, html, text, attachments, replyTo }) {
 }
 
 async function notifyAdmin(subject, html) {
-  const to = runtimeConfig.get('admin_notify_email', 'ADMIN_NOTIFY_EMAIL');
-  if (!to) return null;
-  return sendMail({ to, subject: `[Classifieds] ${subject}`, html });
+  // Falls back to the first admin account's login email if no separate
+  // notification address is configured, so report/moderation alerts still
+  // reach someone by default instead of silently going nowhere.
+  let to = runtimeConfig.get('admin_notify_email', 'ADMIN_NOTIFY_EMAIL');
+  if (!to) {
+    const db = require('../db');
+    const admin = db.prepare('SELECT email FROM admin_users ORDER BY id LIMIT 1').get();
+    to = admin?.email;
+  }
+  if (!to) {
+    console.warn('[mailer] notifyAdmin: no admin_notify_email set and no admin account found - alert not sent:', subject);
+    return null;
+  }
+  return sendMail({ to, subject: `[JListings] ${subject}`, html });
 }
 
 module.exports = { sendMail, notifyAdmin };

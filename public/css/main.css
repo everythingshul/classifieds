@@ -196,6 +196,7 @@ p { margin: 0 0 .7em; }
 .detail-meta-list li { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
 .detail-meta-list li:last-child { border-bottom: none; }
 .detail-meta-list li span:first-child { color: var(--ink-soft); font-weight: 600; }
+.detail-meta-list li.stacked { flex-direction: column; align-items: flex-start; gap: 4px; }
 
 /* ---------- Forms / wizard ---------- */
 .wizard-steps { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -205,6 +206,7 @@ p { margin: 0 0 .7em; }
 .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .form-row label { font-weight: 600; font-size: .84rem; }
 .form-row .hint { font-size: .74rem; color: var(--ink-soft); font-weight: 400; }
+.char-counter { font-size: .72rem; color: var(--ink-soft); text-align: end; }
 .form-row input, .form-row select, .form-row textarea {
   padding: 8px 10px; border: 1px solid var(--border); border-radius: 0; font-family: inherit; font-size: .88rem;
 }

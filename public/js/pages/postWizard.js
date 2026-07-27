@@ -49,14 +49,12 @@ function renderPostWizard() {
         <button type="button" class="category-tile ${state.postType === 'listing' ? 'selected' : ''}" data-v="listing">Listing</button>
         <button type="button" class="category-tile ${state.postType === 'simcha' ? 'selected' : ''}" data-v="simcha">Simcha</button>
       </div>
-      <div style="margin-top:20px;text-align:end"><button class="btn" id="nextBtn">Next</button></div>
     `);
     document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => {
       state.postType = btn.dataset.v;
       state.category = null;
-      render();
+      go(1);
     }));
-    document.getElementById('nextBtn').addEventListener('click', () => { if (state.postType) go(1); else toast('Choose Classified or Simcha'); });
   }
 
   function renderCategoryStep() {
@@ -142,12 +140,25 @@ function renderPostWizard() {
       </div>`;
   }
 
+  function baseCharLimits() {
+    return state.postType === 'listing' ? cfg.listingCharLimits : cfg.charLimits;
+  }
+
   function renderClassifiedDetailsStep() {
     const catDef = currentCatDef();
+    const base = baseCharLimits();
+    const over = cfg.oversizedCharLimits;
+    const wantsOversized = !!state.data.wantsOversized;
+    const titleLimit = wantsOversized ? over.title : base.title;
+    const descLimit = wantsOversized ? over.description : base.description;
     shell(`
       <h3 style="margin-top:0">${escapeHtml(catDef.label)}</h3>
-      <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${cfg.charLimits.title}" value="${escapeHtml(state.data.title || '')}" required></div>
-      <div class="form-row"><label>Description</label><textarea id="f_description" rows="5" maxlength="${cfg.charLimits.description}">${escapeHtml(state.data.description || '')}</textarea></div>
+      <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${titleLimit}" value="${escapeHtml(state.data.title || '')}" required><div class="char-counter" id="titleCounter"></div></div>
+      <div class="form-row"><label>Description</label><textarea id="f_description" rows="5" maxlength="${descLimit}">${escapeHtml(state.data.description || '')}</textarea><div class="char-counter" id="descCounter"></div></div>
+      <label class="addon-row" style="margin:-4px 0 14px">
+        <input type="checkbox" id="f_wantsOversized" ${wantsOversized ? 'checked' : ''}>
+        Need more space? Oversized post (up to ${over.title} title / ${over.description} description characters)${cfg.addons.oversized ? ` — ${formatCents(cfg.addons.oversized.price_cents)}` : ''}
+      </label>
       ${categorySpecificFieldsHtml()}
       <div class="form-row"><label>Location</label><input type="text" id="f_location" placeholder="City, State" value="${escapeHtml(state.data.locationText || '')}" required></div>
       ${imageUploadHtml()}
@@ -180,6 +191,28 @@ function renderPostWizard() {
     attachLocationAutocomplete(document.getElementById('f_location'), {
       onSelect: (p) => { state.data._locFromMaps = p; },
     });
+
+    const titleInput = document.getElementById('f_title');
+    const descInput = document.getElementById('f_description');
+    const oversizedCheckbox = document.getElementById('f_wantsOversized');
+    function updateCounters() {
+      document.getElementById('titleCounter').textContent = `${titleInput.value.length} / ${titleInput.maxLength}`;
+      document.getElementById('descCounter').textContent = `${descInput.value.length} / ${descInput.maxLength}`;
+    }
+    oversizedCheckbox.addEventListener('change', () => {
+      const over = cfg.oversizedCharLimits;
+      const base = baseCharLimits();
+      const nextTitleMax = oversizedCheckbox.checked ? over.title : base.title;
+      const nextDescMax = oversizedCheckbox.checked ? over.description : base.description;
+      titleInput.maxLength = nextTitleMax;
+      descInput.maxLength = nextDescMax;
+      if (titleInput.value.length > nextTitleMax) titleInput.value = titleInput.value.slice(0, nextTitleMax);
+      if (descInput.value.length > nextDescMax) descInput.value = descInput.value.slice(0, nextDescMax);
+      updateCounters();
+    });
+    titleInput.addEventListener('input', updateCounters);
+    descInput.addEventListener('input', updateCounters);
+    updateCounters();
     const fileInput = document.getElementById('f_images');
     if (fileInput) {
       fileInput.addEventListener('change', () => {
@@ -256,6 +289,7 @@ function renderPostWizard() {
         posterPhone: document.getElementById('p_phone').value.trim(),
         posterPhoneCountry: document.getElementById('p_phoneCountry').value,
         posterEmail,
+        wantsOversized: oversizedCheckbox.checked,
         fields: { ...(state.data.fields || {}), ...fields, taxonomyId: fields.taxonomyId },
       });
       if (fields.taxonomyId !== undefined) state.data.taxonomyId = fields.taxonomyId;
@@ -325,7 +359,7 @@ function renderPostWizard() {
       </div>`}
       <h3>Add-ons</h3>
       <label class="addon-row"><input type="checkbox" id="wantsStrike" ${state.data.wantsStrike ? 'checked' : ''}> Featured / Striking listing — ${cfg.addons.strike ? formatCents(cfg.addons.strike.price_cents) : ''}</label>
-      <label class="addon-row"><input type="checkbox" id="wantsOversized" ${state.data.wantsOversized ? 'checked' : ''}> Oversized post (longer title/description) — ${cfg.addons.oversized ? formatCents(cfg.addons.oversized.price_cents) : ''}</label>
+      ${state.data.wantsOversized ? `<p class="hint">Oversized post add-on selected on the Details step${cfg.addons.oversized ? ` — ${formatCents(cfg.addons.oversized.price_cents)}` : ''}.</p>` : ''}
       <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     document.querySelectorAll('.tier-tile').forEach((el) => el.addEventListener('click', () => {
@@ -337,7 +371,6 @@ function renderPostWizard() {
     document.getElementById('nextBtn').addEventListener('click', () => {
       if (!isFree && !state.data.pricingTierId) return toast('Choose a pricing option');
       state.data.wantsStrike = document.getElementById('wantsStrike').checked;
-      state.data.wantsOversized = document.getElementById('wantsOversized').checked;
       go(4);
     });
   }
@@ -346,19 +379,72 @@ function renderPostWizard() {
     const simchaCatName = state.postType === 'simcha'
       ? cfg.taxonomies.find((t) => String(t.id) === String(state.data.taxonomyId))?.name
       : null;
+
+    function fieldSummaryRows() {
+      const f = state.data.fields || {};
+      const rows = [];
+      if (f.jobType) rows.push(['Job Type', f.jobType]);
+      if (f.taxonomyId) {
+        const tax = cfg.taxonomies.find((t) => String(t.id) === String(f.taxonomyId));
+        if (tax) rows.push([state.category === 'real-estate' ? 'Real Estate Category' : 'Job Category', tax.name]);
+      }
+      if (f.payAmount) rows.push(['Pay', `${formatCents(f.payAmount * 100)} / ${f.payPeriod}`]);
+      if (f.experience) rows.push(['Experience', f.experience]);
+      if (f.lostOrFound) rows.push(['Status', f.lostOrFound === 'lost' ? 'Lost' : 'Found']);
+      if (f.price !== undefined && f.price !== null && f.price !== '') rows.push(['Price', formatCents(Number(f.price) * 100)]);
+      return rows;
+    }
+
+    function contactSummaryRows() {
+      const rows = [];
+      if (state.data.contactPhone) rows.push(['Contact Phone', state.data.contactPhone + (state.data.contactPhoneExt ? ` x${state.data.contactPhoneExt}` : '')]);
+      if (state.data.contactEmail) rows.push(['Contact Email', state.data.contactEmail]);
+      if (state.data.contactUrl) rows.push(['Contact Website', state.data.contactUrl]);
+      return rows;
+    }
+
+    function pricingSummary() {
+      if (state.postType === 'simcha') return null;
+      if (currentCatDef()?.free) return { lines: [{ label: 'Standard (Free)', amount: 0 }], total: 0 };
+      const tier = cfg.pricingTiers.find((t) => String(t.id) === String(state.data.pricingTierId));
+      const lines = [];
+      if (tier) lines.push({ label: `${tier.name} listing`, amount: tier.price_cents });
+      if (state.data.wantsStrike && cfg.addons.strike) lines.push({ label: cfg.addons.strike.config.label || 'Featured / Striking listing', amount: cfg.addons.strike.price_cents });
+      if (state.data.wantsOversized && cfg.addons.oversized) lines.push({ label: cfg.addons.oversized.config.label || 'Oversized post', amount: cfg.addons.oversized.price_cents });
+      const total = lines.reduce((s, l) => s + l.amount, 0);
+      return { lines, total };
+    }
+
+    const pricing = pricingSummary();
+
     shell(`
       <h3 style="margin-top:0">Review Your ${state.postType === 'simcha' ? 'Simcha' : 'Listing'}</h3>
       <ul class="detail-meta-list">
         ${state.postType === 'simcha'
           ? `<li><span>Category</span><span>${escapeHtml(simchaCatName || '')}</span></li>`
-          : `<li><span>Title</span><span>${escapeHtml(state.data.title)}</span></li><li><span>Location</span><span>${escapeHtml(state.data.locationText)}</span></li>`}
+          : `<li><span>Category</span><span>${escapeHtml(currentCatDef()?.label || '')}</span></li>
+             <li><span>Title</span><span>${escapeHtml(state.data.title)}</span></li>
+             ${state.data.description ? `<li class="stacked"><span>Description</span><span>${escapeHtml(state.data.description)}</span></li>` : ''}
+             ${fieldSummaryRows().map(([k, v]) => `<li><span>${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></li>`).join('')}
+             <li><span>Location</span><span>${escapeHtml(state.data.locationText)}</span></li>`}
+        ${state.data.description && state.postType === 'simcha' ? `<li class="stacked"><span>Details</span><span>${escapeHtml(state.data.description)}</span></li>` : ''}
+        ${contactSummaryRows().map(([k, v]) => `<li><span>${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></li>`).join('')}
+        ${state.data.posterFirstName || state.data.posterLastName ? `<li><span>Name</span><span>${escapeHtml(`${state.data.posterFirstName || ''} ${state.data.posterLastName || ''}`.trim())}</span></li>` : ''}
         <li><span>Email</span><span>${escapeHtml(state.data.posterEmail)}</span></li>
+        ${state.data.posterPhone ? `<li><span>Phone</span><span>${escapeHtml(state.data.posterPhone)}</span></li>` : ''}
       </ul>
+      ${pricing ? `
+        <h3>Pricing</h3>
+        <ul class="detail-meta-list">
+          ${pricing.lines.map((l) => `<li><span>${escapeHtml(l.label)}</span><span>${formatCents(l.amount)}</span></li>`).join('')}
+          <li><span><b>Total</b></span><span><b>${formatCents(pricing.total)}</b></span></li>
+        </ul>
+      ` : ''}
       <p class="hint">By submitting, you agree to our <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</p>
       <div id="stepError" class="error-list" style="display:none"></div>
       <div id="reviewActions" style="margin-top:10px;display:flex;justify-content:space-between">
         <button class="btn btn-outline" id="backBtn">Back</button>
-        <button class="btn btn-gold" id="submitBtn">Submit${state.postType !== 'simcha' && !currentCatDef()?.free ? ' & Pay' : ''}</button>
+        <button class="btn btn-gold" id="submitBtn">Submit${pricing && pricing.total > 0 ? ' & Pay' : ''}</button>
       </div>
       <div id="checkoutContainer" style="margin-top:16px"></div>
     `);
