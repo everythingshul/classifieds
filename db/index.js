@@ -122,8 +122,9 @@ function seed() {
 
   // Integration settings - editable from the admin portal's Settings page so
   // the site can be configured after deploy without touching env vars.
-  seed('site_name', process.env.SITE_NAME || 'Everything Shul Classifieds');
+  seed('site_name', process.env.SITE_NAME || 'JListings');
   seed('app_url', process.env.APP_URL || '');
+  seed('stripe_publishable_key', process.env.STRIPE_PUBLISHABLE_KEY || '');
   seed('stripe_secret_key', process.env.STRIPE_SECRET_KEY || '');
   seed('stripe_webhook_secret', process.env.STRIPE_WEBHOOK_SECRET || '');
   seed('google_maps_api_key', process.env.GOOGLE_MAPS_API_KEY || '');

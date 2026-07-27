@@ -35,6 +35,7 @@ function renderTermsPage() {
       <p>Questions about these Terms may be directed to the Site administrator.</p>
     </div>`;
   I18N.apply();
+  setPageTitle('Terms & Conditions');
 }
 
 function renderRefundPolicyPage() {
@@ -59,4 +60,5 @@ function renderRefundPolicyPage() {
       <p>Email the Site administrator with your invoice number, the email address used to post, and the reason for your request. Approved refunds are issued to the original payment method within a reasonable time.</p>
     </div>`;
   I18N.apply();
+  setPageTitle('Refund Policy');
 }

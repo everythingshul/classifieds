@@ -26,6 +26,7 @@ async function renderSettingsPage() {
       <h3 style="margin-top:0">Payments — Stripe</h3>
       <p class="hint">From your Stripe dashboard: Developers → API keys for the secret key, and Developers → Webhooks (endpoint <code>/api/webhook</code>) for the signing secret.</p>
       <form id="stripeForm">
+        <div class="form-row"><label>Publishable key <span class="hint">(safe to expose publicly - powers the embedded checkout form)</span></label><input name="stripe_publishable_key" placeholder="pk_live_..." value="${escapeHtml(s.stripe_publishable_key || '')}"></div>
         ${secretField('stripe_secret_key', 'Secret key', s.stripe_secret_key_isSet, 'sk_live_...')}
         ${secretField('stripe_webhook_secret', 'Webhook signing secret', s.stripe_webhook_secret_isSet, 'whsec_...')}
         <button class="btn btn-sm" type="submit">Save</button>
@@ -57,7 +58,7 @@ async function renderSettingsPage() {
           <p class="hint">From your Brevo dashboard: Settings → SMTP &amp; API → API Keys.</p>
           ${secretField('brevo_api_key', 'API Key', s.brevo_api_key_isSet, 'xkeysib-...')}
         </div>
-        <div class="form-row"><label>From address</label><input name="mail_from" placeholder="Everything Shul Classifieds &lt;no-reply@example.com&gt;" value="${escapeHtml(s.mail_from || '')}"></div>
+        <div class="form-row"><label>From address</label><input name="mail_from" placeholder="JListings &lt;no-reply@example.com&gt;" value="${escapeHtml(s.mail_from || '')}"></div>
         <button class="btn btn-sm" type="submit">Save</button>
       </form>
     </div>
@@ -120,7 +121,7 @@ async function renderSettingsPage() {
     ['site_name', fd.site_name], ['app_url', fd.app_url], ['admin_notify_email', fd.admin_notify_email],
   ]);
   bindForm('stripeForm', (fd) => {
-    const out = [];
+    const out = [['stripe_publishable_key', fd.stripe_publishable_key]];
     if (fd.stripe_secret_key) out.push(['stripe_secret_key', fd.stripe_secret_key]);
     if (fd.stripe_webhook_secret) out.push(['stripe_webhook_secret', fd.stripe_webhook_secret]);
     return out;

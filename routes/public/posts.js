@@ -6,9 +6,10 @@ const { buildClassifiedCharges, buildListingCharges, buildSimchaCharges, getAddo
 const { findCategory } = require('../../services/categories');
 const { findListingCategory } = require('../../services/listingCategories');
 const { getActivePromo, applyDiscount, recordUse } = require('../../services/promoCodes');
-const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive } = require('../../services/postLifecycle');
+const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive, fulfillCheckoutSession } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
 const { createCheckoutSession } = require('../../services/checkout');
+const { getStripe } = require('../../utils/stripeClient');
 const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
 
@@ -163,14 +164,40 @@ async function finalizeOrCheckout({ res, post, payment, charges, posterEmail, ty
 
   const session = await createCheckoutSession({
     lineItems: charges.lineItems,
-    successUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${appUrl()}/post.html?canceled=1`,
+    returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
     customerEmail: posterEmail,
     metadata: { kind: 'listing', postId: String(post.id), paymentId: String(payment.id), type, promoCode: charges.promo?.code || '' },
   });
   db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-  return res.json({ requiresPayment: true, checkoutUrl: session.url });
+  return res.json({ requiresPayment: true, clientSecret: session.client_secret });
 }
+
+// Fallback verification for the success page: normally the Stripe webhook
+// fulfills a paid session, but if the webhook is misconfigured or hasn't
+// arrived yet, this lets the return page finalize things itself as soon as
+// the payer lands back on it, instead of leaving the post stuck.
+router.get('/verify-session', async (req, res, next) => {
+  try {
+    const sessionId = String(req.query.session_id || '');
+    if (!sessionId) return res.status(400).json({ error: 'session_id is required' });
+
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status !== 'paid') {
+      return res.json({ paid: false });
+    }
+
+    const result = await fulfillCheckoutSession(session);
+    const meta = session.metadata || {};
+    res.json({
+      paid: true,
+      kind: meta.kind || null,
+      post: result && result.public_id ? formatPostPublic(result) : null,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 
 // Boost: enter the email used to post + pay to move the listing back to the top.
 router.post('/:publicId/boost', async (req, res, next) => {
@@ -193,13 +220,12 @@ router.post('/:publicId/boost', async (req, res, next) => {
     const payment = recordPayment({ postId: post.id, kind: 'boost', amountCents: amount, payerEmail: email, status: 'pending' });
     const session = await createCheckoutSession({
       lineItems: [{ label: `Boost listing: ${post.title}`, amount_cents: amount }],
-      successUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl()}${postUrlPath(post)}?canceled=1`,
+      returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
       customerEmail: email,
       metadata: { kind: 'boost', postId: String(post.id), paymentId: String(payment.id) },
     });
     db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-    res.json({ requiresPayment: true, checkoutUrl: session.url });
+    res.json({ requiresPayment: true, clientSecret: session.client_secret });
   } catch (e) {
     next(e);
   }
@@ -226,13 +252,12 @@ router.post('/:publicId/strike', async (req, res, next) => {
     const payment = recordPayment({ postId: post.id, kind: 'strike', amountCents: amount, payerEmail: email, status: 'pending' });
     const session = await createCheckoutSession({
       lineItems: [{ label: `Feature listing: ${post.title}`, amount_cents: amount }],
-      successUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl()}${postUrlPath(post)}?canceled=1`,
+      returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
       customerEmail: email,
       metadata: { kind: 'strike', postId: String(post.id), paymentId: String(payment.id) },
     });
     db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-    res.json({ requiresPayment: true, checkoutUrl: session.url });
+    res.json({ requiresPayment: true, clientSecret: session.client_secret });
   } catch (e) {
     next(e);
   }

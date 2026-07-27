@@ -24,6 +24,7 @@ async function renderSimchasListPage({ query }) {
     </div>
   `;
   I18N.apply();
+  setPageTitle('Simchas', 'Browse recent simcha announcements on JListings.');
 
   document.getElementById('filtersForm').addEventListener('submit', (e) => {
     e.preventDefault();

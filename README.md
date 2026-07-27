@@ -1,6 +1,6 @@
-# Everything Shul Classifieds
+# JListings
 
-A community classifieds and simchas board: free-form Node.js/Express backend, SQLite
+A community classifieds, listings and simchas board: free-form Node.js/Express backend, SQLite
 storage, Stripe Checkout for paid listings, and a dependency-free vanilla-JS frontend
 with full Hebrew/RTL support.
 
@@ -48,8 +48,9 @@ exists yet, an admin account is created automatically - log in at `/admin`.
 |---|---|
 | `JWT_SECRET` | Signs admin session tokens. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Bootstraps the first admin account. |
+| `STRIPE_PUBLISHABLE_KEY` | Powers the embedded Stripe Checkout form on the client (safe to expose publicly). |
 | `STRIPE_SECRET_KEY` | Needed for any paid listing/boost/strike checkout. |
-| `STRIPE_WEBHOOK_SECRET` | Verifies the `/api/webhook` Stripe callback that finalizes paid posts. |
+| `STRIPE_WEBHOOK_SECRET` | Verifies the `/api/webhook` Stripe callback that finalizes paid posts. If this is ever missing or misconfigured, the post-success page still finalizes the payment itself as a fallback. |
 | `APP_URL` | Base URL used in emails and Stripe redirect URLs. |
 
 ### Optional environment variables

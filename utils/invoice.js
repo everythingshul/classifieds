@@ -28,7 +28,7 @@ async function createInvoicePdf(invoice) {
     y -= opts.gap ?? 16;
   };
 
-  draw(runtimeConfig.get('site_name', 'SITE_NAME') || 'Everything Shul Classifieds', { size: 18, bold: true, gap: 26 });
+  draw(runtimeConfig.get('site_name', 'SITE_NAME') || 'JListings', { size: 18, bold: true, gap: 26 });
   draw(`Invoice ${invoice.invoiceNumber}`, { size: 13, bold: true, gap: 18 });
   draw(`Date: ${invoice.issuedAt.toDateString()}`, { gap: 22 });
 

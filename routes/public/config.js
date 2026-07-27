@@ -6,6 +6,7 @@ const runtimeConfig = require('../../services/runtimeConfig');
 const { getCountryList } = require('../../utils/countries');
 const { getAllClassifiedCategories, getOptionNames } = require('../../services/categories');
 const { getAllListingCategories } = require('../../services/listingCategories');
+const { getPublishableKey } = require('../../utils/stripeClient');
 
 const router = express.Router();
 
@@ -33,7 +34,8 @@ router.get('/', (req, res) => {
     listingCharLimits: getListingCharLimits(),
     defaultLocation: getSetting('default_location', DEFAULT_BROOKLYN_LOCATION),
     googleMapsApiKey: runtimeConfig.get('google_maps_api_key', 'GOOGLE_MAPS_API_KEY') || null,
-    siteName: runtimeConfig.get('site_name', 'SITE_NAME') || 'Everything Shul Classifieds',
+    stripePublishableKey: getPublishableKey() || null,
+    siteName: runtimeConfig.get('site_name', 'SITE_NAME') || 'JListings',
   });
 });
 

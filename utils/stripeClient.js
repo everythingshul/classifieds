@@ -15,4 +15,8 @@ function getWebhookSecret() {
   return runtimeConfig.get('stripe_webhook_secret', 'STRIPE_WEBHOOK_SECRET');
 }
 
-module.exports = { getStripe, getWebhookSecret };
+function getPublishableKey() {
+  return runtimeConfig.get('stripe_publishable_key', 'STRIPE_PUBLISHABLE_KEY');
+}
+
+module.exports = { getStripe, getWebhookSecret, getPublishableKey };

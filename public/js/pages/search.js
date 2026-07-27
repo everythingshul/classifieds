@@ -4,6 +4,7 @@ async function renderSearchPage({ query }) {
   if (!q.trim()) {
     document.getElementById('app').innerHTML = `<div class="container"><h1 data-i18n="search_results">Search Results</h1><p class="empty-state">${I18N.t('no_results')}</p></div>`;
     I18N.apply();
+    setPageTitle('Search');
     return;
   }
 
@@ -48,4 +49,5 @@ async function renderSearchPage({ query }) {
     </div>
   `;
   I18N.apply();
+  setPageTitle(`Search: "${q}"`);
 }

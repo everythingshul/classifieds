@@ -59,12 +59,14 @@ async function renderDetailPage(id, type) {
               <button class="btn btn-sm" type="submit" name="action" value="boost">Boost to Top</button>
               <button class="btn btn-sm btn-gold" type="submit" name="action" value="strike">Make Featured</button>
             </form>
+            <div id="boostCheckoutContainer" style="margin-top:12px"></div>
           </details>`}
         </div>
       </div>
     </div>
   `;
   I18N.apply();
+  setPageTitle(`${post.title} - ${post.categoryLabel}`, post.description ? post.description.slice(0, 160) : `${post.categoryLabel} on JListings.`);
 
   document.getElementById('bookmarkBtn').addEventListener('click', () => {
     const active = Bookmarks.toggle(type, id);
@@ -101,8 +103,13 @@ async function renderDetailPage(id, type) {
       const email = new FormData(e.target).get('email');
       try {
         const result = action === 'boost' ? await Api.boost(id, { email }) : await Api.strike(id, { email });
-        if (result.checkoutUrl) window.location.href = result.checkoutUrl;
-        else { toast('Done!'); Router.navigate(window.location.pathname); }
+        if (result.clientSecret) {
+          boostForm.style.display = 'none';
+          await mountEmbeddedCheckout(document.getElementById('boostCheckoutContainer'), result.clientSecret);
+        } else {
+          toast('Done!');
+          Router.navigate(window.location.pathname);
+        }
       } catch (err) {
         toast(err.message);
       }

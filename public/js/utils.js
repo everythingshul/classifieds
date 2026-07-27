@@ -69,6 +69,36 @@ function populateCountrySelect(selectEl, selected) {
   selectEl.innerHTML = countries.map((c) => `<option value="${c.code}" ${c.code === value ? 'selected' : ''}>${c.code} +${c.dial}</option>`).join('');
 }
 
+// Mounts Stripe's Embedded Checkout (the payment form itself renders inline
+// in `containerEl`, no redirect to a Stripe-hosted page) using the
+// publishable key exposed via /api/config.
+let _stripeInstance = null;
+async function mountEmbeddedCheckout(containerEl, clientSecret) {
+  const pk = window.SITE_CONFIG?.stripePublishableKey;
+  if (!pk) {
+    containerEl.innerHTML = `<p class="error-list">Payments are not configured on this site yet. Please contact the site owner.</p>`;
+    return null;
+  }
+  if (!_stripeInstance) _stripeInstance = Stripe(pk);
+  const checkout = await _stripeInstance.initEmbeddedCheckout({ clientSecret });
+  checkout.mount(containerEl);
+  return checkout;
+}
+
+function setPageTitle(title, description) {
+  const siteName = window.SITE_CONFIG?.siteName || 'JListings';
+  document.title = title ? `${title} | ${siteName}` : siteName;
+  if (description) {
+    let tag = document.querySelector('meta[name="description"]');
+    if (!tag) {
+      tag = document.createElement('meta');
+      tag.name = 'description';
+      document.head.appendChild(tag);
+    }
+    tag.setAttribute('content', description);
+  }
+}
+
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';

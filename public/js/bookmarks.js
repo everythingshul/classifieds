@@ -15,7 +15,7 @@ const Bookmarks = (() => {
     return idx === -1;
   }
   function grouped() {
-    const out = { classified: [], simcha: [] };
+    const out = { classified: [], listing: [], simcha: [] };
     all().forEach((entry) => {
       const [type, id] = entry.split(':');
       if (out[type]) out[type].push(id);

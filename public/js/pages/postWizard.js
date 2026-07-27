@@ -18,6 +18,7 @@ function renderPostWizard() {
       </div>
     `;
     I18N.apply();
+    setPageTitle('Post an Ad');
   }
 
   function go(step) { state.step = step; render(); }
@@ -213,10 +214,12 @@ function renderPostWizard() {
       } else if (state.category === 'job-offers') {
         fields.jobType = document.getElementById('f_jobType').value;
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
+        if (!fields.taxonomyId) errs.push('Job category is required');
         const pay = document.getElementById('f_payAmount').value;
         if (pay) { fields.payAmount = pay; fields.payPeriod = document.getElementById('f_payPeriod').value; }
       } else if (state.category === 'seeking-a-job') {
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
+        if (!fields.taxonomyId) errs.push('Job category is required');
         fields.experience = document.getElementById('f_experience').value;
       } else if (['items-for-sale', 'items-for-rent'].includes(state.category)) {
         fields.price = document.getElementById('f_price').value;
@@ -225,6 +228,7 @@ function renderPostWizard() {
         fields.lostOrFound = document.getElementById('f_lostOrFound').value;
       } else if (state.category === 'real-estate') {
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
+        if (!fields.taxonomyId) errs.push('Real estate category is required');
         fields.price = document.getElementById('f_price').value;
       } else if (document.getElementById('f_price')) {
         fields.price = document.getElementById('f_price').value;
@@ -352,10 +356,11 @@ function renderPostWizard() {
       </ul>
       <p class="hint">By submitting, you agree to our <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</p>
       <div id="stepError" class="error-list" style="display:none"></div>
-      <div style="margin-top:10px;display:flex;justify-content:space-between">
+      <div id="reviewActions" style="margin-top:10px;display:flex;justify-content:space-between">
         <button class="btn btn-outline" id="backBtn">Back</button>
         <button class="btn btn-gold" id="submitBtn">Submit${state.postType !== 'simcha' && !currentCatDef()?.free ? ' & Pay' : ''}</button>
       </div>
+      <div id="checkoutContainer" style="margin-top:16px"></div>
     `);
     document.getElementById('backBtn').addEventListener('click', () => go(state.postType === 'simcha' ? 3 : 3));
     document.getElementById('submitBtn').addEventListener('click', submitPost);
@@ -407,7 +412,8 @@ function renderPostWizard() {
 
       const result = await Api.createPost(fd);
       if (result.requiresPayment) {
-        window.location.href = result.checkoutUrl;
+        document.getElementById('reviewActions').style.display = 'none';
+        await mountEmbeddedCheckout(document.getElementById('checkoutContainer'), result.clientSecret);
       } else {
         document.getElementById('app').innerHTML = `
           <div class="container" style="padding:60px 0;text-align:center">

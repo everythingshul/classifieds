@@ -71,6 +71,7 @@ async function renderClassifiedsListPage({ query }) {
     </div>
   `;
   I18N.apply();
+  setPageTitle(catDef ? (I18N.get() === 'he' ? catDef.labelHe : catDef.label) : 'Classifieds', catDef ? `${catDef.label} classifieds on JListings.` : 'Browse all community classifieds on JListings.');
 
   document.getElementById('filtersForm').addEventListener('submit', (e) => {
     e.preventDefault();

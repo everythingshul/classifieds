@@ -9,7 +9,7 @@ async function renderHomePage() {
       <div class="home-grid">
         <div class="home-main">
           <div style="padding:30px 0 6px">
-            <h1>${escapeHtml(window.SITE_CONFIG?.siteName || 'Everything Shul Classifieds')}</h1>
+            <h1>${escapeHtml(window.SITE_CONFIG?.siteName || 'JListings')}</h1>
             <a href="/post" class="btn btn-gold" data-i18n="nav_post">Post an Ad</a>
           </div>
 
@@ -55,5 +55,6 @@ async function renderHomePage() {
     </div>
   `;
   I18N.apply();
+  setPageTitle(null, 'Community classifieds, business listings, and simcha announcements. Post a job, sell an item, find a service, or share a simcha.');
   if (typeof renderWeatherWidget === 'function') renderWeatherWidget(loc, c.location);
 }

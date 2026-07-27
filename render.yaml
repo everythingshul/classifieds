@@ -24,6 +24,8 @@ services:
         sync: false
       - key: ADMIN_NOTIFY_EMAIL
         sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
