@@ -1,5 +1,6 @@
 function postUrl(post) {
-  return `/${post.type === 'simcha' ? 'simchas' : 'classifieds'}/${post.id}`;
+  const segment = post.type === 'simcha' ? 'simchas' : post.type === 'listing' ? 'listings' : 'classifieds';
+  return `/${segment}/${post.id}`;
 }
 
 function categoryLabelFor(post) {
@@ -30,7 +31,7 @@ function postCardHtml(post) {
       <div class="body">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
           <span class="cat">${escapeHtml(categoryLabelFor(post))}</span>
-          ${post.isFeatured ? `<span class="badge-featured" style="position:static;margin:0">&#9733;</span>` : ''}
+          ${post.isFeatured ? `<span class="badge-featured" style="position:static;margin:0">Featured</span>` : ''}
         </div>
         <span class="title">${escapeHtml(post.title)}</span>
         ${post.description ? `<p class="card-desc">${escapeHtml(post.description)}</p>` : ''}

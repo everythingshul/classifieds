@@ -1,10 +1,11 @@
 const express = require('express');
 const db = require('../../db');
 const { LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
-const { getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getSetting, getAddon } = require('../../services/pricing');
+const { getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits, getSetting, getAddon } = require('../../services/pricing');
 const runtimeConfig = require('../../services/runtimeConfig');
 const { getCountryList } = require('../../utils/countries');
 const { getAllClassifiedCategories, getOptionNames } = require('../../services/categories');
+const { getAllListingCategories } = require('../../services/listingCategories');
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ router.get('/', (req, res) => {
 
   res.json({
     categories: getAllClassifiedCategories(),
+    listingCategories: getAllListingCategories(),
     countries: getCountryList(),
     jobTypes: getOptionNames('job_type'),
     payPeriods: getOptionNames('pay_period'),
@@ -28,6 +30,7 @@ router.get('/', (req, res) => {
     charLimits: getClassifiedCharLimits(),
     simchaCharLimits: getSimchaCharLimits(),
     oversizedCharLimits: getOversizedCharLimits(),
+    listingCharLimits: getListingCharLimits(),
     defaultLocation: getSetting('default_location', DEFAULT_BROOKLYN_LOCATION),
     googleMapsApiKey: runtimeConfig.get('google_maps_api_key', 'GOOGLE_MAPS_API_KEY') || null,
     siteName: runtimeConfig.get('site_name', 'SITE_NAME') || 'Everything Shul Classifieds',

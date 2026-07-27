@@ -2,6 +2,7 @@ const { LOST_FOUND_OPTIONS } = require('../utils/constants');
 const { isValidEmail, isValidUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
 const { getClassifiedCategoryKeys, findCategory, getOptionNames } = require('./categories');
+const { getListingCategoryKeys, findListingCategory } = require('./listingCategories');
 
 class ValidationError extends Error {
   constructor(errors) {
@@ -176,6 +177,67 @@ function validateContact(body, errors) {
   return contact;
 }
 
+// Listings is a fully separate section from Classifieds - every category is
+// admin-defined and generic (no specialized fields like job type/lost-found).
+function validateListingPayload(body, charLimits) {
+  const errors = [];
+  const category = body.category;
+  const categoryDef = findListingCategory(category);
+  if (!categoryDef) {
+    throw new ValidationError([`category must be one of ${getListingCategoryKeys().join(', ')}`]);
+  }
+
+  const title = requireString(body.title, 'title', errors, { max: charLimits.title });
+  const description = requireString(body.description, 'description', errors, { max: charLimits.description });
+  const locationText = requireString(body.locationText, 'location', errors, { max: 200 });
+
+  const fields = {};
+  if (categoryDef.hasPrice && body.fields?.price !== undefined && body.fields?.price !== null && body.fields?.price !== '') {
+    const price = Number(body.fields.price);
+    if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
+    fields.price = price;
+  }
+
+  const posterEmail = requireString(body.posterEmail, 'email', errors);
+  if (posterEmail && !isValidEmail(posterEmail)) errors.push('email address is invalid');
+
+  let posterPhone = null;
+  if (body.posterPhone) {
+    const p = validatePhone(body.posterPhone, body.posterPhoneCountry || 'US');
+    if (!p.valid) errors.push('phone number is invalid');
+    else posterPhone = p.e164;
+  }
+
+  const contact = validateContact(body, errors);
+
+  if (!body.pricingTierId && !categoryDef.free) {
+    errors.push('a pricing tier must be selected');
+  }
+
+  if (errors.length) throw new ValidationError(errors);
+
+  return {
+    category,
+    title,
+    description,
+    fields,
+    locationText,
+    locationCity: body.locationCity || null,
+    locationState: body.locationState || null,
+    locationLat: body.locationLat != null ? Number(body.locationLat) : null,
+    locationLng: body.locationLng != null ? Number(body.locationLng) : null,
+    locationPlaceId: body.locationPlaceId || null,
+    posterFirstName: body.posterFirstName || null,
+    posterLastName: body.posterLastName || null,
+    posterEmail: posterEmail.toLowerCase(),
+    posterPhone,
+    contact,
+    pricingTierId: body.pricingTierId ? Number(body.pricingTierId) : null,
+    wantsStrike: !!body.wantsStrike,
+    wantsOversized: !!body.wantsOversized,
+  };
+}
+
 function validateSimchaPayload(body, charLimits) {
   const errors = [];
   // Simchas have no title, date, or location field to fill in - just a
@@ -237,4 +299,4 @@ function validateSimchaPayload(body, charLimits) {
   };
 }
 
-module.exports = { ValidationError, validateClassifiedPayload, validateSimchaPayload };
+module.exports = { ValidationError, validateClassifiedPayload, validateSimchaPayload, validateListingPayload, validateCategoryFields };

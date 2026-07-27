@@ -3,7 +3,7 @@ async function renderModerationPage() {
   const root = document.getElementById('adminContent');
 
   if (!data.posts.length) {
-    root.innerHTML = `<h1>Moderation Queue</h1><p>Nothing waiting for approval. 🎉</p>`;
+    root.innerHTML = `<h1>Moderation Queue</h1><p>Nothing waiting for approval.</p>`;
     return;
   }
 

@@ -1,7 +1,8 @@
 async function renderDetailPage(id, type) {
-  const post = type === 'simcha' ? await Api.simchaDetail(id) : await Api.classifiedDetail(id);
+  const post = type === 'simcha' ? await Api.simchaDetail(id) : type === 'listing' ? await Api.listingDetail(id) : await Api.classifiedDetail(id);
   const isBookmarked = Bookmarks.has(type, id);
   Api.registerImpressions([id]);
+  Api.registerClicks([id]);
 
   const fieldRows = [];
   if (post.fields?.jobType) fieldRows.push(['Job Type', post.fields.jobType.replace('_', ' ')]);
@@ -9,37 +10,48 @@ async function renderDetailPage(id, type) {
   if (post.fields?.experience) fieldRows.push(['Experience', post.fields.experience]);
   if (post.fields?.lostOrFound) fieldRows.push(['Status', post.fields.lostOrFound.toUpperCase()]);
   if (post.fields?.price !== undefined && post.fields?.price !== null) fieldRows.push(['Price', formatCents(post.fields.price * 100)]);
-  if (post.fields?.simchaDate) fieldRows.push(['Date', formatDate(new Date(post.fields.simchaDate).getTime())]);
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
-  fieldRows.push([I18N.t('posted'), formatDate(post.publishedAt)]);
 
   const contactButtons = [];
-  if (post.contact?.phone) contactButtons.push(`<a class="btn" href="${post.contact.phone.tel}">&#128222; ${I18N.t('call')} ${escapeHtml(post.contact.phone.display)}${post.contact.phone.ext ? ' x' + escapeHtml(post.contact.phone.ext) : ''}</a>`);
-  if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline" href="${post.contact.email.mailto}">&#9993; ${I18N.t('email')}</a>`);
-  if (post.contact?.url) contactButtons.push(`<a class="btn btn-outline" href="${post.contact.url.href}" target="_blank" rel="noopener">&#127760; ${I18N.t('website')}</a>`);
+  if (post.contact?.phone) contactButtons.push(`<a class="btn contact-link" data-click-type="phone" href="${post.contact.phone.tel}">${I18N.t('call')} ${escapeHtml(post.contact.phone.display)}${post.contact.phone.ext ? ' x' + escapeHtml(post.contact.phone.ext) : ''}</a>`);
+  if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="email" href="${post.contact.email.mailto}">${I18N.t('email')}</a>`);
+  if (post.contact?.url) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="website" href="${post.contact.url.href}" target="_blank" rel="noopener">${I18N.t('website')}</a>`);
+  const hasContact = contactButtons.length > 0;
 
-  const images = post.images && post.images.length ? post.images.map((i) => `<img src="${i}" alt="">`).join('') : '';
+  const images = post.images || [];
+  const gallery = images.length
+    ? `<div class="detail-gallery">
+        <div class="detail-gallery-main"><img src="${images[0]}" alt="" id="galleryMain"></div>
+        ${images.length > 1 ? `<div class="detail-gallery-thumbs">${images.map((src, i) => `<img src="${src}" alt="" class="${i === 0 ? 'active' : ''}" data-src="${src}">`).join('')}</div>` : ''}
+      </div>`
+    : '';
 
   document.getElementById('app').innerHTML = `
     <div class="container">
-      <div class="detail-grid">
+      <div class="detail-grid detail-anim">
         <div>
-          <span class="tag">${escapeHtml(post.categoryLabel)}</span>
-          <h1>${escapeHtml(post.title)}</h1>
-          ${images ? `<div class="detail-images">${images}</div>` : ''}
-          <p style="white-space:pre-wrap">${escapeHtml(post.description || '')}</p>
-          <ul class="detail-meta-list">
-            ${fieldRows.map(([k, v]) => `<li><span>${escapeHtml(String(k))}</span><span>${escapeHtml(String(v))}</span></li>`).join('')}
-          </ul>
+          <div class="detail-topline">
+            <span class="tag tag-lg">${escapeHtml(post.categoryLabel)}</span>
+            ${post.isFeatured ? '<span class="badge-featured" style="position:static">Featured</span>' : ''}
+            <span class="detail-posted">${I18N.t('posted')} ${escapeHtml(formatRelativeTime(post.publishedAt))}</span>
+          </div>
+          <h1 class="detail-title">${escapeHtml(post.title)}</h1>
+          ${gallery}
+          <p class="detail-desc">${escapeHtml(post.description || '')}</p>
+          ${fieldRows.length ? `<ul class="detail-meta-list">${fieldRows.map(([k, v]) => `<li><span>${escapeHtml(String(k))}</span><span>${escapeHtml(String(v))}</span></li>`).join('')}</ul>` : ''}
         </div>
         <div class="contact-card">
+          ${type === 'simcha' ? `
+          <div style="display:flex;gap:8px">
+            <button class="bookmark-btn ${isBookmarked ? 'active' : ''}" id="bookmarkBtn"><span id="bookmarkLabel">${I18N.t(isBookmarked ? 'bookmarked' : 'bookmark')}</span></button>
+            <button class="report-link" id="reportBtn" data-i18n="report">Report</button>
+          </div>` : `
           <h3 data-i18n="contact">Contact</h3>
-          ${contactButtons.join('') || '<p class="sub">No contact info provided.</p>'}
+          ${hasContact ? contactButtons.join('') : '<p class="sub">No contact info provided.</p>'}
           <div style="display:flex;gap:8px;margin-top:14px">
-            <button class="bookmark-btn ${isBookmarked ? 'active' : ''}" id="bookmarkBtn">&#9733; <span id="bookmarkLabel">${I18N.t(isBookmarked ? 'bookmarked' : 'bookmark')}</span></button>
+            <button class="bookmark-btn ${isBookmarked ? 'active' : ''}" id="bookmarkBtn"><span id="bookmarkLabel">${I18N.t(isBookmarked ? 'bookmarked' : 'bookmark')}</span></button>
             <button class="report-link" id="reportBtn" data-i18n="report">Report</button>
           </div>
-          ${type === 'classified' ? `
           <details style="margin-top:16px">
             <summary style="cursor:pointer;font-weight:600;font-size:.88rem">Boost or Feature this listing</summary>
             <form id="boostForm" style="margin-top:10px">
@@ -47,7 +59,7 @@ async function renderDetailPage(id, type) {
               <button class="btn btn-sm" type="submit" name="action" value="boost">Boost to Top</button>
               <button class="btn btn-sm btn-gold" type="submit" name="action" value="strike">Make Featured</button>
             </form>
-          </details>` : ''}
+          </details>`}
         </div>
       </div>
     </div>
@@ -65,6 +77,20 @@ async function renderDetailPage(id, type) {
     if (reason === null) return;
     await Api.report(id, { reason, reporterEmail: null });
     toast('Report sent. Thank you.');
+  });
+
+  document.querySelectorAll('.contact-link').forEach((el) => {
+    el.addEventListener('click', () => Api.registerClicks([id]));
+  });
+
+  const thumbs = document.querySelectorAll('.detail-gallery-thumbs img');
+  const mainImg = document.getElementById('galleryMain');
+  thumbs.forEach((t) => {
+    t.addEventListener('click', () => {
+      mainImg.src = t.dataset.src;
+      thumbs.forEach((x) => x.classList.remove('active'));
+      t.classList.add('active');
+    });
   });
 
   const boostForm = document.getElementById('boostForm');

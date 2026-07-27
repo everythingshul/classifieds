@@ -12,12 +12,12 @@ async function renderPostsPage(query) {
       <div class="field"><label>Status</label>
         <select name="status"><option value="">Any</option>${['pending_payment', 'pending_approval', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${filters.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       </div>
-      <div class="field"><label>Type</label><select name="type"><option value="">Any</option><option value="classified" ${filters.type === 'classified' ? 'selected' : ''}>Classified</option><option value="simcha" ${filters.type === 'simcha' ? 'selected' : ''}>Simcha</option></select></div>
+      <div class="field"><label>Type</label><select name="type"><option value="">Any</option><option value="classified" ${filters.type === 'classified' ? 'selected' : ''}>Classified</option><option value="listing" ${filters.type === 'listing' ? 'selected' : ''}>Listing</option><option value="simcha" ${filters.type === 'simcha' ? 'selected' : ''}>Simcha</option></select></div>
       <button class="btn btn-sm" type="submit">Filter</button>
     </form>
 
     <table class="admin-table">
-      <thead><tr><th>Title</th><th>Type</th><th>Category</th><th>Status</th><th>Views</th><th>Expires</th><th></th></tr></thead>
+      <thead><tr><th>Title</th><th>Type</th><th>Category</th><th>Status</th><th>Views</th><th>Clicks</th><th>Expires</th><th></th></tr></thead>
       <tbody>
         ${data.posts.map((p) => `
           <tr>
@@ -26,6 +26,7 @@ async function renderPostsPage(query) {
             <td>${escapeHtml(p.categoryLabel)}</td>
             <td><span class="status-pill status-${p.status}">${p.status}</span></td>
             <td>${p.viewCount}</td>
+            <td>${p.clickCount}</td>
             <td>${p.expiresAt ? formatDate(p.expiresAt) : (p.savedForever ? 'Never' : '—')}</td>
             <td><button class="btn btn-sm edit-btn" data-id="${p.id}">Edit</button></td>
           </tr>
@@ -59,6 +60,7 @@ async function openEditor(id) {
   panel.innerHTML = `
     <div class="admin-card">
       <h3 style="margin-top:0">Edit: ${escapeHtml(p.title)} <span class="status-pill status-${p.status}">${p.status}</span></h3>
+      <p class="hint">${p.viewCount} views · ${p.clickCount} clicks</p>
       <form id="editForm">
         <div class="form-cols">
           <div class="form-row"><label>Title</label><input name="title" value="${escapeHtml(p.title)}"></div>
@@ -88,11 +90,11 @@ async function openEditor(id) {
         ${p.status === 'pending_approval' ? `<button class="btn btn-gold" id="approveBtn">Approve &amp; Publish</button><button class="btn btn-danger" id="rejectBtn">Reject</button>` : ''}
         <button class="btn btn-outline" id="boostBtn">Boost to Top</button>
         <button class="btn btn-outline" id="extendBtn">Extend 30 Days</button>
-        <button class="btn btn-outline" id="saveForeverBtn">${p.savedForever ? 'Saved Forever ✓' : 'Save Forever'}</button>
+        <button class="btn btn-outline" id="saveForeverBtn">${p.savedForever ? 'Saved Forever' : 'Save Forever'}</button>
         <button class="btn btn-danger" id="deleteBtn">Remove Listing</button>
       </div>
 
-      ${p.images.length ? `<h4>Images</h4><div style="display:flex;gap:10px;flex-wrap:wrap">${p.images.map((img) => `<div><img class="thumb-mini" style="width:100px;height:100px" src="${img.url}"><div>${img.approved ? '✅ approved' : '⏳ pending'}</div></div>`).join('')}</div>` : ''}
+      ${p.images.length ? `<h4>Images</h4><div style="display:flex;gap:10px;flex-wrap:wrap">${p.images.map((img) => `<div><img class="thumb-mini" style="width:100px;height:100px" src="${img.url}"><div>${img.approved ? 'Approved' : 'Pending'}</div></div>`).join('')}</div>` : ''}
 
       ${p.payments?.length ? `<h4>Payment History</h4><table class="admin-table"><thead><tr><th>Kind</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>${p.payments.map((pay) => `<tr><td>${pay.kind}</td><td>${formatCents(pay.amount_cents)}</td><td>${pay.status}</td><td>${formatDate(pay.created_at)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}

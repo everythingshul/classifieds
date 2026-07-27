@@ -14,6 +14,15 @@ db.pragma('foreign_keys = ON');
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);
 
+// Lightweight column migrations for databases created before a column existed
+// - CREATE TABLE IF NOT EXISTS above doesn't add columns to an already-existing table.
+function addColumnIfMissing(table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+addColumnIfMissing('posts', 'click_count', 'click_count INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('pricing_tiers', 'post_type', "post_type TEXT NOT NULL DEFAULT 'classified'");
+
 function seed() {
   const now = Date.now();
 

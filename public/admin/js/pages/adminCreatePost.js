@@ -5,10 +5,17 @@ async function renderCreatePostPage() {
   let category = cfg.categories[0].key;
   let files = [];
 
+  function categoriesForType() {
+    return type === 'listing' ? cfg.listingCategories : cfg.categories;
+  }
+
   function categoryFieldsHtml() {
-    const catDef = cfg.categories.find((c) => c.key === category);
+    const catDef = categoriesForType().find((c) => c.key === category);
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
     const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
+    if (type === 'listing') {
+      return catDef?.hasPrice ? `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>` : '';
+    }
     if (category === 'job-offers') {
       return `
         <div class="form-cols">
@@ -30,19 +37,19 @@ async function renderCreatePostPage() {
   }
 
   function render() {
-    const catDef = cfg.categories.find((c) => c.key === category);
+    const catDef = categoriesForType().find((c) => c.key === category);
     const simchaTax = cfg.taxonomies.filter((t) => t.grp === 'simcha');
     root.innerHTML = `
       <h1>+ New Post</h1>
       <div class="admin-card" style="max-width:640px">
         <div class="form-row">
           <label>Type</label>
-          <select id="typeSelect"><option value="classified" ${type === 'classified' ? 'selected' : ''}>Classified</option><option value="simcha" ${type === 'simcha' ? 'selected' : ''}>Simcha</option></select>
+          <select id="typeSelect"><option value="classified" ${type === 'classified' ? 'selected' : ''}>Classified</option><option value="listing" ${type === 'listing' ? 'selected' : ''}>Listing</option><option value="simcha" ${type === 'simcha' ? 'selected' : ''}>Simcha</option></select>
         </div>
-        ${type === 'classified' ? `
+        ${type !== 'simcha' ? `
           <div class="form-row">
             <label>Category</label>
-            <select id="categorySelect">${cfg.categories.map((c) => `<option value="${c.key}" ${category === c.key ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select>
+            ${categoriesForType().length ? `<select id="categorySelect">${categoriesForType().map((c) => `<option value="${c.key}" ${category === c.key ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select>` : `<p class="hint">No ${type} categories exist yet - add one under Categories first.</p>`}
           </div>
           <div class="form-row"><label>Title</label><input type="text" id="f_title"></div>
           <div class="form-row"><label>Description</label><textarea id="f_description" rows="3"></textarea></div>
@@ -80,7 +87,11 @@ async function renderCreatePostPage() {
       </div>
     `;
 
-    document.getElementById('typeSelect').addEventListener('change', (e) => { type = e.target.value; render(); });
+    document.getElementById('typeSelect').addEventListener('change', (e) => {
+      type = e.target.value;
+      category = categoriesForType()[0]?.key || null;
+      render();
+    });
     const categorySelect = document.getElementById('categorySelect');
     if (categorySelect) categorySelect.addEventListener('change', (e) => { category = e.target.value; render(); });
     const imgInput = document.getElementById('f_images');
@@ -103,7 +114,8 @@ async function renderCreatePostPage() {
       fd.set('durationDays', document.getElementById('durationDays').value || '30');
       fd.set('wantsStrike', document.getElementById('wantsStrike').value);
 
-      if (type === 'classified') {
+      if (type === 'classified' || type === 'listing') {
+        if (!category) throw new Error(`No ${type} categories exist yet - add one under Categories first.`);
         fd.set('category', category);
         fd.set('title', document.getElementById('f_title').value.trim());
         fd.set('description', document.getElementById('f_description').value.trim());

@@ -9,6 +9,8 @@ const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { findCategory } = require('../../services/categories');
+const { findListingCategory } = require('../../services/listingCategories');
+const { validateCategoryFields } = require('../../services/postValidation');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -21,7 +23,7 @@ function imagesFor(postId) {
 // uploaded images pre-approved (admin is trusted, unlike public submissions).
 router.post('/create', upload.array('images', 6), async (req, res, next) => {
   try {
-    const type = req.body.type === 'simcha' ? 'simcha' : 'classified';
+    const type = req.body.type === 'simcha' ? 'simcha' : req.body.type === 'listing' ? 'listing' : 'classified';
     let fields = {};
     try {
       fields = req.body.fields ? JSON.parse(req.body.fields) : {};
@@ -30,14 +32,28 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
     }
 
     const title = String(req.body.title || '').trim();
-    if (type === 'classified' && !title) return res.status(400).json({ error: 'Title is required' });
+    if (type !== 'simcha' && !title) return res.status(400).json({ error: 'Title is required' });
 
-    const catDef = type === 'classified' ? findCategory(req.body.category) : null;
-    if (type === 'classified' && !catDef) return res.status(400).json({ error: 'Invalid category' });
+    const catDef = type === 'classified' ? findCategory(req.body.category) : type === 'listing' ? findListingCategory(req.body.category) : null;
+    if (type !== 'simcha' && !catDef) return res.status(400).json({ error: 'Invalid category' });
+
+    if (type === 'classified') {
+      const fieldErrors = [];
+      fields = validateCategoryFields(req.body.category, fields, fieldErrors, catDef);
+      if (fieldErrors.length) return res.status(400).json({ error: 'Validation failed', details: fieldErrors });
+    } else if (type === 'listing') {
+      const nextFields = {};
+      if (catDef.hasPrice && fields.price !== undefined && fields.price !== null && fields.price !== '') {
+        const price = Number(fields.price);
+        if (Number.isNaN(price) || price < 0) return res.status(400).json({ error: 'Validation failed', details: ['price must be a positive number'] });
+        nextFields.price = price;
+      }
+      fields = nextFields;
+    }
 
     const uploaded = [];
     for (const file of req.files || []) {
-      if (type === 'classified' && !catDef.hasImages) return res.status(400).json({ error: `${catDef.label} does not support images` });
+      if (type !== 'simcha' && !catDef.hasImages) return res.status(400).json({ error: `${catDef.label} does not support images` });
       uploaded.push({ filename: await processAndSaveImage(file.buffer), originalName: file.originalname });
     }
 
@@ -52,7 +68,7 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
 
     const taxonomyId = req.body.taxonomyId ? Number(req.body.taxonomyId) : null;
     const payload = {
-      category: type === 'classified' ? req.body.category : 'simcha',
+      category: type === 'simcha' ? 'simcha' : req.body.category,
       taxonomyId,
       title,
       description: req.body.description || '',
@@ -208,7 +224,7 @@ router.post('/:id/approve', async (req, res, next) => {
     await sendMail({
       to: updated.poster_email,
       subject: `Your listing is now live: ${updated.title}`,
-      html: `<p>Great news - your listing "${updated.title}" has been approved and is now live.</p><p><a href="${appUrl()}/${updated.type === 'simcha' ? 'simchas' : 'classifieds'}/${updated.public_id}">View it here</a></p>`,
+      html: `<p>Great news - your listing "${updated.title}" has been approved and is now live.</p><p><a href="${appUrl()}${updated.type === 'simcha' ? '/simchas/' : updated.type === 'listing' ? '/listings/' : '/classifieds/'}${updated.public_id}">View it here</a></p>`,
     }).catch(() => {});
     res.json(formatPostAdmin(updated, imagesFor(post.id)));
   } catch (e) {

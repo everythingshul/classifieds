@@ -1,9 +1,10 @@
 const express = require('express');
 const db = require('../../db');
 const { upload, processAndSaveImage } = require('../../middleware/upload');
-const { validateClassifiedPayload, validateSimchaPayload, ValidationError } = require('../../services/postValidation');
-const { buildClassifiedCharges, buildSimchaCharges, getAddon, getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits } = require('../../services/pricing');
+const { validateClassifiedPayload, validateSimchaPayload, validateListingPayload, ValidationError } = require('../../services/postValidation');
+const { buildClassifiedCharges, buildListingCharges, buildSimchaCharges, getAddon, getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits } = require('../../services/pricing');
 const { findCategory } = require('../../services/categories');
+const { findListingCategory } = require('../../services/listingCategories');
 const { getActivePromo, applyDiscount, recordUse } = require('../../services/promoCodes');
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
@@ -16,6 +17,11 @@ const router = express.Router();
 const runtimeConfig = require('../../services/runtimeConfig');
 function appUrl() {
   return runtimeConfig.get('app_url', 'APP_URL') || '';
+}
+function postUrlPath(post) {
+  if (post.type === 'simcha') return `/simchas/${post.public_id}`;
+  if (post.type === 'listing') return `/listings/${post.public_id}`;
+  return `/classifieds/${post.public_id}`;
 }
 
 // Mutates `charges` in place: collapses its line items into a single
@@ -44,7 +50,7 @@ async function processUploadedImages(files) {
 
 router.post('/', upload.array('images', 6), async (req, res, next) => {
   try {
-    const type = req.body.type === 'simcha' ? 'simcha' : 'classified';
+    const type = req.body.type === 'simcha' ? 'simcha' : req.body.type === 'listing' ? 'listing' : 'classified';
     let parsedFields = {};
     try {
       parsedFields = req.body.fields ? JSON.parse(req.body.fields) : {};
@@ -91,6 +97,37 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
       });
 
       return await finalizeOrCheckout({ res, post, payment, charges, posterEmail: payload.posterEmail, type: 'classified' });
+    }
+
+    if (type === 'listing') {
+      const charLimits = wantsOversized ? getOversizedCharLimits() : getListingCharLimits();
+      const payload = validateListingPayload({ ...req.body, fields: parsedFields, wantsOversized }, charLimits);
+      const catDef = findListingCategory(payload.category);
+      const uploaded = await processUploadedImages(req.files);
+      if (uploaded.length && !catDef.hasImages) {
+        return res.status(400).json({ error: `${catDef.label} does not support image uploads` });
+      }
+
+      const charges = buildListingCharges({
+        category: payload.category,
+        categoryDef: catDef,
+        pricingTierId: payload.pricingTierId,
+        wantsStrike: payload.wantsStrike,
+        wantsOversized: payload.wantsOversized,
+      });
+      applyPromoToCharges(charges, req.body.promoCode);
+
+      const post = insertPost({ type: 'listing', category: payload.category, payload, hasImages: uploaded.length > 0 });
+      attachImages(post.id, uploaded);
+      const payment = recordPayment({
+        postId: post.id,
+        kind: 'listing',
+        amountCents: charges.totalCents,
+        payerEmail: payload.posterEmail,
+        status: charges.totalCents === 0 ? 'paid' : 'pending',
+      });
+
+      return await finalizeOrCheckout({ res, post, payment, charges, posterEmail: payload.posterEmail, type: 'listing' });
     }
 
     // simcha - no title/date/location are collected; the title is the
@@ -157,7 +194,7 @@ router.post('/:publicId/boost', async (req, res, next) => {
     const session = await createCheckoutSession({
       lineItems: [{ label: `Boost listing: ${post.title}`, amount_cents: amount }],
       successUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl()}/classifieds/${post.public_id}?canceled=1`,
+      cancelUrl: `${appUrl()}${postUrlPath(post)}?canceled=1`,
       customerEmail: email,
       metadata: { kind: 'boost', postId: String(post.id), paymentId: String(payment.id) },
     });
@@ -190,7 +227,7 @@ router.post('/:publicId/strike', async (req, res, next) => {
     const session = await createCheckoutSession({
       lineItems: [{ label: `Feature listing: ${post.title}`, amount_cents: amount }],
       successUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl()}/classifieds/${post.public_id}?canceled=1`,
+      cancelUrl: `${appUrl()}${postUrlPath(post)}?canceled=1`,
       customerEmail: email,
       metadata: { kind: 'strike', postId: String(post.id), paymentId: String(payment.id) },
     });
@@ -210,7 +247,7 @@ router.post('/:publicId/report', async (req, res, next) => {
     db.prepare('INSERT INTO reports (post_id, reason, reporter_email, created_at) VALUES (?, ?, ?, ?)').run(
       post.id, reason, reporterEmail, Date.now()
     );
-    const url = `${appUrl()}/${post.type === 'simcha' ? 'simchas' : 'classifieds'}/${post.public_id}`;
+    const url = `${appUrl()}${postUrlPath(post)}`;
     await notifyAdmin(
       `Post reported: ${post.title}`,
       `<p><b>Post:</b> ${post.title}</p><p><b>Reason:</b> ${reason || '(none given)'}</p><p><b>Reported by:</b> ${reporterEmail || 'anonymous'}</p><p><a href="${url}">View post</a></p>`
@@ -229,6 +266,20 @@ router.post('/impressions', (req, res, next) => {
     if (!ids.length) return res.json({ ok: true });
     const placeholders = ids.map(() => '?').join(',');
     db.prepare(`UPDATE posts SET view_count = view_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Real clicks: opening a post's detail page, or clicking a contact link on it.
+// Tracked separately from impressions so admins can see engagement, not just reach.
+router.post('/clicks', (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String).slice(0, 100) : [];
+    if (!ids.length) return res.json({ ok: true });
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`UPDATE posts SET click_count = click_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
     res.json({ ok: true });
   } catch (e) {
     next(e);

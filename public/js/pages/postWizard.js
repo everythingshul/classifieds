@@ -22,6 +22,13 @@ function renderPostWizard() {
 
   function go(step) { state.step = step; render(); }
 
+  function currentCategories() {
+    return state.postType === 'listing' ? cfg.listingCategories : cfg.categories;
+  }
+  function currentCatDef() {
+    return currentCategories().find((c) => c.key === state.category);
+  }
+
   function render() {
     if (state.step === 0) return renderTypeStep();
     if (state.step === 1) return state.postType === 'simcha' ? renderSimchaCategoryStep() : renderCategoryStep();
@@ -38,6 +45,7 @@ function renderPostWizard() {
     shell(`
       <div class="category-grid">
         <button type="button" class="category-tile ${state.postType === 'classified' ? 'selected' : ''}" data-v="classified">Classified</button>
+        <button type="button" class="category-tile ${state.postType === 'listing' ? 'selected' : ''}" data-v="listing">Listing</button>
         <button type="button" class="category-tile ${state.postType === 'simcha' ? 'selected' : ''}" data-v="simcha">Simcha</button>
       </div>
       <div style="margin-top:20px;text-align:end"><button class="btn" id="nextBtn">Next</button></div>
@@ -51,10 +59,11 @@ function renderPostWizard() {
   }
 
   function renderCategoryStep() {
+    const categories = currentCategories();
     shell(`
-      <div class="category-grid">
-        ${cfg.categories.map((c) => `<button type="button" class="category-tile ${state.category === c.key ? 'selected' : ''}" data-v="${c.key}">${escapeHtml(I18N.get() === 'he' ? c.labelHe : c.label)}${c.free ? ' <span class="tag">Free</span>' : ''}</button>`).join('')}
-      </div>
+      ${categories.length ? `<div class="category-grid">
+        ${categories.map((c) => `<button type="button" class="category-tile ${state.category === c.key ? 'selected' : ''}" data-v="${c.key}">${escapeHtml(I18N.get() === 'he' ? c.labelHe : c.label)}${c.free ? ' <span class="tag">Free</span>' : ''}</button>`).join('')}
+      </div>` : `<p class="hint">No categories are available for this section yet. Please check back soon.</p>`}
       <div style="margin-top:20px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => { state.category = btn.dataset.v; render(); }));
@@ -86,7 +95,10 @@ function renderPostWizard() {
   function categorySpecificFieldsHtml() {
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
     const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
-    switch (state.category) {
+    // Listings are always generic (admin-defined, no specialized fields) -
+    // skip straight to the default case regardless of what the category's
+    // slug happens to look like.
+    switch (state.postType === 'listing' ? null : state.category) {
       case 'job-offers':
         return `
           <div class="form-cols">
@@ -111,15 +123,15 @@ function renderPostWizard() {
           <div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
           <div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>`;
       default: {
-        // Admin-added custom category type.
-        const catDef = cfg.categories.find((c) => c.key === state.category);
+        // Admin-added custom classifieds category, or a Listing (always generic).
+        const catDef = currentCatDef();
         return catDef?.hasPrice ? `<div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>` : '';
       }
     }
   }
 
   function imageUploadHtml() {
-    const catDef = cfg.categories.find((c) => c.key === state.category);
+    const catDef = currentCatDef();
     if (!catDef?.hasImages) return '';
     return `
       <div class="form-row">
@@ -130,7 +142,7 @@ function renderPostWizard() {
   }
 
   function renderClassifiedDetailsStep() {
-    const catDef = cfg.categories.find((c) => c.key === state.category);
+    const catDef = currentCatDef();
     shell(`
       <h3 style="margin-top:0">${escapeHtml(catDef.label)}</h3>
       <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${cfg.charLimits.title}" value="${escapeHtml(state.data.title || '')}" required></div>
@@ -196,7 +208,9 @@ function renderPostWizard() {
       if (!contactPhone && !contactEmail && !contactUrl) errs.push('At least one contact method is required');
 
       const fields = {};
-      if (state.category === 'job-offers') {
+      if (state.postType === 'listing') {
+        if (document.getElementById('f_price')) fields.price = document.getElementById('f_price').value;
+      } else if (state.category === 'job-offers') {
         fields.jobType = document.getElementById('f_jobType').value;
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
         const pay = document.getElementById('f_payAmount').value;
@@ -296,8 +310,9 @@ function renderPostWizard() {
   }
 
   function renderPricingStep() {
-    const tiers = cfg.pricingTiers.filter((t) => (t.category === state.category || t.category === null) && t.active);
-    const isFree = state.category === 'lost-found';
+    const wantedType = state.postType === 'listing' ? 'listing' : 'classified';
+    const tiers = cfg.pricingTiers.filter((t) => t.post_type === wantedType && (t.category === state.category || t.category === null) && t.active);
+    const isFree = !!currentCatDef()?.free;
     shell(`
       ${isFree ? '<p class="tag">This category is always free to post.</p>' : `
       <h3 style="margin-top:0">Choose how long to run your ad</h3>
@@ -339,7 +354,7 @@ function renderPostWizard() {
       <div id="stepError" class="error-list" style="display:none"></div>
       <div style="margin-top:10px;display:flex;justify-content:space-between">
         <button class="btn btn-outline" id="backBtn">Back</button>
-        <button class="btn btn-gold" id="submitBtn">Submit${state.postType === 'classified' && state.category !== 'lost-found' ? ' & Pay' : ''}</button>
+        <button class="btn btn-gold" id="submitBtn">Submit${state.postType !== 'simcha' && !currentCatDef()?.free ? ' & Pay' : ''}</button>
       </div>
     `);
     document.getElementById('backBtn').addEventListener('click', () => go(state.postType === 'simcha' ? 3 : 3));
@@ -353,7 +368,7 @@ function renderPostWizard() {
     try {
       const fd = new FormData();
       fd.set('type', state.postType);
-      if (state.postType === 'classified') {
+      if (state.postType === 'classified' || state.postType === 'listing') {
         fd.set('category', state.category);
         fd.set('title', state.data.title);
         fd.set('description', state.data.description || '');
@@ -396,8 +411,8 @@ function renderPostWizard() {
       } else {
         document.getElementById('app').innerHTML = `
           <div class="container" style="padding:60px 0;text-align:center">
-            <h1>🎉 Your post is live!</h1>
-            <p><a href="/${result.post.type === 'simcha' ? 'simchas' : 'classifieds'}/${result.post.id}" class="btn">View your post</a></p>
+            <h1>Your post is live!</h1>
+            <p><a href="/${result.post.type === 'simcha' ? 'simchas' : result.post.type === 'listing' ? 'listings' : 'classifieds'}/${result.post.id}" class="btn">View your post</a></p>
           </div>`;
       }
     } catch (e) {

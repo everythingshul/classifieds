@@ -3,6 +3,12 @@ const { formatCents } = require('./money');
 const { sendMail, notifyAdmin } = require('./mailer');
 const runtimeConfig = require('../services/runtimeConfig');
 
+function typeLabel(type) {
+  if (type === 'simcha') return 'Simcha';
+  if (type === 'listing') return 'Listing';
+  return 'Classified';
+}
+
 async function createInvoicePdf(invoice) {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
@@ -33,7 +39,7 @@ async function createInvoicePdf(invoice) {
   y -= 8;
 
   draw('Post Details', { bold: true, gap: 15 });
-  draw(`Type: ${invoice.post.type === 'simcha' ? 'Simcha' : 'Classified'}`, { gap: 14 });
+  draw(`Type: ${typeLabel(invoice.post.type)}`, { gap: 14 });
   draw(`Category: ${invoice.post.categoryLabel}`, { gap: 14 });
   draw(`Title: ${invoice.post.title}`, { gap: 14 });
   if (invoice.post.location) draw(`Location: ${invoice.post.location}`, { gap: 14 });
@@ -67,7 +73,7 @@ function invoiceHtml(invoice) {
     <p>Thank you for your posting${invoice.poster.firstName ? `, ${invoice.poster.firstName}` : ''}.</p>
     <h3>Post Details</h3>
     <table style="width:100%;border-collapse:collapse">
-      <tr><td style="padding:4px 8px;color:#666">Type</td><td style="padding:4px 8px">${invoice.post.type === 'simcha' ? 'Simcha' : 'Classified'}</td></tr>
+      <tr><td style="padding:4px 8px;color:#666">Type</td><td style="padding:4px 8px">${typeLabel(invoice.post.type)}</td></tr>
       <tr><td style="padding:4px 8px;color:#666">Category</td><td style="padding:4px 8px">${invoice.post.categoryLabel}</td></tr>
       <tr><td style="padding:4px 8px;color:#666">Title</td><td style="padding:4px 8px">${invoice.post.title}</td></tr>
       ${invoice.post.location ? `<tr><td style="padding:4px 8px;color:#666">Location</td><td style="padding:4px 8px">${invoice.post.location}</td></tr>` : ''}

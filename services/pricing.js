@@ -7,7 +7,13 @@ function getPricingTier(id) {
 
 function getTiersForCategory(category) {
   return db
-    .prepare('SELECT * FROM pricing_tiers WHERE active = 1 AND (category = ? OR category IS NULL) ORDER BY sort_order')
+    .prepare("SELECT * FROM pricing_tiers WHERE active = 1 AND post_type = 'classified' AND (category = ? OR category IS NULL) ORDER BY sort_order")
+    .all(category);
+}
+
+function getListingTiersForCategory(category) {
+  return db
+    .prepare("SELECT * FROM pricing_tiers WHERE active = 1 AND post_type = 'listing' AND (category = ? OR category IS NULL) ORDER BY sort_order")
     .all(category);
 }
 
@@ -31,6 +37,9 @@ function getSimchaCharLimits() {
 function getOversizedCharLimits() {
   return getSettingJson('oversized_char_limits', { title: 140, description: 500 });
 }
+function getListingCharLimits() {
+  return getSettingJson('listing_char_limits', { title: 80, description: 200 });
+}
 
 function getSetting(key, fallback = null) {
   const row = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(key);
@@ -45,11 +54,42 @@ function buildClassifiedCharges({ category, categoryDef, pricingTierId, wantsStr
   let tier = null;
 
   if (categoryDef?.free) {
-    tier = db.prepare('SELECT * FROM pricing_tiers WHERE category = ? AND active = 1 LIMIT 1').get(category)
+    tier = db.prepare("SELECT * FROM pricing_tiers WHERE category = ? AND post_type = 'classified' AND active = 1 LIMIT 1").get(category)
       || { name: 'Standard (Free)', duration_days: 30, price_cents: 0 };
   } else {
     tier = getPricingTier(pricingTierId);
-    if (!tier || (tier.category && tier.category !== category)) {
+    if (!tier || tier.post_type !== 'classified' || (tier.category && tier.category !== category)) {
+      throw Object.assign(new Error('Invalid pricing tier for this category'), { status: 400 });
+    }
+  }
+  if (!tier) throw Object.assign(new Error('No pricing tier available'), { status: 400 });
+  lineItems.push({ kind: 'listing', label: `${tier.name} listing`, amount_cents: tier.price_cents });
+
+  if (wantsStrike) {
+    const strike = getAddon('strike');
+    if (strike) lineItems.push({ kind: 'strike', label: strike.config.label || 'Featured / Striking listing', amount_cents: strike.price_cents });
+  }
+  if (wantsOversized) {
+    const oversized = getAddon('oversized');
+    if (oversized) lineItems.push({ kind: 'oversized', label: oversized.config.label || 'Oversized post', amount_cents: oversized.price_cents });
+  }
+
+  const totalCents = lineItems.reduce((s, i) => s + i.amount_cents, 0);
+  return { tier, lineItems, totalCents };
+}
+
+// Mirrors buildClassifiedCharges but scoped to Listings' own pricing tiers
+// (post_type = 'listing'), kept fully separate per the site's design.
+function buildListingCharges({ category, categoryDef, pricingTierId, wantsStrike, wantsOversized }) {
+  const lineItems = [];
+  let tier = null;
+
+  if (categoryDef?.free) {
+    tier = db.prepare("SELECT * FROM pricing_tiers WHERE category = ? AND post_type = 'listing' AND active = 1 LIMIT 1").get(category)
+      || { name: 'Standard (Free)', duration_days: 30, price_cents: 0 };
+  } else {
+    tier = getPricingTier(pricingTierId);
+    if (!tier || tier.post_type !== 'listing' || (tier.category && tier.category !== category)) {
       throw Object.assign(new Error('Invalid pricing tier for this category'), { status: 400 });
     }
   }
@@ -79,11 +119,14 @@ function buildSimchaCharges() {
 module.exports = {
   getPricingTier,
   getTiersForCategory,
+  getListingTiersForCategory,
   getAddon,
   getClassifiedCharLimits,
   getSimchaCharLimits,
   getOversizedCharLimits,
+  getListingCharLimits,
   getSetting,
   buildClassifiedCharges,
+  buildListingCharges,
   buildSimchaCharges,
 };

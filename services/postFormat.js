@@ -1,8 +1,10 @@
 const { formatPhoneDashed } = require('../utils/phone');
 const { findCategory } = require('./categories');
+const { findListingCategory } = require('./listingCategories');
 
-function categoryLabel(category) {
+function categoryLabel(category, type) {
   if (category === 'simcha') return 'Simcha';
+  if (type === 'listing') return findListingCategory(category)?.label || category;
   return findCategory(category)?.label || category;
 }
 
@@ -38,7 +40,7 @@ function formatPostPublic(post, images = []) {
     id: post.public_id,
     type: post.type,
     category: post.category,
-    categoryLabel: categoryLabel(post.category),
+    categoryLabel: categoryLabel(post.category, post.type),
     taxonomyId: post.taxonomy_id || null,
     title: post.title,
     description: post.description,
@@ -50,7 +52,9 @@ function formatPostPublic(post, images = []) {
       lat: post.location_lat,
       lng: post.location_lng,
     },
-    contact: buildContactLinks(post),
+    // Simchas never show contact info publicly - it's collected only so
+    // admins/CRM can reach the poster, and for the report-post workflow.
+    contact: post.type === 'simcha' ? {} : buildContactLinks(post),
     isFeatured: !!post.is_featured_strike,
     // View count is tracked (see /api/posts/impressions) but not shown
     // publicly for now - it's still visible to admins via formatPostAdmin.
@@ -67,7 +71,7 @@ function formatPostAdmin(post, images = []) {
     publicId: post.public_id,
     type: post.type,
     category: post.category,
-    categoryLabel: categoryLabel(post.category),
+    categoryLabel: categoryLabel(post.category, post.type),
     taxonomyId: post.taxonomy_id || null,
     title: post.title,
     description: post.description,
@@ -100,6 +104,7 @@ function formatPostAdmin(post, images = []) {
     status: post.status,
     hasImages: !!post.has_images,
     viewCount: post.view_count,
+    clickCount: post.click_count,
     boostedAt: post.boosted_at,
     publishedAt: post.published_at,
     expiresAt: post.expires_at,

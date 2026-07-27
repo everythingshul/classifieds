@@ -100,7 +100,7 @@ async function sendSurpriseEmails(post) {
         to: s.recipient_email,
         subject: `A surprise Mazel Tov for you!`,
         html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto">
-          <h2 style="color:#1f3b57">Mazel Tov! 🎉</h2>
+          <h2 style="color:#1f3b57">Mazel Tov!</h2>
           <p><b>${from}</b> wanted to surprise you with a Mazel Tov!</p>
           <p><a href="${url}" style="display:inline-block;padding:10px 18px;background:#1f3b57;color:#fff;text-decoration:none;border-radius:4px">View the Simcha</a></p>
         </div>`,
@@ -149,14 +149,15 @@ async function sendInvoiceForPost(post) {
   const payments = db.prepare('SELECT * FROM post_payments WHERE post_id = ? AND status = ?').all(post.id, 'paid');
   const totalCents = payments.reduce((s, p) => s + p.amount_cents, 0);
   const invoiceNumber = payments[0]?.invoice_number || newInvoiceNumber();
-  const url = `${appUrl()}${post.type === 'simcha' ? '/simchas/' : '/classifieds/'}${post.public_id}`;
+  const urlSegment = post.type === 'simcha' ? '/simchas/' : post.type === 'listing' ? '/listings/' : '/classifieds/';
+  const url = `${appUrl()}${urlSegment}${post.public_id}`;
   const invoice = {
     invoiceNumber,
     issuedAt: new Date(),
     poster: { firstName: post.poster_first_name, lastName: post.poster_last_name, email: post.poster_email, phone: post.poster_phone },
     post: {
       type: post.type,
-      categoryLabel: categoryLabel(post.category),
+      categoryLabel: categoryLabel(post.category, post.type),
       title: post.title,
       publicId: post.public_id,
       url,

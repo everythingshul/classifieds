@@ -37,12 +37,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/config', require('./routes/public/config'));
 app.use('/api/home', require('./routes/public/home'));
 app.use('/api/classifieds', require('./routes/public/classifieds'));
+app.use('/api/listings', require('./routes/public/listings'));
 app.use('/api/simchas', require('./routes/public/simchas'));
 app.use('/api/posts', require('./routes/public/posts'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
 app.use('/api/admin/custom-categories', require('./routes/admin/customCategories'));
+app.use('/api/admin/listing-categories', require('./routes/admin/listingCategories'));
 app.use('/api/admin/promo-codes', require('./routes/admin/promoCodes'));
 app.use('/api/admin/reports', require('./routes/admin/reports'));
 app.use('/api/admin/pricing', require('./routes/admin/pricing'));
@@ -55,8 +57,8 @@ app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
 });
 
-// Client-side routed pages (classified/simcha detail, view-all, etc.) all serve the same shell.
-app.get(['/classifieds/*', '/simchas/*'], (req, res) => {
+// Client-side routed pages (classified/listing/simcha detail, view-all, etc.) all serve the same shell.
+app.get(['/classifieds/*', '/listings/*', '/simchas/*'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

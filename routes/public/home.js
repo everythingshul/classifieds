@@ -41,6 +41,12 @@ router.get('/', async (req, res, next) => {
          ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT 10`
       )
       .all(now);
+    const recentListings = db
+      .prepare(
+        `SELECT * FROM posts WHERE type = 'listing' AND status = 'live' AND (expires_at IS NULL OR expires_at > ?)
+         ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT 10`
+      )
+      .all(now);
     const recentSimchas = db
       .prepare(
         `SELECT * FROM posts WHERE type = 'simcha' AND status = 'live' AND (expires_at IS NULL OR expires_at > ?)
@@ -48,11 +54,12 @@ router.get('/', async (req, res, next) => {
       )
       .all(now);
 
-    const imgMap = imagesForPosts(recentClassifieds.map((p) => p.id));
+    const imgMap = imagesForPosts([...recentClassifieds, ...recentListings].map((p) => p.id));
 
     res.json({
       calendar,
       recentClassifieds: recentClassifieds.map((p) => formatPostPublic(p, imgMap.get(p.id) || [])),
+      recentListings: recentListings.map((p) => formatPostPublic(p, imgMap.get(p.id) || [])),
       recentSimchas: recentSimchas.map((p) => formatPostPublic(p)),
     });
   } catch (e) {

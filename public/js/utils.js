@@ -17,6 +17,19 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+function formatRelativeTime(ms) {
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return I18N.get() === 'he' ? 'הרגע' : 'just now';
+  if (mins < 60) return I18N.get() === 'he' ? `לפני ${mins} דק׳` : `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return I18N.get() === 'he' ? `לפני ${hours} שע׳` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return I18N.get() === 'he' ? `לפני ${days} ימים` : `${days}d ago`;
+  return formatDate(ms);
+}
+
 function debounce(fn, wait = 350) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };

@@ -12,8 +12,11 @@
   Router.add('/', renderHomePage);
   Router.add('/classifieds', renderClassifiedsListPage);
   Router.add('/classifieds/:id', ({ id }) => renderDetailPage(id, 'classified'));
+  Router.add('/listings', renderListingsListPage);
+  Router.add('/listings/:id', ({ id }) => renderDetailPage(id, 'listing'));
   Router.add('/simchas', renderSimchasListPage);
   Router.add('/simchas/:id', ({ id }) => renderDetailPage(id, 'simcha'));
+  Router.add('/search', renderSearchPage);
   Router.add('/post', renderPostWizard);
   Router.add('/bookmarks', renderBookmarksPage);
   Router.add('/terms', renderTermsPage);

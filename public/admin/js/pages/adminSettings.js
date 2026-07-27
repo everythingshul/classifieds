@@ -85,6 +85,11 @@ async function renderSettingsPage() {
         </div>
         <h4>Simcha Character Limit</h4>
         <div class="form-row" style="max-width:200px"><label>Details</label><input name="simcha_description" type="number" value="${s.simcha_char_limits?.description ?? 200}"></div>
+        <h4>Listing Character Limits</h4>
+        <div class="form-cols">
+          <div class="form-row"><label>Title</label><input name="listing_title" type="number" value="${s.listing_char_limits?.title ?? 80}"></div>
+          <div class="form-row"><label>Description</label><input name="listing_description" type="number" value="${s.listing_char_limits?.description ?? 200}"></div>
+        </div>
         <h4>Oversized Add-on Limits</h4>
         <div class="form-cols">
           <div class="form-row"><label>Title</label><input name="oversized_title" type="number" value="${s.oversized_char_limits?.title ?? 140}"></div>
@@ -139,6 +144,7 @@ async function renderSettingsPage() {
     ['simcha_retention_max_days', Number(fd.simcha_retention_max_days)],
     ['classified_char_limits', { title: Number(fd.classified_title), description: Number(fd.classified_description) }],
     ['simcha_char_limits', { description: Number(fd.simcha_description) }],
+    ['listing_char_limits', { title: Number(fd.listing_title), description: Number(fd.listing_description) }],
     ['oversized_char_limits', { title: Number(fd.oversized_title), description: Number(fd.oversized_description) }],
   ]);
   bindForm('locForm', (fd) => [

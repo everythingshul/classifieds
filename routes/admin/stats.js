@@ -11,8 +11,9 @@ router.get('/', (req, res) => {
   const pendingApproval = db.prepare("SELECT COUNT(*) AS c FROM posts WHERE status = 'pending_approval'").get().c;
   const revenue = db.prepare("SELECT SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid'").get().total || 0;
   const totalViews = db.prepare('SELECT SUM(view_count) AS v FROM posts').get().v || 0;
-  const topViewed = db.prepare('SELECT id, public_id, title, type, category, view_count FROM posts ORDER BY view_count DESC LIMIT 10').all();
-  res.json({ byStatus, byType, pendingApproval, revenueCents: revenue, totalViews, topViewed });
+  const totalClicks = db.prepare('SELECT SUM(click_count) AS c FROM posts').get().c || 0;
+  const topViewed = db.prepare('SELECT id, public_id, title, type, category, view_count, click_count FROM posts ORDER BY view_count DESC LIMIT 10').all();
+  res.json({ byStatus, byType, pendingApproval, revenueCents: revenue, totalViews, totalClicks, topViewed });
 });
 
 module.exports = router;

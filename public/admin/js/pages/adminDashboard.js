@@ -8,7 +8,7 @@ async function renderDashboardPage() {
 
     ${reports.length ? `
     <div class="admin-card" style="border-color:var(--danger)">
-      <h3 style="margin-top:0;color:var(--danger)">&#9888; Reported Posts (${reports.length})</h3>
+      <h3 style="margin-top:0;color:var(--danger)">Reported Posts (${reports.length})</h3>
       <table class="admin-table">
         <thead><tr><th>Post</th><th>Reason</th><th>Reported By</th><th>When</th><th></th></tr></thead>
         <tbody>
@@ -31,6 +31,7 @@ async function renderDashboardPage() {
       <div class="stat-card"><div class="num">${reports.length}</div><div class="label">Open Reports</div></div>
       <div class="stat-card"><div class="num">${formatCents(stats.revenueCents)}</div><div class="label">Total Revenue</div></div>
       <div class="stat-card"><div class="num">${stats.totalViews}</div><div class="label">Total Views</div></div>
+      <div class="stat-card"><div class="num">${stats.totalClicks}</div><div class="label">Total Clicks</div></div>
     </div>
 
     <div class="admin-card">

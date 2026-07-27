@@ -39,6 +39,22 @@ CREATE TABLE IF NOT EXISTS custom_categories (
   created_at INTEGER NOT NULL
 );
 
+-- Listings: a fully separate section from Classifieds. Starts empty - every
+-- category is admin-defined, using the same generic form shape (description,
+-- location, optional price, optional images) as admin-added classifieds types.
+CREATE TABLE IF NOT EXISTS listing_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT UNIQUE NOT NULL,
+  label TEXT NOT NULL,
+  label_he TEXT,
+  has_images INTEGER NOT NULL DEFAULT 0,
+  has_price INTEGER NOT NULL DEFAULT 0,
+  free INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS promo_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT UNIQUE NOT NULL,
@@ -56,6 +72,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
 CREATE TABLE IF NOT EXISTS pricing_tiers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   category TEXT, -- one of the 9 fixed classifieds category keys, or NULL, or 'simcha'
+  post_type TEXT NOT NULL DEFAULT 'classified', -- 'classified' | 'listing' - keeps Listings pricing/rules separate
   name TEXT NOT NULL,
   duration_days INTEGER NOT NULL,
   price_cents INTEGER NOT NULL DEFAULT 0,
@@ -108,6 +125,7 @@ CREATE TABLE IF NOT EXISTS posts (
   -- pending_payment | pending_approval | live | rejected | expired | removed
   has_images INTEGER NOT NULL DEFAULT 0,
   view_count INTEGER NOT NULL DEFAULT 0,
+  click_count INTEGER NOT NULL DEFAULT 0,
   boosted_at INTEGER,
   published_at INTEGER,
   expires_at INTEGER,

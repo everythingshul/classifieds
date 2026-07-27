@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { getClassifiedCategoryKeys } = require('../../services/categories');
+const { getListingCategoryKeys } = require('../../services/listingCategories');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -11,14 +12,16 @@ router.get('/tiers', (req, res) => {
 });
 
 router.post('/tiers', (req, res) => {
-  const { category, name, durationDays, priceCents, sortOrder } = req.body;
-  if (category && category !== 'simcha' && !getClassifiedCategoryKeys().includes(category)) {
-    return res.status(400).json({ error: 'Invalid category' });
+  const { category, name, durationDays, priceCents, sortOrder, postType } = req.body;
+  const type = postType === 'listing' ? 'listing' : 'classified';
+  if (category && category !== 'simcha') {
+    const validKeys = type === 'listing' ? getListingCategoryKeys() : getClassifiedCategoryKeys();
+    if (!validKeys.includes(category)) return res.status(400).json({ error: 'Invalid category' });
   }
   if (!name || !durationDays) return res.status(400).json({ error: 'name and durationDays are required' });
   const info = db
-    .prepare('INSERT INTO pricing_tiers (category, name, duration_days, price_cents, sort_order, active) VALUES (?, ?, ?, ?, ?, 1)')
-    .run(category || null, name, Number(durationDays), Number(priceCents) || 0, Number(sortOrder) || 0);
+    .prepare('INSERT INTO pricing_tiers (category, post_type, name, duration_days, price_cents, sort_order, active) VALUES (?, ?, ?, ?, ?, ?, 1)')
+    .run(category || null, type, name, Number(durationDays), Number(priceCents) || 0, Number(sortOrder) || 0);
   res.status(201).json(db.prepare('SELECT * FROM pricing_tiers WHERE id = ?').get(info.lastInsertRowid));
 });
 

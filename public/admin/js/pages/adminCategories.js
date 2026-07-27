@@ -6,6 +6,7 @@ async function renderCategoriesPage() {
     <h1>Categories</h1>
     <div class="tabs">
       <button data-tab="types" class="${_catTab === 'types' ? 'active' : ''}">Classifieds Types</button>
+      <button data-tab="listing_types" class="${_catTab === 'listing_types' ? 'active' : ''}">Listing Categories</button>
       <button data-tab="job" class="${_catTab === 'job' ? 'active' : ''}">Job Categories</button>
       <button data-tab="real_estate" class="${_catTab === 'real_estate' ? 'active' : ''}">Real Estate Categories</button>
       <button data-tab="simcha" class="${_catTab === 'simcha' ? 'active' : ''}">Simcha Categories</button>
@@ -15,16 +16,36 @@ async function renderCategoriesPage() {
     <div id="catContent"></div>
   `;
   root.querySelectorAll('.tabs button').forEach((btn) => btn.addEventListener('click', () => { _catTab = btn.dataset.tab; renderCategoriesPage(); }));
-  if (_catTab === 'types') await renderCustomCategoryList();
-  else await renderCatList();
+  if (_catTab === 'types') {
+    await renderGenericCategoryList({
+      list: () => AdminApi.customCategories(),
+      create: (body) => AdminApi.createCustomCategory(body),
+      update: (id, body) => AdminApi.updateCustomCategory(id, body),
+      remove: (id) => AdminApi.deleteCustomCategory(id),
+      intro: "The 9 built-in types can't be removed. Add new ones below with a generic form (description, location, and optional price/photos).",
+      deleteConfirm: 'Delete this classifieds type?',
+    });
+  } else if (_catTab === 'listing_types') {
+    await renderGenericCategoryList({
+      list: () => AdminApi.listingCategories(),
+      create: (body) => AdminApi.createListingCategory(body),
+      update: (id, body) => AdminApi.updateListingCategory(id, body),
+      remove: (id) => AdminApi.deleteListingCategory(id),
+      intro: 'Listings starts with zero categories - add whatever you need below with a generic form (description, location, and optional price/photos).',
+      deleteConfirm: 'Delete this listing category?',
+    });
+  } else {
+    await renderCatList();
+  }
 }
 
-async function renderCustomCategoryList() {
+async function renderGenericCategoryList({ list, create, update, remove, intro, deleteConfirm }) {
   const content = document.getElementById('catContent');
-  const all = await AdminApi.customCategories();
+  const all = await list();
+  const reload = () => renderCategoriesPage();
   content.innerHTML = `
     <div class="admin-card">
-      <p class="hint">The 9 built-in types can't be removed. Add new ones below with a generic form (description, location, and optional price/photos).</p>
+      <p class="hint">${escapeHtml(intro)}</p>
       <form id="addTypeForm" style="margin-bottom:16px">
         <div class="form-cols">
           <div class="form-row"><label>Name (English)</label><input type="text" id="newLabel" required></div>
@@ -35,7 +56,7 @@ async function renderCustomCategoryList() {
           <label><input type="checkbox" id="newHasImages"> Allows photos (admin-approved)</label>
           <label><input type="checkbox" id="newFree"> Free to post</label>
         </div>
-        <button class="btn btn-sm" type="submit">Add Type</button>
+        <button class="btn btn-sm" type="submit">Add</button>
       </form>
       <table class="admin-table">
         <thead><tr><th>Name</th><th>Price?</th><th>Photos?</th><th>Free?</th><th>Status</th><th></th></tr></thead>
@@ -57,14 +78,14 @@ async function renderCustomCategoryList() {
 
   document.getElementById('addTypeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    await AdminApi.createCustomCategory({
+    await create({
       label: document.getElementById('newLabel').value.trim(),
       labelHe: document.getElementById('newLabelHe').value.trim() || null,
       hasPrice: document.getElementById('newHasPrice').checked,
       hasImages: document.getElementById('newHasImages').checked,
       free: document.getElementById('newFree').checked,
     });
-    renderCustomCategoryList();
+    reload();
   });
 
   content.querySelectorAll('tr[data-id]').forEach((row) => {
@@ -73,14 +94,14 @@ async function renderCustomCategoryList() {
     const toggleBtn = row.querySelector('.toggle-type');
     if (toggleBtn) toggleBtn.addEventListener('click', async () => {
       const c = all.find((x) => String(x.id) === id);
-      await AdminApi.updateCustomCategory(id, { active: !c.active });
-      renderCustomCategoryList();
+      await update(id, { active: !c.active });
+      reload();
     });
     const delBtn = row.querySelector('.delete-type');
     if (delBtn) delBtn.addEventListener('click', async () => {
-      if (!confirm('Delete this classifieds type?')) return;
-      await AdminApi.deleteCustomCategory(id);
-      renderCustomCategoryList();
+      if (!confirm(deleteConfirm)) return;
+      await remove(id);
+      reload();
     });
   });
 }

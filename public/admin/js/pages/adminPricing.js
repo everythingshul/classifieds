@@ -4,29 +4,49 @@ async function renderPricingPage() {
   ]);
   const root = document.getElementById('adminContent');
   const categoryKeys = cfg.categories.map((c) => c.key);
+  const listingCategoryKeys = (cfg.listingCategories || []).map((c) => c.key);
+  const classifiedTiers = tiers.filter((t) => (t.post_type || 'classified') === 'classified');
+  const listingTiers = tiers.filter((t) => t.post_type === 'listing');
+
+  function tierTableRows(list) {
+    return list.map((t) => `
+      <tr data-id="${t.id}">
+        <td>${t.category || 'All categories'}</td>
+        <td><input class="tier-name" value="${escapeHtml(t.name)}" style="width:130px"></td>
+        <td><input class="tier-days" type="number" value="${t.duration_days}" style="width:70px"></td>
+        <td><input class="tier-price" type="number" step="0.01" value="${(t.price_cents / 100).toFixed(2)}" style="width:90px"></td>
+        <td><input class="tier-active" type="checkbox" ${t.active ? 'checked' : ''}></td>
+        <td><button class="btn btn-sm save-tier">Save</button> <button class="btn btn-sm btn-danger del-tier">Delete</button></td>
+      </tr>
+    `).join('');
+  }
 
   root.innerHTML = `
     <h1>Pricing</h1>
 
     <div class="admin-card">
-      <h3 style="margin-top:0">Listing Duration Tiers</h3>
+      <h3 style="margin-top:0">Classifieds Duration Tiers</h3>
       <table class="admin-table">
         <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price</th><th>Active</th><th></th></tr></thead>
-        <tbody>
-          ${tiers.map((t) => `
-            <tr data-id="${t.id}">
-              <td>${t.category || 'All categories'}</td>
-              <td><input class="tier-name" value="${escapeHtml(t.name)}" style="width:130px"></td>
-              <td><input class="tier-days" type="number" value="${t.duration_days}" style="width:70px"></td>
-              <td><input class="tier-price" type="number" step="0.01" value="${(t.price_cents / 100).toFixed(2)}" style="width:90px"></td>
-              <td><input class="tier-active" type="checkbox" ${t.active ? 'checked' : ''}></td>
-              <td><button class="btn btn-sm save-tier">Save</button> <button class="btn btn-sm btn-danger del-tier">Delete</button></td>
-            </tr>
-          `).join('')}
-        </tbody>
+        <tbody>${tierTableRows(classifiedTiers)}</tbody>
       </table>
-      <form id="addTierForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
+      <form id="addTierForm" data-post-type="classified" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
         <div class="field"><label>Category</label><select name="category"><option value="">All categories</option>${categoryKeys.map((k) => `<option value="${k}">${k}</option>`).join('')}<option value="simcha">simcha</option></select></div>
+        <div class="field"><label>Name</label><input name="name" required></div>
+        <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
+        <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
+        <button class="btn btn-sm" type="submit">Add Tier</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top:0">Listing Duration Tiers <span class="hint">(separate pricing/rules from Classifieds)</span></h3>
+      <table class="admin-table">
+        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price</th><th>Active</th><th></th></tr></thead>
+        <tbody>${tierTableRows(listingTiers)}</tbody>
+      </table>
+      <form id="addListingTierForm" data-post-type="listing" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
+        <div class="field"><label>Category</label><select name="category"><option value="">All categories</option>${listingCategoryKeys.map((k) => `<option value="${k}">${k}</option>`).join('')}</select></div>
         <div class="field"><label>Name</label><input name="name" required></div>
         <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
         <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
@@ -115,16 +135,19 @@ async function renderPricingPage() {
     });
   });
 
-  document.getElementById('addTierForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    await AdminApi.createTier({
-      category: fd.get('category') || null,
-      name: fd.get('name'),
-      durationDays: Number(fd.get('durationDays')),
-      priceCents: Math.round(Number(fd.get('price')) * 100),
+  ['addTierForm', 'addListingTierForm'].forEach((formId) => {
+    document.getElementById(formId).addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      await AdminApi.createTier({
+        category: fd.get('category') || null,
+        postType: e.target.dataset.postType,
+        name: fd.get('name'),
+        durationDays: Number(fd.get('durationDays')),
+        priceCents: Math.round(Number(fd.get('price')) * 100),
+      });
+      renderPricingPage();
     });
-    renderPricingPage();
   });
 
   document.getElementById('addPromoForm').addEventListener('submit', async (e) => {

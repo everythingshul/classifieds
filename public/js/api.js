@@ -22,6 +22,9 @@ const Api = (() => {
     classifieds: (params) => req(`/classifieds?${new URLSearchParams(params)}`),
     classifiedDetail: (id) => req(`/classifieds/${id}`),
     categoryCounts: () => req('/classifieds/category-counts'),
+    listings: (params) => req(`/listings?${new URLSearchParams(params)}`),
+    listingDetail: (id) => req(`/listings/${id}`),
+    listingCategoryCounts: () => req('/listings/category-counts'),
     simchas: (params) => req(`/simchas?${new URLSearchParams(params)}`),
     simchaDetail: (id) => req(`/simchas/${id}`),
     postsByIds: (ids) => req(`/posts/by-ids?ids=${ids.join(',')}`),
@@ -30,5 +33,6 @@ const Api = (() => {
     boost: (id, body) => req(`/posts/${id}/boost`, { method: 'POST', body }),
     strike: (id, body) => req(`/posts/${id}/strike`, { method: 'POST', body }),
     registerImpressions: (ids) => req('/posts/impressions', { method: 'POST', body: { ids } }).catch(() => {}),
+    registerClicks: (ids) => req('/posts/clicks', { method: 'POST', body: { ids } }).catch(() => {}),
   };
 })();

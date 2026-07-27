@@ -14,8 +14,6 @@ const CLASSIFIED_CATEGORIES = [
 
 const CLASSIFIED_CATEGORY_KEYS = CLASSIFIED_CATEGORIES.map((c) => c.key);
 
-const JOB_TYPES = ['part_time', 'full_time', 'seasonal', 'one_time'];
-const PAY_PERIODS = ['hour', 'week', 'month', 'season', 'year', 'project'];
 const LOST_FOUND_OPTIONS = ['lost', 'found'];
 
 const POST_STATUSES = ['pending_payment', 'pending_approval', 'live', 'rejected', 'expired', 'removed'];
@@ -40,8 +38,6 @@ const DEFAULT_BROOKLYN_LOCATION = {
 module.exports = {
   CLASSIFIED_CATEGORIES,
   CLASSIFIED_CATEGORY_KEYS,
-  JOB_TYPES,
-  PAY_PERIODS,
   LOST_FOUND_OPTIONS,
   POST_STATUSES,
   DEFAULT_CHAR_LIMITS,
