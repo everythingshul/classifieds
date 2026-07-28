@@ -19,6 +19,7 @@ const AdminRouter = (() => {
       root.innerHTML = `<div class="error-list">${escapeHtml(e.message)}</div>`;
     }
     highlightSidebar();
+    if (typeof refreshNotificationBadges === 'function') refreshNotificationBadges();
   }
   function init() {
     window.addEventListener('hashchange', resolve);

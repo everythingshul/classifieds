@@ -179,33 +179,34 @@ async function renderSettingsPage() {
     btn.disabled = true;
     btn.textContent = 'Testing…';
     resultEl.innerHTML = `<p class="hint">Loading Google Maps…</p>`;
+    // Uses the exact same attachLocationAutocomplete() the real post form
+    // calls (not a separately hand-written check), against a throwaway
+    // input, then simulates real typing - so "Working" here means the
+    // actual production code path is working, not just that some Google
+    // object could be constructed without throwing.
+    window.SITE_CONFIG = window.SITE_CONFIG || {};
+    const prevKey = window.SITE_CONFIG.googleMapsApiKey;
+    window.SITE_CONFIG.googleMapsApiKey = key;
+    const probe = document.createElement('input');
+    probe.style.position = 'fixed';
+    probe.style.opacity = '0';
+    probe.style.pointerEvents = 'none';
+    document.body.appendChild(probe);
     try {
-      await new Promise((resolve, reject) => {
-        const existing = document.getElementById('mapsTestScript');
-        if (existing) existing.remove();
-        const script = document.createElement('script');
-        script.id = 'mapsTestScript';
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('The Google Maps script itself failed to load - check the key is correct and not blocked by HTTP referrer restrictions for this domain.'));
-        document.head.appendChild(script);
-      });
-      let usedApi = 'new (Autocomplete Data API)';
-      try {
-        const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary('places');
-        if (!AutocompleteSuggestion) throw new Error('AutocompleteSuggestion not available');
-        await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: 'New York', sessionToken: new AutocompleteSessionToken() });
-      } catch (newApiErr) {
-        usedApi = 'legacy (classic Autocomplete widget)';
-        if (!window.google?.maps?.places?.Autocomplete) throw newApiErr;
-        // Just confirming the constructor doesn't throw - it needs a live DOM input, which we don't want to leave behind.
-        const probe = document.createElement('input');
-        new google.maps.places.Autocomplete(probe, { types: ['geocode'] });
-      }
-      resultEl.innerHTML = `<p class="hint" style="color:var(--success)">Working! Using the ${usedApi} path.</p>`;
+      const status = await attachLocationAutocomplete(probe, { onSelect: () => {} });
+      if (!status.ok) throw new Error(status.error);
+      probe.value = 'New York';
+      probe.dispatchEvent(new Event('input'));
+      await new Promise((r) => setTimeout(r, 900)); // debounce (300ms) + network round trip
+      const suggestionCount = document.querySelectorAll('.places-suggestions li').length;
+      if (!suggestionCount) throw new Error(`Connected via the ${status.api} path, but a real search for "New York" returned zero suggestions - something is still misconfigured.`);
+      resultEl.innerHTML = `<p class="hint" style="color:var(--success)">Working! Using the ${escapeHtml(status.api)} path (${suggestionCount} live suggestions returned for a test search).</p>`;
     } catch (e) {
       resultEl.innerHTML = `<p class="hint" style="color:var(--danger)">Failed: ${escapeHtml(e.message || String(e))}</p>`;
     } finally {
+      document.querySelectorAll('.places-suggestions').forEach((el) => el.remove());
+      probe.remove();
+      window.SITE_CONFIG.googleMapsApiKey = prevKey;
       btn.disabled = false;
       btn.textContent = 'Test Maps API';
     }

@@ -13,7 +13,7 @@ async function renderDetailPage(id, type) {
   if (post.fields?.payAmount) fieldRows.push(['Pay', `${formatCents(post.fields.payAmount * 100)} / ${post.fields.payPeriod}`]);
   if (post.fields?.experience) fieldRows.push(['Experience', post.fields.experience]);
   if (post.fields?.lostOrFound) fieldRows.push(['Status', post.fields.lostOrFound.toUpperCase()]);
-  if (post.fields?.price !== undefined && post.fields?.price !== null) fieldRows.push(['Price', formatCents(post.fields.price * 100)]);
+  if (post.fields?.price !== undefined && post.fields?.price !== null) fieldRows.push(['Price', formatMoney(post.fields.price * 100, post.fields.currency)]);
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
 
   const contactButtons = [];

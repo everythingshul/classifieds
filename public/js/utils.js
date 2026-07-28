@@ -7,6 +7,18 @@ function formatCents(cents) {
   return `$${(Number(cents || 0) / 100).toFixed(2)}`;
 }
 
+// For a poster's own listed price, which can be in a currency other than
+// USD - unlike formatCents, which is only ever used for what the site
+// itself charges (always USD via Stripe).
+function formatMoney(cents, currency) {
+  const amount = Number(cents || 0) / 100;
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
+  } catch (e) {
+    return formatCents(cents);
+  }
+}
+
 function formatDate(ms) {
   if (!ms) return '';
   return new Date(ms).toLocaleDateString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });

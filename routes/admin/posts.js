@@ -4,13 +4,14 @@ const { requireAdmin } = require('../../middleware/adminAuth');
 const { formatPostAdmin } = require('../../services/postFormat');
 const { computeExpiry, DAY_MS, sendInvoiceForPost, insertPost, attachImages, attachSimchaSurprises, recordPayment } = require('../../services/postLifecycle');
 const { sendMail } = require('../../utils/mailer');
-const { POST_STATUSES } = require('../../utils/constants');
+const { POST_STATUSES, CURRENCY_CODES } = require('../../utils/constants');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { findCategory } = require('../../services/categories');
 const { findListingCategory } = require('../../services/listingCategories');
 const { validateCategoryFields } = require('../../services/postValidation');
+const { normalizeUrl } = require('../../utils/validate');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -47,6 +48,7 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
         const price = Number(fields.price);
         if (Number.isNaN(price) || price < 0) return res.status(400).json({ error: 'Validation failed', details: ['price must be a positive number'] });
         nextFields.price = price;
+        nextFields.currency = CURRENCY_CODES.includes(fields.currency) ? fields.currency : 'USD';
       }
       fields = nextFields;
     }
@@ -134,7 +136,7 @@ router.get('/', (req, res) => {
   if (req.query.type) { where.push('type = ?'); params.push(req.query.type); }
   if (req.query.category) { where.push('category = ?'); params.push(req.query.category); }
   if (req.query.needsUrlApproval) {
-    where.push("contact_url IS NOT NULL AND contact_url != '' AND contact_url_approved = 0");
+    where.push("contact_url IS NOT NULL AND contact_url != '' AND contact_url_approved = 0 AND status IN ('live', 'pending_approval')");
   }
   if (req.query.q) {
     where.push('(title LIKE ? OR description LIKE ? OR poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ? OR public_id LIKE ?)');
@@ -190,7 +192,7 @@ router.put('/:id', (req, res) => {
     b.contactPhone ?? post.contact_phone,
     b.contactPhoneExt ?? post.contact_phone_ext,
     b.contactEmail ?? post.contact_email,
-    b.contactUrl ?? post.contact_url,
+    b.contactUrl !== undefined ? normalizeUrl(b.contactUrl) : post.contact_url,
     b.contactUrlApproved !== undefined ? (b.contactUrlApproved ? 1 : 0) : post.contact_url_approved,
     b.taxonomyId !== undefined ? b.taxonomyId : post.taxonomy_id,
     b.status ?? post.status,

@@ -105,6 +105,17 @@ function renderPostWizard() {
     return `<div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${opts.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
   }
 
+  function priceFieldHtml({ required } = {}) {
+    const currencies = cfg.currencies || [{ code: 'USD', symbol: '$', label: 'US Dollar (USD)' }];
+    return `
+      <div class="form-row"><label>Price${required ? '' : ' <span class="hint">(optional)</span>'}</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="f_price" min="0" step="0.01" style="flex:1" ${required ? 'required' : ''}>
+          <select id="f_currency" style="width:110px">${currencies.map((c) => `<option value="${c.code}" ${c.code === 'USD' ? 'selected' : ''}>${escapeHtml(c.code)}</option>`).join('')}</select>
+        </div>
+      </div>`;
+  }
+
   function categorySpecificFieldsHtml() {
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
     const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
@@ -128,17 +139,17 @@ function renderPostWizard() {
           <div class="form-row"><label>Experience</label><textarea id="f_experience" rows="3"></textarea></div>`;
       case 'items-for-sale':
       case 'items-for-rent':
-        return `${genericTaxonomyFieldHtml()}<div class="form-row"><label>Price</label><input type="number" id="f_price" min="0" step="0.01" required></div>`;
+        return `${genericTaxonomyFieldHtml()}${priceFieldHtml({ required: true })}`;
       case 'lost-found':
         return `${genericTaxonomyFieldHtml()}<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
       case 'real-estate':
         return `
           <div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
-          <div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>`;
+          ${priceFieldHtml({ required: false })}`;
       default: {
         // Admin-added custom classifieds category, or a Listing (always generic).
         const catDef = currentCatDef();
-        return `${genericTaxonomyFieldHtml()}${catDef?.hasPrice ? `<div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>` : ''}`;
+        return `${genericTaxonomyFieldHtml()}${catDef?.hasPrice ? priceFieldHtml({ required: false }) : ''}`;
       }
     }
   }
@@ -285,6 +296,8 @@ function renderPostWizard() {
         if (document.getElementById('f_price')) fields.price = document.getElementById('f_price').value;
         if (genericTaxSelect) fields.taxonomyId = genericTaxSelect.value;
       }
+      const currencySelect = document.getElementById('f_currency');
+      if (currencySelect && fields.price !== undefined) fields.currency = currencySelect.value;
 
       if (errs.length) {
         const box = document.getElementById('stepError');
@@ -410,7 +423,7 @@ function renderPostWizard() {
       if (f.payAmount) rows.push(['Pay', `${formatCents(f.payAmount * 100)} / ${f.payPeriod}`]);
       if (f.experience) rows.push(['Experience', f.experience]);
       if (f.lostOrFound) rows.push(['Status', f.lostOrFound === 'lost' ? 'Lost' : 'Found']);
-      if (f.price !== undefined && f.price !== null && f.price !== '') rows.push(['Price', formatCents(Number(f.price) * 100)]);
+      if (f.price !== undefined && f.price !== null && f.price !== '') rows.push(['Price', formatMoney(Number(f.price) * 100, f.currency)]);
       return rows;
     }
 

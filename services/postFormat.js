@@ -1,4 +1,5 @@
 const { formatPhoneDashed } = require('../utils/phone');
+const { normalizeUrl } = require('../utils/validate');
 const { findCategory } = require('./categories');
 const { findListingCategory } = require('./listingCategories');
 
@@ -22,7 +23,12 @@ function buildContactLinks(post) {
     contact.email = { display: post.contact_email, mailto: `mailto:${post.contact_email}` };
   }
   if (post.contact_url && post.contact_url_approved) {
-    contact.url = { display: post.contact_url, href: post.contact_url };
+    // Defensive: normalizes even URLs stored without a protocol before this
+    // was fixed at submission time (e.g. "example.com"), which would
+    // otherwise resolve as a relative in-site path instead of an external
+    // link.
+    const href = normalizeUrl(post.contact_url);
+    contact.url = { display: post.contact_url, href };
   }
   return contact;
 }

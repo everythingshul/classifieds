@@ -36,7 +36,7 @@ function postCardHtml(post) {
         <span class="title">${escapeHtml(post.title)}</span>
         ${post.description ? `<p class="card-desc">${escapeHtml(post.description)}</p>` : ''}
         ${meta ? `<span class="meta">${escapeHtml(meta)}</span>` : ''}
-        ${priceField !== null && priceField !== undefined ? `<span class="price">${formatCents(priceField * 100)}</span>` : ''}
+        ${priceField !== null && priceField !== undefined ? `<span class="price">${formatMoney(priceField * 100, post.fields.currency)}</span>` : ''}
       </div>
     </a>`;
 }

@@ -14,9 +14,9 @@ function loadGoogleMaps(apiKey) {
   return _placesLoading;
 }
 
-function addressComponentsFrom(place) {
+function addressComponentsFrom(components) {
   let city = '', state = '';
-  (place.addressComponents || place.address_components || []).forEach((c) => {
+  (components || []).forEach((c) => {
     const types = c.types || [];
     if (types.includes('locality')) city = c.longText || c.long_name;
     if (!city && types.includes('postal_town')) city = c.longText || c.long_name;
@@ -25,17 +25,10 @@ function addressComponentsFrom(place) {
   return { city, state };
 }
 
-// Uses the new (2025+) Places "Autocomplete Data API" - a headless,
-// non-deprecated API that returns suggestion data without owning the
-// input's DOM, so we can render our own dropdown over the existing plain
-// <input> instead of swapping it for Google's custom element. This is the
-// path new Google Cloud projects/keys must use, since the older
-// google.maps.places.Autocomplete widget (see tryLegacyAutocomplete below)
-// was blocked for new customers starting March 2025.
-async function tryNewAutocomplete(inputEl, { onSelect }) {
-  const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary('places');
-  if (!AutocompleteSuggestion) return false;
-
+// Shared dropdown UI: renders a suggestions list under inputEl, debounces
+// input, and hands off the picked item to onPick. Both autocomplete paths
+// below use this so the actual DOM/UX wiring is only written once.
+function mountSuggestionsDropdown(inputEl, { fetchSuggestions, onPick }) {
   const box = document.createElement('ul');
   box.className = 'places-suggestions';
   box.style.display = 'none';
@@ -43,24 +36,23 @@ async function tryNewAutocomplete(inputEl, { onSelect }) {
   if (getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
   wrap.appendChild(box);
 
-  let token = new AutocompleteSessionToken();
   let debounceTimer = null;
-  let activeSuggestions = [];
+  let activeItems = [];
 
   function hide() { box.style.display = 'none'; box.innerHTML = ''; }
 
   async function search(value) {
     if (!value || value.length < 3) return hide();
-    let result;
+    let items;
     try {
-      result = await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: value, sessionToken: token });
+      items = await fetchSuggestions(value);
     } catch (e) {
-      console.error('[maps] Autocomplete suggestion fetch failed - check that "Places API (New)" is enabled and billing is active on the Google Cloud project.', e);
+      console.error('[maps] Autocomplete suggestion fetch failed.', e);
       return hide();
     }
-    activeSuggestions = (result?.suggestions || []).filter((s) => s.placePrediction);
-    if (!activeSuggestions.length) return hide();
-    box.innerHTML = activeSuggestions.map((s, i) => `<li data-i="${i}">${s.placePrediction.text.toString()}</li>`).join('');
+    activeItems = items || [];
+    if (!activeItems.length) return hide();
+    box.innerHTML = activeItems.map((it, i) => `<li data-i="${i}">${it.label}</li>`).join('');
     box.style.display = 'block';
   }
 
@@ -74,76 +66,135 @@ async function tryNewAutocomplete(inputEl, { onSelect }) {
     const li = e.target.closest('li');
     if (!li) return;
     e.preventDefault();
-    const suggestion = activeSuggestions[Number(li.dataset.i)];
-    if (!suggestion) return;
-    const place = suggestion.placePrediction.toPlace();
-    try {
-      await place.fetchFields({ fields: ['formattedAddress', 'location', 'addressComponents'] });
-    } catch (e2) {
-      console.error('[maps] Failed to fetch place details for the selected suggestion.', e2);
-      hide();
-      return;
-    }
-    inputEl.value = place.formattedAddress || inputEl.value;
-    const { city, state } = addressComponentsFrom(place);
-    onSelect?.({
-      text: place.formattedAddress || inputEl.value,
-      lat: place.location?.lat?.(),
-      lng: place.location?.lng?.(),
-      placeId: place.id,
-      city, state,
-    });
-    token = new AutocompleteSessionToken();
+    const item = activeItems[Number(li.dataset.i)];
     hide();
+    if (item) await onPick(item);
   });
+}
 
+// Uses the new (2025+) Places "Autocomplete Data API" - a headless,
+// non-deprecated API that returns suggestion data without owning the
+// input's DOM. This is the path new Google Cloud projects/keys must use,
+// since the classic google.maps.places.Autocomplete *widget* was blocked
+// for new customers starting March 2025 (see tryLegacyAutocomplete below,
+// which uses the still-unrestricted AutocompleteService instead of that
+// widget).
+async function tryNewAutocomplete(inputEl, { onSelect }) {
+  const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary('places');
+  if (!AutocompleteSuggestion) return false;
+
+  // A cheap real-use check up front, rather than only discovering at the
+  // user's first keystroke that this path is silently non-functional.
+  await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: 'a', sessionToken: new AutocompleteSessionToken() });
+
+  let token = new AutocompleteSessionToken();
+  mountSuggestionsDropdown(inputEl, {
+    fetchSuggestions: async (value) => {
+      const result = await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: value, sessionToken: token });
+      return (result?.suggestions || [])
+        .filter((s) => s.placePrediction)
+        .map((s) => ({ label: s.placePrediction.text.toString(), suggestion: s }));
+    },
+    onPick: async (item) => {
+      const place = item.suggestion.placePrediction.toPlace();
+      try {
+        await place.fetchFields({ fields: ['formattedAddress', 'location', 'addressComponents'] });
+      } catch (e) {
+        console.error('[maps] Failed to fetch place details for the selected suggestion.', e);
+        return;
+      }
+      inputEl.value = place.formattedAddress || inputEl.value;
+      const { city, state } = addressComponentsFrom(place.addressComponents);
+      onSelect?.({
+        text: place.formattedAddress || inputEl.value,
+        lat: place.location?.lat?.(),
+        lng: place.location?.lng?.(),
+        placeId: place.id,
+        city, state,
+      });
+      token = new AutocompleteSessionToken();
+    },
+  });
   return true;
 }
 
-// Older Google Cloud projects/keys (created before March 2025) can still use
-// this widget. Kept as a fallback for accounts where it still works, or
-// where "Places API (New)" isn't enabled but the classic "Places API" is.
+// AutocompleteService + PlacesService are the older, non-UI prediction/
+// details classes - unlike the classic Autocomplete *widget*, Google never
+// blocked these for new customers, so they're a real fallback (not just a
+// silent no-op) for projects that only have the classic "Places API"
+// enabled rather than "Places API (New)".
 async function tryLegacyAutocomplete(inputEl, { onSelect }) {
-  if (!window.google?.maps?.places?.Autocomplete) return false;
-  try {
-    const ac = new google.maps.places.Autocomplete(inputEl, { types: ['geocode'] });
-    ac.addListener('place_changed', () => {
-      const place = ac.getPlace();
-      if (!place || !place.geometry) return;
-      const { city, state } = addressComponentsFrom(place);
-      onSelect?.({
-        text: place.formatted_address || inputEl.value,
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng(),
-        placeId: place.place_id,
-        city, state,
-      });
+  if (!window.google?.maps?.places?.AutocompleteService) return false;
+  const service = new google.maps.places.AutocompleteService();
+  const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+
+  // A real functional check up front - confirms Google actually returns
+  // results for this key/project instead of just that the classes exist.
+  await new Promise((resolve, reject) => {
+    service.getPlacePredictions({ input: 'a' }, (predictions, status) => {
+      if (status === 'OK' || status === 'ZERO_RESULTS') return resolve();
+      reject(new Error(`Legacy Places Autocomplete Service status: ${status}`));
     });
-    return true;
-  } catch (e) {
-    console.error('[maps] The classic Places Autocomplete widget failed to initialize. As of March 2025 Google blocks this widget for newly-created API keys/projects - if this site\'s Google Maps key is new, that\'s the likely cause. The location field still works for manual typing either way.', e);
-    return false;
-  }
+  });
+
+  mountSuggestionsDropdown(inputEl, {
+    fetchSuggestions: (value) => new Promise((resolve, reject) => {
+      service.getPlacePredictions({ input: value }, (predictions, status) => {
+        if (status === 'ZERO_RESULTS') return resolve([]);
+        if (status !== 'OK' || !predictions) return reject(new Error(`status: ${status}`));
+        resolve(predictions.map((p) => ({ label: p.description, prediction: p })));
+      });
+    }),
+    onPick: (item) => new Promise((resolve) => {
+      placesService.getDetails({ placeId: item.prediction.place_id, fields: ['formatted_address', 'geometry', 'address_components'] }, (place, status) => {
+        if (status !== 'OK' || !place) return resolve();
+        inputEl.value = place.formatted_address || inputEl.value;
+        const { city, state } = addressComponentsFrom(place.address_components);
+        onSelect?.({
+          text: place.formatted_address || inputEl.value,
+          lat: place.geometry?.location?.lat?.(),
+          lng: place.geometry?.location?.lng?.(),
+          placeId: item.prediction.place_id,
+          city, state,
+        });
+        resolve();
+      });
+    }),
+  });
+  return true;
 }
 
 // Attaches address autocomplete to a plain text input when a Maps API key is
 // configured. Falls back silently to plain manual text entry otherwise (or
 // if both Places API paths fail) - the location field always works either
-// way, autocomplete is just a convenience.
+// way, autocomplete is just a convenience. Returns a status object (rather
+// than throwing/swallowing) so callers - including the Admin Settings "Test
+// Maps API" button - can report exactly what happened using this same,
+// real code path instead of a separate check that could drift out of sync.
 async function attachLocationAutocomplete(inputEl, { onSelect } = {}) {
   const apiKey = window.SITE_CONFIG?.googleMapsApiKey;
   if (!apiKey) {
-    console.warn('[maps] No Google Maps API key is configured (Admin -> Settings -> Maps) - address autocomplete is disabled, manual location entry still works.');
-    return;
+    const msg = 'No Google Maps API key is configured (Admin -> Settings -> Maps) - address autocomplete is disabled, manual location entry still works.';
+    console.warn(`[maps] ${msg}`);
+    return { ok: false, error: msg };
   }
   const ok = await loadGoogleMaps(apiKey);
-  if (!ok || !window.google?.maps) return;
-
-  let attached = false;
-  try {
-    attached = await tryNewAutocomplete(inputEl, { onSelect });
-  } catch (e) {
-    console.error('[maps] New Places Autocomplete Data API unavailable, will try the legacy widget instead.', e);
+  if (!ok || !window.google?.maps) {
+    const msg = 'The Google Maps script failed to load - check the key is correct and not blocked by HTTP referrer restrictions for this domain.';
+    return { ok: false, error: msg };
   }
-  if (!attached) await tryLegacyAutocomplete(inputEl, { onSelect });
+
+  try {
+    if (await tryNewAutocomplete(inputEl, { onSelect })) return { ok: true, api: 'new (Autocomplete Data API)' };
+  } catch (e) {
+    console.warn('[maps] New Places Autocomplete Data API unavailable, trying the legacy AutocompleteService instead.', e.message);
+  }
+  try {
+    if (await tryLegacyAutocomplete(inputEl, { onSelect })) return { ok: true, api: 'legacy (AutocompleteService)' };
+    throw new Error('AutocompleteService not available on window.google.maps.places');
+  } catch (e) {
+    const msg = `Both the new and legacy Places Autocomplete paths failed (${e.message}) - check that a Places product ("Places API" or "Places API (New)") is enabled and billing is active on the Google Cloud project for this key, and that the key isn't restricted away from this domain. Manual location entry still works.`;
+    console.error(`[maps] ${msg}`);
+    return { ok: false, error: msg };
+  }
 }

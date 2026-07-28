@@ -1,4 +1,4 @@
-const { LOST_FOUND_OPTIONS } = require('../utils/constants');
+const { LOST_FOUND_OPTIONS, CURRENCY_CODES } = require('../utils/constants');
 const { isValidEmail, isValidUrl, normalizeUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
 const { getClassifiedCategoryKeys, findCategory, getOptionNames } = require('./categories');
@@ -19,6 +19,13 @@ function requireString(v, field, errors, { max } = {}) {
   }
   if (max && v.length > max) errors.push(`${field} must be ${max} characters or fewer`);
   return v.trim();
+}
+
+// Defaults to USD (and silently falls back to USD for an invalid/unknown
+// code) rather than erroring - the currency choice is a display preference
+// on the poster's own price, not something worth blocking a submission over.
+function currencyOrDefault(f) {
+  return CURRENCY_CODES.includes(f.currency) ? f.currency : 'USD';
 }
 
 function validateCategoryFields(category, fields, errors, categoryDef) {
@@ -48,6 +55,7 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
       const price = Number(f.price);
       if (Number.isNaN(price) || price < 0) errors.push('price is required and must be a positive number');
       out.price = price;
+      out.currency = currencyOrDefault(f);
       break;
     }
     case 'lost-found': {
@@ -60,6 +68,7 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
         const price = Number(f.price);
         if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
         out.price = price;
+        out.currency = currencyOrDefault(f);
       }
       break;
     }
@@ -73,6 +82,7 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
         const price = Number(f.price);
         if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
         out.price = price;
+        out.currency = currencyOrDefault(f);
       }
       break;
   }
@@ -198,6 +208,7 @@ function validateListingPayload(body, charLimits) {
     const price = Number(body.fields.price);
     if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
     fields.price = price;
+    fields.currency = currencyOrDefault(body.fields || {});
   }
 
   // Optional: only used if the admin has defined sub-categories for this

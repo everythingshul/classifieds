@@ -17,12 +17,17 @@ async function renderCreatePostPage() {
     return `<div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">—</option>${opts.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
   }
 
+  function priceFieldHtml() {
+    const currencies = cfg.currencies || [{ code: 'USD' }];
+    return `<div class="form-row"><label>Price</label><div style="display:flex;gap:6px"><input type="number" id="f_price" style="flex:1"><select id="f_currency" style="width:90px">${currencies.map((c) => `<option value="${c.code}">${escapeHtml(c.code)}</option>`).join('')}</select></div></div>`;
+  }
+
   function categoryFieldsHtml() {
     const catDef = categoriesForType().find((c) => c.key === category);
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
     const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
     if (type === 'listing') {
-      return `${genericTaxonomyFieldHtml(catDef)}${catDef?.hasPrice ? `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>` : ''}`;
+      return `${genericTaxonomyFieldHtml(catDef)}${catDef?.hasPrice ? priceFieldHtml() : ''}`;
     }
     if (category === 'job-offers') {
       return `
@@ -38,9 +43,9 @@ async function renderCreatePostPage() {
       return `${genericTaxonomyFieldHtml(catDef)}<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
     }
     if (category === 'real-estate') {
-      return `<div class="form-row"><label>Real Estate Category</label><select id="f_taxonomyId"><option value="">—</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div><div class="form-row"><label>Price</label><input type="number" id="f_price"></div>`;
+      return `<div class="form-row"><label>Real Estate Category</label><select id="f_taxonomyId"><option value="">—</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>${priceFieldHtml()}`;
     }
-    return `${genericTaxonomyFieldHtml(catDef)}${catDef?.hasPrice ? `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>` : ''}`;
+    return `${genericTaxonomyFieldHtml(catDef)}${catDef?.hasPrice ? priceFieldHtml() : ''}`;
   }
 
   function render() {
@@ -134,7 +139,11 @@ async function renderCreatePostPage() {
         const lf = document.getElementById('f_lostOrFound');
         if (lf) fields.lostOrFound = lf.value;
         const price = document.getElementById('f_price');
-        if (price) fields.price = price.value;
+        if (price) {
+          fields.price = price.value;
+          const currency = document.getElementById('f_currency');
+          if (currency) fields.currency = currency.value;
+        }
         fd.set('fields', JSON.stringify(fields));
         fd.set('locationText', document.getElementById('f_location').value.trim());
         files.forEach((f) => fd.append('images', f));

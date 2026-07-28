@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../../db');
-const { LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
+const { LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION, CURRENCIES } = require('../../utils/constants');
 const { getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits, getSetting, getAddon } = require('../../services/pricing');
 const runtimeConfig = require('../../services/runtimeConfig');
 const { getCountryList } = require('../../utils/countries');
@@ -22,6 +22,7 @@ router.get('/', (req, res) => {
     jobTypes: getOptionNames('job_type'),
     payPeriods: getOptionNames('pay_period'),
     lostFoundOptions: LOST_FOUND_OPTIONS,
+    currencies: CURRENCIES,
     taxonomies,
     pricingTiers,
     addons: {

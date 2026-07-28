@@ -35,6 +35,20 @@ const DEFAULT_BROOKLYN_LOCATION = {
   tzid: 'America/New_York',
 };
 
+// Currencies a poster can choose for their own listed price (e.g. an item's
+// asking price) - separate from what the site itself charges for the
+// listing fee via Stripe, which stays in whatever currency the site's
+// Stripe account is configured for.
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', label: 'US Dollar (USD)' },
+  { code: 'CAD', symbol: 'CA$', label: 'Canadian Dollar (CAD)' },
+  { code: 'ILS', symbol: '₪', label: 'Israeli Shekel (ILS)' },
+  { code: 'EUR', symbol: '€', label: 'Euro (EUR)' },
+  { code: 'GBP', symbol: '£', label: 'British Pound (GBP)' },
+  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar (AUD)' },
+];
+const CURRENCY_CODES = CURRENCIES.map((c) => c.code);
+
 module.exports = {
   CLASSIFIED_CATEGORIES,
   CLASSIFIED_CATEGORY_KEYS,
@@ -43,4 +57,6 @@ module.exports = {
   DEFAULT_CHAR_LIMITS,
   OVERSIZED_CHAR_LIMITS,
   DEFAULT_BROOKLYN_LOCATION,
+  CURRENCIES,
+  CURRENCY_CODES,
 };
