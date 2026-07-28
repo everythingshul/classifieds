@@ -15,6 +15,7 @@ function getAllListingCategories({ includeInactive = false } = {}) {
     hasImages: !!row.has_images,
     hasPrice: !!row.has_price,
     free: !!row.free,
+    taxonomyGroup: `lst:${row.key}`,
     id: row.id,
     active: !!row.active,
   }));

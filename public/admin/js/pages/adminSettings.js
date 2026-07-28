@@ -61,6 +61,14 @@ async function renderSettingsPage() {
         <div class="form-row"><label>From address</label><input name="mail_from" placeholder="JListings &lt;no-reply@example.com&gt;" value="${escapeHtml(s.mail_from || '')}"></div>
         <button class="btn btn-sm" type="submit">Save</button>
       </form>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <div class="form-row"><label>Send a test email to</label>
+        <div style="display:flex;gap:10px">
+          <input type="email" id="testEmailTo" placeholder="you@example.com" value="${escapeHtml(s.admin_notify_email || '')}" style="flex:1">
+          <button class="btn btn-sm btn-outline" type="button" id="sendTestEmailBtn">Send test email</button>
+        </div>
+      </div>
+      <div id="testEmailResult"></div>
     </div>
 
     <div class="admin-card">
@@ -129,6 +137,26 @@ async function renderSettingsPage() {
   document.getElementById('mailProviderSelect').addEventListener('change', (e) => {
     document.getElementById('smtpFields').style.display = e.target.value === 'smtp' ? 'block' : 'none';
     document.getElementById('brevoFields').style.display = e.target.value === 'brevo' ? 'block' : 'none';
+  });
+  document.getElementById('sendTestEmailBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('sendTestEmailBtn');
+    const resultEl = document.getElementById('testEmailResult');
+    const to = document.getElementById('testEmailTo').value.trim();
+    if (!to) { resultEl.innerHTML = `<p class="hint" style="color:var(--danger)">Enter a recipient email first.</p>`; return; }
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    resultEl.innerHTML = '';
+    try {
+      const result = await AdminApi.sendTestEmail(to);
+      resultEl.innerHTML = result.dryRun
+        ? `<p class="hint" style="color:var(--danger)">${escapeHtml(result.message)}</p>`
+        : `<p class="hint" style="color:var(--success)">Sent! Check the inbox at ${escapeHtml(to)} (and spam folder).</p>`;
+    } catch (e) {
+      resultEl.innerHTML = `<p class="hint" style="color:var(--danger)">Failed: ${escapeHtml(e.message)}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send test email';
+    }
   });
   bindForm('mailForm', (fd) => {
     const out = [

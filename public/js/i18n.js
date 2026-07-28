@@ -14,7 +14,7 @@ const I18N = (() => {
       no_results: 'No listings found.', view_details: 'View Details', contact: 'Contact',
       call: 'Call', email: 'Email', website: 'Visit Website', report: 'Report', bookmark: 'Save', bookmarked: 'Saved',
       posted: 'Posted', expires: 'Expires', views: 'views',
-      terms: 'Terms & Conditions', refund_policy: 'Refund Policy',
+      terms: 'Terms & Conditions', refund_policy: 'Refund Policy', contact_us: 'Contact Us',
       lang_toggle: 'עברית',
     },
     he: {
@@ -31,7 +31,7 @@ const I18N = (() => {
       no_results: 'לא נמצאו מודעות.', view_details: 'לפרטים', contact: 'ליצירת קשר',
       call: 'התקשר', email: 'שלח אימייל', website: 'לאתר', report: 'דווח', bookmark: 'שמור', bookmarked: 'שמור',
       posted: 'פורסם', expires: 'בתוקף עד', views: 'צפיות',
-      terms: 'תנאי שימוש', refund_policy: 'מדיניות החזרים',
+      terms: 'תנאי שימוש', refund_policy: 'מדיניות החזרים', contact_us: 'צור קשר',
       lang_toggle: 'English',
     },
   };

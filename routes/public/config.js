@@ -7,11 +7,12 @@ const { getCountryList } = require('../../utils/countries');
 const { getAllClassifiedCategories, getOptionNames } = require('../../services/categories');
 const { getAllListingCategories } = require('../../services/listingCategories');
 const { getPublishableKey } = require('../../utils/stripeClient');
+const { orderTaxonomyTree } = require('../../services/taxonomySort');
 
 const router = express.Router();
 
 router.get('/', (req, res) => {
-  const taxonomies = db.prepare('SELECT * FROM taxonomies WHERE active = 1 ORDER BY grp, parent_id, sort_order').all();
+  const taxonomies = orderTaxonomyTree(db.prepare('SELECT * FROM taxonomies WHERE active = 1 ORDER BY grp, parent_id, sort_order').all());
   const pricingTiers = db.prepare('SELECT * FROM pricing_tiers WHERE active = 1 ORDER BY category, sort_order').all();
 
   res.json({

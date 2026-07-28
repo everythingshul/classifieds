@@ -5,6 +5,10 @@ async function renderDetailPage(id, type) {
   Api.registerClicks([id]);
 
   const fieldRows = [];
+  if (post.taxonomyId) {
+    const tax = window.SITE_CONFIG?.taxonomies?.find((t) => String(t.id) === String(post.taxonomyId));
+    if (tax) fieldRows.push(['Category', tax.name]);
+  }
   if (post.fields?.jobType) fieldRows.push(['Job Type', post.fields.jobType.replace('_', ' ')]);
   if (post.fields?.payAmount) fieldRows.push(['Pay', `${formatCents(post.fields.payAmount * 100)} / ${post.fields.payPeriod}`]);
   if (post.fields?.experience) fieldRows.push(['Experience', post.fields.experience]);
@@ -103,6 +107,10 @@ async function renderDetailPage(id, type) {
       const email = new FormData(e.target).get('email');
       try {
         const result = action === 'boost' ? await Api.boost(id, { email }) : await Api.strike(id, { email });
+        if (result.checkoutUrl) {
+          window.location.href = result.checkoutUrl;
+          return;
+        }
         if (result.clientSecret) {
           boostForm.style.display = 'none';
           await mountEmbeddedCheckout(document.getElementById('boostCheckoutContainer'), result.clientSecret);

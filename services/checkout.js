@@ -1,15 +1,15 @@
-const { getStripe } = require('../utils/stripeClient');
+const { getStripe, getPublishableKey } = require('../utils/stripeClient');
 
-// Embedded Checkout: the payment form itself renders inline on our page (via
-// Stripe.js) instead of redirecting to a Stripe-hosted page. Stripe still
-// needs a `return_url` for after payment completes (e.g. 3D Secure), which is
-// where post-success.html verifies the session and finalizes the post - a
-// fallback that doesn't depend on the webhook having arrived yet.
-async function createCheckoutSession({ lineItems, returnUrl, metadata, customerEmail }) {
+// Embedded Checkout (the payment form renders inline via Stripe.js) requires
+// a publishable key on top of the secret key. If one hasn't been set in
+// Admin -> Settings, fall back to Stripe's classic hosted, redirect-based
+// Checkout instead, which only needs the secret key - so a site that never
+// configures the new publishable-key field still takes payments rather than
+// failing outright.
+async function createCheckoutSession({ lineItems, returnUrl, cancelUrl, metadata, customerEmail }) {
   const stripe = getStripe();
-  return stripe.checkout.sessions.create({
+  const base = {
     mode: 'payment',
-    ui_mode: 'embedded',
     payment_method_types: ['card'],
     customer_email: customerEmail,
     line_items: lineItems.map((item) => ({
@@ -20,9 +20,13 @@ async function createCheckoutSession({ lineItems, returnUrl, metadata, customerE
         product_data: { name: item.label },
       },
     })),
-    return_url: returnUrl,
     metadata,
-  });
+  };
+
+  if (getPublishableKey()) {
+    return stripe.checkout.sessions.create({ ...base, ui_mode: 'embedded', return_url: returnUrl });
+  }
+  return stripe.checkout.sessions.create({ ...base, success_url: returnUrl, cancel_url: cancelUrl || returnUrl });
 }
 
 module.exports = { createCheckoutSession };

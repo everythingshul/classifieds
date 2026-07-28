@@ -41,6 +41,7 @@ app.use('/api/classifieds', require('./routes/public/classifieds'));
 app.use('/api/listings', require('./routes/public/listings'));
 app.use('/api/simchas', require('./routes/public/simchas'));
 app.use('/api/posts', require('./routes/public/posts'));
+app.use('/api/contact', require('./routes/public/contact'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
@@ -48,6 +49,7 @@ app.use('/api/admin/custom-categories', require('./routes/admin/customCategories
 app.use('/api/admin/listing-categories', require('./routes/admin/listingCategories'));
 app.use('/api/admin/promo-codes', require('./routes/admin/promoCodes'));
 app.use('/api/admin/reports', require('./routes/admin/reports'));
+app.use('/api/admin/contact-messages', require('./routes/admin/contactMessages'));
 app.use('/api/admin/pricing', require('./routes/admin/pricing'));
 app.use('/api/admin/settings', require('./routes/admin/settings'));
 app.use('/api/admin/posts', require('./routes/admin/posts'));

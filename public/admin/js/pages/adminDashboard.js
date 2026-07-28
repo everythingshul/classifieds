@@ -1,5 +1,5 @@
 async function renderDashboardPage() {
-  const [stats, { reports }] = await Promise.all([AdminApi.stats(), AdminApi.reports()]);
+  const [stats, { reports }, { messages }] = await Promise.all([AdminApi.stats(), AdminApi.reports(), AdminApi.contactMessages()]);
   const liveCount = stats.byStatus.find((s) => s.status === 'live')?.c || 0;
   const byStatusRows = stats.byStatus.map((s) => `<tr><td>${s.status}</td><td>${s.c}</td></tr>`).join('');
 
@@ -19,6 +19,25 @@ async function renderDashboardPage() {
               <td>${escapeHtml(r.reporter_email || 'anonymous')}</td>
               <td>${formatDate(r.created_at)}</td>
               <td><button class="btn btn-sm dismiss-report">Dismiss</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    ${messages.length ? `
+    <div class="admin-card">
+      <h3 style="margin-top:0">Contact Messages (${messages.length})</h3>
+      <table class="admin-table">
+        <thead><tr><th>From</th><th>Subject</th><th>Message</th><th>When</th><th></th></tr></thead>
+        <tbody>
+          ${messages.map((m) => `
+            <tr data-id="${m.id}">
+              <td>${escapeHtml(m.name || '(no name)')}<br><span class="hint">${escapeHtml(m.email)}</span></td>
+              <td>${escapeHtml(m.subject || '(no subject)')}</td>
+              <td>${escapeHtml(m.message)}</td>
+              <td>${formatDate(m.created_at)}</td>
+              <td><button class="btn btn-sm dismiss-contact">Dismiss</button></td>
             </tr>
           `).join('')}
         </tbody>
@@ -54,6 +73,13 @@ async function renderDashboardPage() {
     btn.addEventListener('click', async () => {
       const id = btn.closest('tr').dataset.id;
       await AdminApi.dismissReport(id);
+      renderDashboardPage();
+    });
+  });
+  document.querySelectorAll('.dismiss-contact').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('tr').dataset.id;
+      await AdminApi.dismissContactMessage(id);
       renderDashboardPage();
     });
   });

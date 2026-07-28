@@ -212,6 +212,13 @@ p { margin: 0 0 .7em; }
 }
 .form-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 600px) { .form-cols { grid-template-columns: 1fr; } }
+.places-suggestions {
+  list-style: none; margin: 0; padding: 0; position: absolute; left: 0; right: 0; top: 100%; z-index: 20;
+  background: #fff; border: 1px solid var(--border); border-top: none; max-height: 220px; overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+.places-suggestions li { padding: 8px 10px; font-size: .85rem; cursor: pointer; }
+.places-suggestions li:hover { background: var(--paper); }
 .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 @media (max-width: 700px) { .category-grid { grid-template-columns: repeat(2, 1fr); } }
 .category-tile { border: 2px solid var(--border); border-radius: var(--radius); padding: 12px 8px; text-align: center; background: #fff; font-size: .82rem; font-weight: 600; }

@@ -14,7 +14,7 @@ async function renderSimchasListPage({ query }) {
       <form class="filters-bar" id="filtersForm">
         <div class="field"><label data-i18n="search">Search</label><input type="text" name="q" value="${escapeHtml(query.q || '')}"></div>
         <div class="field"><label data-i18n="category">Category</label>
-          <select name="taxonomyId"><option value="">Any</option>${simchaTaxonomies.map((t) => `<option value="${t.id}" ${String(query.taxonomyId) === String(t.id) ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select>
+          <select name="taxonomyId"><option value="">Any</option>${simchaTaxonomies.map((t) => `<option value="${t.id}" ${String(query.taxonomyId) === String(t.id) ? 'selected' : ''}>${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select>
         </div>
         <button class="btn btn-sm" type="submit" data-i18n="filter">Filter</button>
       </form>

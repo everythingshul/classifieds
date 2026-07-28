@@ -225,7 +225,7 @@ router.post('/:id/approve', async (req, res, next) => {
       to: updated.poster_email,
       subject: `Your listing is now live: ${updated.title}`,
       html: `<p>Great news - your listing "${updated.title}" has been approved and is now live.</p><p><a href="${appUrl()}${updated.type === 'simcha' ? '/simchas/' : updated.type === 'listing' ? '/listings/' : '/classifieds/'}${updated.public_id}">View it here</a></p>`,
-    }).catch(() => {});
+    }).catch((e) => console.error('[posts] Failed to send approval email for post', updated.public_id, '-', e.message));
     res.json(formatPostAdmin(updated, imagesFor(post.id)));
   } catch (e) {
     next(e);
@@ -242,7 +242,7 @@ router.post('/:id/reject', async (req, res, next) => {
       to: post.poster_email,
       subject: `Your listing was not approved: ${post.title}`,
       html: `<p>Unfortunately your listing "${post.title}" was not approved.</p>${reason ? `<p><b>Reason:</b> ${reason}</p>` : ''}<p>Please contact us with any questions.</p>`,
-    }).catch(() => {});
+    }).catch((e) => console.error('[posts] Failed to send rejection email for post', post.public_id, '-', e.message));
     res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
   } catch (e) {
     next(e);

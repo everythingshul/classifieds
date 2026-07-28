@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
+const { sendMail } = require('../../utils/mailer');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -21,6 +22,27 @@ router.get('/', (req, res) => {
     }
   });
   res.json(out);
+});
+
+// Sends a real email through whatever provider/credentials are currently
+// saved, so the admin can confirm the setup actually works (and see the
+// exact provider error if it doesn't) without having to post a test listing.
+router.post('/test-email', async (req, res) => {
+  const to = String(req.body.to || '').trim();
+  if (!to || !to.includes('@')) return res.status(400).json({ error: 'A valid recipient email is required' });
+  try {
+    const result = await sendMail({
+      to,
+      subject: 'Test email from JListings',
+      html: '<p>This is a test email sent from Admin → Settings → Outbound Email. If you received this, your email configuration works.</p>',
+    });
+    if (result?.messageId === 'dry-run') {
+      return res.json({ ok: true, dryRun: true, message: 'No provider is configured (or no API key set) - this was logged to the server console instead of actually sent.' });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.put('/:key', (req, res) => {

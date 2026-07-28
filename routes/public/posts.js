@@ -165,11 +165,12 @@ async function finalizeOrCheckout({ res, post, payment, charges, posterEmail, ty
   const session = await createCheckoutSession({
     lineItems: charges.lineItems,
     returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${appUrl()}/post`,
     customerEmail: posterEmail,
     metadata: { kind: 'listing', postId: String(post.id), paymentId: String(payment.id), type, promoCode: charges.promo?.code || '' },
   });
   db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-  return res.json({ requiresPayment: true, clientSecret: session.client_secret });
+  return res.json({ requiresPayment: true, clientSecret: session.client_secret || null, checkoutUrl: session.url || null });
 }
 
 // Fallback verification for the success page: normally the Stripe webhook
@@ -221,11 +222,12 @@ router.post('/:publicId/boost', async (req, res, next) => {
     const session = await createCheckoutSession({
       lineItems: [{ label: `Boost listing: ${post.title}`, amount_cents: amount }],
       returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${appUrl()}${postUrlPath(post)}`,
       customerEmail: email,
       metadata: { kind: 'boost', postId: String(post.id), paymentId: String(payment.id) },
     });
     db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-    res.json({ requiresPayment: true, clientSecret: session.client_secret });
+    res.json({ requiresPayment: true, clientSecret: session.client_secret || null, checkoutUrl: session.url || null });
   } catch (e) {
     next(e);
   }
@@ -253,11 +255,12 @@ router.post('/:publicId/strike', async (req, res, next) => {
     const session = await createCheckoutSession({
       lineItems: [{ label: `Feature listing: ${post.title}`, amount_cents: amount }],
       returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${appUrl()}${postUrlPath(post)}`,
       customerEmail: email,
       metadata: { kind: 'strike', postId: String(post.id), paymentId: String(payment.id) },
     });
     db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-    res.json({ requiresPayment: true, clientSecret: session.client_secret });
+    res.json({ requiresPayment: true, clientSecret: session.client_secret || null, checkoutUrl: session.url || null });
   } catch (e) {
     next(e);
   }
@@ -273,10 +276,14 @@ router.post('/:publicId/report', async (req, res, next) => {
       post.id, reason, reporterEmail, Date.now()
     );
     const url = `${appUrl()}${postUrlPath(post)}`;
-    await notifyAdmin(
-      `Post reported: ${post.title}`,
-      `<p><b>Post:</b> ${post.title}</p><p><b>Reason:</b> ${reason || '(none given)'}</p><p><b>Reported by:</b> ${reporterEmail || 'anonymous'}</p><p><a href="${url}">View post</a></p>`
-    );
+    try {
+      await notifyAdmin(
+        `Post reported: ${post.title}`,
+        `<p><b>Post:</b> ${post.title}</p><p><b>Reason:</b> ${reason || '(none given)'}</p><p><b>Reported by:</b> ${reporterEmail || 'anonymous'}</p><p><a href="${url}">View post</a></p>`
+      );
+    } catch (e) {
+      console.error('[posts] Failed to send report notification email for post', post.public_id, '-', e.message);
+    }
     res.json({ ok: true });
   } catch (e) {
     next(e);

@@ -28,7 +28,7 @@ function getCustomCategories({ includeInactive = false } = {}) {
     hasImages: !!row.has_images,
     hasPrice: !!row.has_price,
     free: !!row.free,
-    taxonomyGroup: null,
+    taxonomyGroup: `cat:${row.key}`,
     isSystem: false,
     id: row.id,
     active: !!row.active,

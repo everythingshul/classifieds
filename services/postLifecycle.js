@@ -134,10 +134,24 @@ async function finalizePostLive(postId) {
   ).run(nextStatus, nextStatus === 'live' ? now : null, nextStatus === 'live' ? expiresAt : null, now, now, postId);
 
   const updated = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
-  await sendInvoiceForPost(updated);
+
+  // The post's status/expiry has already been committed above - a broken
+  // mail config (bad SMTP creds, unreachable host, etc.) must never throw
+  // back out of here and make the post-live transition itself look like it
+  // failed. Log clearly so send failures are still diagnosable from server
+  // logs instead of disappearing silently.
+  try {
+    await sendInvoiceForPost(updated);
+  } catch (e) {
+    console.error('[postLifecycle] Failed to send invoice email for post', updated.public_id, '-', e.message);
+  }
 
   if (nextStatus === 'pending_approval') {
-    await notifyAdminNewPost(updated, 'New post with images awaiting approval');
+    try {
+      await notifyAdminNewPost(updated, 'New post with images awaiting approval');
+    } catch (e) {
+      console.error('[postLifecycle] Failed to notify admin of new post', updated.public_id, '-', e.message);
+    }
   }
   if (updated.type === 'simcha') {
     await sendSurpriseEmails(updated);
@@ -209,7 +223,7 @@ async function fulfillCheckoutSession(session) {
           to: post.poster_email,
           subject: `Your listing was boosted: ${post.title}`,
           html: `<p>Your listing "${post.title}" has been moved back to the top.</p>`,
-        }).catch(() => {});
+        }).catch((e) => console.error('[postLifecycle] Failed to send boost confirmation email for post', post.public_id, '-', e.message));
       }
     }
     return post;
@@ -223,7 +237,7 @@ async function fulfillCheckoutSession(session) {
           to: post.poster_email,
           subject: `Your listing is now featured: ${post.title}`,
           html: `<p>Your listing "${post.title}" is now featured/striking.</p>`,
-        }).catch(() => {});
+        }).catch((e) => console.error('[postLifecycle] Failed to send strike confirmation email for post', post.public_id, '-', e.message));
       }
     }
     return post;

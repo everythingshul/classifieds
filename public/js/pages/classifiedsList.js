@@ -57,7 +57,7 @@ async function renderClassifiedsListPage({ query }) {
         ` : ''}
         ${category === 'real-estate' ? `
           <div class="field"><label>Category</label>
-            <select name="taxonomyId"><option value="">Any</option>${reTaxonomies.map((t) => `<option value="${t.id}" ${String(query.taxonomyId) === String(t.id) ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select>
+            <select name="taxonomyId"><option value="">Any</option>${reTaxonomies.map((t) => `<option value="${t.id}" ${String(query.taxonomyId) === String(t.id) ? 'selected' : ''}>${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select>
           </div>
           <div class="field"><label>Min Price</label><input type="number" name="minPrice" value="${escapeHtml(query.minPrice || '')}"></div>
           <div class="field"><label>Max Price</label><input type="number" name="maxPrice" value="${escapeHtml(query.maxPrice || '')}"></div>

@@ -3,12 +3,12 @@
 const CLASSIFIED_CATEGORIES = [
   { key: 'job-offers', label: 'Job Offers', labelHe: 'משרות פנויות', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'job', isSystem: true },
   { key: 'seeking-a-job', label: 'Seeking A Job', labelHe: 'מחפש עבודה', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'job', isSystem: true },
-  { key: 'items-for-sale', label: 'Items For Sale', labelHe: 'למכירה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: null, isSystem: true },
-  { key: 'items-for-rent', label: 'Items For Rent', labelHe: 'להשכרה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: null, isSystem: true },
-  { key: 'free-giveaways', label: 'Free Giveaways', labelHe: 'חינם', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
-  { key: 'lost-found', label: 'Lost & Found', labelHe: 'אבידות ומציאות', hasImages: false, hasPrice: false, free: true, taxonomyGroup: null, isSystem: true },
-  { key: 'wanted', label: 'Wanted', labelHe: 'דרוש', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
-  { key: 'services', label: 'Services', labelHe: 'שירותים', hasImages: false, hasPrice: false, free: false, taxonomyGroup: null, isSystem: true },
+  { key: 'items-for-sale', label: 'Items For Sale', labelHe: 'למכירה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: 'cat:items-for-sale', isSystem: true },
+  { key: 'items-for-rent', label: 'Items For Rent', labelHe: 'להשכרה', hasImages: true, hasPrice: true, free: false, taxonomyGroup: 'cat:items-for-rent', isSystem: true },
+  { key: 'free-giveaways', label: 'Free Giveaways', labelHe: 'חינם', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'cat:free-giveaways', isSystem: true },
+  { key: 'lost-found', label: 'Lost & Found', labelHe: 'אבידות ומציאות', hasImages: false, hasPrice: false, free: true, taxonomyGroup: 'cat:lost-found', isSystem: true },
+  { key: 'wanted', label: 'Wanted', labelHe: 'דרוש', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'cat:wanted', isSystem: true },
+  { key: 'services', label: 'Services', labelHe: 'שירותים', hasImages: false, hasPrice: false, free: false, taxonomyGroup: 'cat:services', isSystem: true },
   { key: 'real-estate', label: 'Real Estate', labelHe: 'נדל"ן', hasImages: true, hasPrice: true, free: false, taxonomyGroup: 'real_estate', isSystem: true },
 ];
 

@@ -77,7 +77,7 @@ function renderPostWizard() {
         <label>Simcha Category</label>
         <select id="taxonomyId">
           <option value="">Select…</option>
-          ${simchaTax.map((t) => `<option value="${t.id}" ${state.data.taxonomyId == t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
+          ${simchaTax.map((t) => `<option value="${t.id}" ${state.data.taxonomyId == t.id ? 'selected' : ''}>${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}
         </select>
       </div>
       <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
@@ -91,6 +91,20 @@ function renderPostWizard() {
     });
   }
 
+  // A generic "Category" sub-selector for any category (built-in or
+  // admin-added, classifieds or listing) that has admin-defined
+  // sub-categories under it - job-offers/seeking-a-job/real-estate render
+  // their own version of this inline below since they pair it with other
+  // category-specific fields, so this is only used for everything else.
+  function genericTaxonomyFieldHtml() {
+    const catDef = currentCatDef();
+    const grp = catDef?.taxonomyGroup;
+    if (!grp || grp === 'job' || grp === 'real_estate') return '';
+    const opts = cfg.taxonomies.filter((t) => t.grp === grp);
+    if (!opts.length) return '';
+    return `<div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${opts.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
+  }
+
   function categorySpecificFieldsHtml() {
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
     const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
@@ -102,7 +116,7 @@ function renderPostWizard() {
         return `
           <div class="form-cols">
             <div class="form-row"><label>Job Type</label><select id="f_jobType">${cfg.jobTypes.map((t) => `<option value="${t}">${t.replace('_', ' ')}</option>`).join('')}</select></div>
-            <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">Select…</option>${jobTax.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select></div>
+            <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">Select…</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
           </div>
           <div class="form-cols">
             <div class="form-row"><label>Pay Amount <span class="hint">(optional)</span></label><input type="number" id="f_payAmount" min="0" step="0.01"></div>
@@ -110,13 +124,13 @@ function renderPostWizard() {
           </div>`;
       case 'seeking-a-job':
         return `
-          <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">Select…</option>${jobTax.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">Select…</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
           <div class="form-row"><label>Experience</label><textarea id="f_experience" rows="3"></textarea></div>`;
       case 'items-for-sale':
       case 'items-for-rent':
-        return `<div class="form-row"><label>Price</label><input type="number" id="f_price" min="0" step="0.01" required></div>`;
+        return `${genericTaxonomyFieldHtml()}<div class="form-row"><label>Price</label><input type="number" id="f_price" min="0" step="0.01" required></div>`;
       case 'lost-found':
-        return `<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
+        return `${genericTaxonomyFieldHtml()}<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
       case 'real-estate':
         return `
           <div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
@@ -124,7 +138,7 @@ function renderPostWizard() {
       default: {
         // Admin-added custom classifieds category, or a Listing (always generic).
         const catDef = currentCatDef();
-        return catDef?.hasPrice ? `<div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>` : '';
+        return `${genericTaxonomyFieldHtml()}${catDef?.hasPrice ? `<div class="form-row"><label>Price <span class="hint">(optional)</span></label><input type="number" id="f_price" min="0" step="0.01"></div>` : ''}`;
       }
     }
   }
@@ -242,8 +256,10 @@ function renderPostWizard() {
       if (!contactPhone && !contactEmail && !contactUrl) errs.push('At least one contact method is required');
 
       const fields = {};
+      const genericTaxSelect = document.getElementById('f_taxonomyId');
       if (state.postType === 'listing') {
         if (document.getElementById('f_price')) fields.price = document.getElementById('f_price').value;
+        if (genericTaxSelect) fields.taxonomyId = genericTaxSelect.value;
       } else if (state.category === 'job-offers') {
         fields.jobType = document.getElementById('f_jobType').value;
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
@@ -257,14 +273,17 @@ function renderPostWizard() {
       } else if (['items-for-sale', 'items-for-rent'].includes(state.category)) {
         fields.price = document.getElementById('f_price').value;
         if (!fields.price) errs.push('Price is required');
+        if (genericTaxSelect) fields.taxonomyId = genericTaxSelect.value;
       } else if (state.category === 'lost-found') {
         fields.lostOrFound = document.getElementById('f_lostOrFound').value;
+        if (genericTaxSelect) fields.taxonomyId = genericTaxSelect.value;
       } else if (state.category === 'real-estate') {
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
         if (!fields.taxonomyId) errs.push('Real estate category is required');
         fields.price = document.getElementById('f_price').value;
-      } else if (document.getElementById('f_price')) {
-        fields.price = document.getElementById('f_price').value;
+      } else {
+        if (document.getElementById('f_price')) fields.price = document.getElementById('f_price').value;
+        if (genericTaxSelect) fields.taxonomyId = genericTaxSelect.value;
       }
 
       if (errs.length) {
@@ -498,6 +517,10 @@ function renderPostWizard() {
 
       const result = await Api.createPost(fd);
       if (result.requiresPayment) {
+        if (result.checkoutUrl) {
+          window.location.href = result.checkoutUrl;
+          return;
+        }
         document.getElementById('reviewActions').style.display = 'none';
         await mountEmbeddedCheckout(document.getElementById('checkoutContainer'), result.clientSecret);
       } else {

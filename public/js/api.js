@@ -34,5 +34,6 @@ const Api = (() => {
     strike: (id, body) => req(`/posts/${id}/strike`, { method: 'POST', body }),
     registerImpressions: (ids) => req('/posts/impressions', { method: 'POST', body: { ids } }).catch(() => {}),
     registerClicks: (ids) => req('/posts/clicks', { method: 'POST', body: { ids } }).catch(() => {}),
+    contact: (body) => req('/contact', { method: 'POST', body }),
   };
 })();

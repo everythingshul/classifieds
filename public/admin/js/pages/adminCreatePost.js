@@ -9,31 +9,38 @@ async function renderCreatePostPage() {
     return type === 'listing' ? cfg.listingCategories : cfg.categories;
   }
 
+  function genericTaxonomyFieldHtml(catDef) {
+    const grp = catDef?.taxonomyGroup;
+    if (!grp || grp === 'job' || grp === 'real_estate') return '';
+    const opts = cfg.taxonomies.filter((t) => t.grp === grp);
+    if (!opts.length) return '';
+    return `<div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">—</option>${opts.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
+  }
+
   function categoryFieldsHtml() {
     const catDef = categoriesForType().find((c) => c.key === category);
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
     const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
     if (type === 'listing') {
-      return catDef?.hasPrice ? `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>` : '';
+      return `${genericTaxonomyFieldHtml(catDef)}${catDef?.hasPrice ? `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>` : ''}`;
     }
     if (category === 'job-offers') {
       return `
         <div class="form-cols">
           <div class="form-row"><label>Job Type</label><select id="f_jobType">${cfg.jobTypes.map((t) => `<option value="${t}">${t}</option>`).join('')}</select></div>
-          <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select></div>
+          <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
         </div>`;
     }
     if (category === 'seeking-a-job') {
-      return `<div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
+      return `<div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
     }
     if (category === 'lost-found') {
-      return `<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
+      return `${genericTaxonomyFieldHtml(catDef)}<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
     }
     if (category === 'real-estate') {
-      return `<div class="form-row"><label>Real Estate Category</label><select id="f_taxonomyId"><option value="">—</option>${reTax.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select></div><div class="form-row"><label>Price</label><input type="number" id="f_price"></div>`;
+      return `<div class="form-row"><label>Real Estate Category</label><select id="f_taxonomyId"><option value="">—</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div><div class="form-row"><label>Price</label><input type="number" id="f_price"></div>`;
     }
-    if (catDef?.hasPrice) return `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>`;
-    return '';
+    return `${genericTaxonomyFieldHtml(catDef)}${catDef?.hasPrice ? `<div class="form-row"><label>Price</label><input type="number" id="f_price"></div>` : ''}`;
   }
 
   function render() {
@@ -59,7 +66,7 @@ async function renderCreatePostPage() {
         ` : `
           <div class="form-row">
             <label>Simcha Category</label>
-            <select id="taxonomySelect"><option value="">—</option>${simchaTax.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select>
+            <select id="taxonomySelect"><option value="">—</option>${simchaTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select>
           </div>
           <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="3"></textarea></div>
           <div class="form-row"><label>Surprise email <span class="hint">(optional, limited to one)</span></label><input type="email" id="f_surprise"></div>

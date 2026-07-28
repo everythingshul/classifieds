@@ -1,25 +1,32 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
+const { orderTaxonomyTree } = require('../../services/taxonomySort');
 
 const router = express.Router();
 router.use(requireAdmin);
 
 const GROUPS = new Set(['job', 'real_estate', 'simcha', 'job_type', 'pay_period']);
+// Every classifieds/listing category (built-in or admin-added) gets its own
+// derived taxonomy group ("cat:<key>" / "lst:<key>") so sub-categories can be
+// managed for any of them, not just the handful with a fixed group above.
+const DERIVED_GROUP_RE = /^(cat|lst):[a-z0-9-]+$/;
+function isValidGroup(grp) {
+  return GROUPS.has(grp) || DERIVED_GROUP_RE.test(grp || '');
+}
 
 router.get('/', (req, res) => {
   const grp = req.query.grp;
   const rows = grp
     ? db.prepare('SELECT * FROM taxonomies WHERE grp = ? ORDER BY parent_id, sort_order').all(grp)
     : db.prepare('SELECT * FROM taxonomies ORDER BY grp, parent_id, sort_order').all();
-  res.json(rows);
+  res.json(orderTaxonomyTree(rows));
 });
 
 router.post('/', (req, res) => {
   const { grp, parentId, name, nameHe, sortOrder } = req.body;
-  if (!GROUPS.has(grp)) return res.status(400).json({ error: 'Invalid group' });
+  if (!isValidGroup(grp)) return res.status(400).json({ error: 'Invalid group' });
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
-  if (parentId && grp !== 'real_estate') return res.status(400).json({ error: 'Only real_estate supports sub-categories' });
   const info = db
     .prepare('INSERT INTO taxonomies (grp, parent_id, name, name_he, sort_order, active) VALUES (?, ?, ?, ?, ?, 1)')
     .run(grp, parentId || null, name.trim(), nameHe || null, sortOrder || 0);

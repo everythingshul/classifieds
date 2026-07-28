@@ -100,10 +100,12 @@ function validateClassifiedPayload(body, charLimits) {
 
   const locationText = requireString(body.locationText, 'location', errors, { max: 200 });
 
-  let taxonomyId = null;
-  if (CATEGORIES_REQUIRING_TAXONOMY.has(category)) {
-    taxonomyId = Number(body.taxonomyId);
-    if (!taxonomyId) errors.push('a category selection is required');
+  // Required for the categories that have always needed it (job/real-estate);
+  // optional-but-accepted for any other category with admin-defined
+  // sub-categories, since not every category will have any defined yet.
+  let taxonomyId = body.taxonomyId ? Number(body.taxonomyId) || null : null;
+  if (CATEGORIES_REQUIRING_TAXONOMY.has(category) && !taxonomyId) {
+    errors.push('a category selection is required');
   }
 
   const fields = validateCategoryFields(category, body.fields, errors, categoryDef);
@@ -198,6 +200,10 @@ function validateListingPayload(body, charLimits) {
     fields.price = price;
   }
 
+  // Optional: only used if the admin has defined sub-categories for this
+  // listing category (see taxonomyGroup on the category, "lst:<key>").
+  const taxonomyId = body.taxonomyId ? Number(body.taxonomyId) || null : null;
+
   const posterEmail = requireString(body.posterEmail, 'email', errors);
   if (posterEmail && !isValidEmail(posterEmail)) errors.push('email address is invalid');
 
@@ -218,6 +224,7 @@ function validateListingPayload(body, charLimits) {
 
   return {
     category,
+    taxonomyId,
     title,
     description,
     fields,
