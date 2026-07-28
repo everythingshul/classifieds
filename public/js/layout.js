@@ -28,13 +28,16 @@ function renderLayout(siteName) {
     </header>
     <main id="app"></main>
     <footer class="site-footer">
-      <div class="container">
-        <div class="footer-links">
-          <a href="/contact" data-i18n="contact_us">Contact Us</a>
-          <a href="/terms" data-i18n="terms">Terms &amp; Conditions</a>
-          <a href="/refund-policy" data-i18n="refund_policy">Refund Policy</a>
+      <div class="container footer-row">
+        <div>
+          <div class="footer-links">
+            <a href="/contact" data-i18n="contact_us">Contact Us</a>
+            <a href="/terms" data-i18n="terms">Terms &amp; Conditions</a>
+            <a href="/refund-policy" data-i18n="refund_policy">Refund Policy</a>
+          </div>
+          <div>&copy; ${new Date().getFullYear()} ${escapeHtml(siteName)}</div>
         </div>
-        <div>&copy; ${new Date().getFullYear()} ${escapeHtml(siteName)}</div>
+        <img class="footer-logo" src="/img/logo.png" onerror="this.style.display='none'" alt="${escapeHtml(siteName)}">
       </div>
     </footer>
   `;
