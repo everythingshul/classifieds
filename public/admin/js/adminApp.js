@@ -37,10 +37,11 @@ function renderShell() {
         <div class="admin-shell" id="adminShell">
           <aside class="admin-sidebar">
             <div class="brand">Admin Portal</div>
-            <a href="#/dashboard">Dashboard</a>
+            <a href="#/dashboard">Dashboard <span class="nav-badge" id="badge-dashboard" style="display:none"></span></a>
             <a href="#/new-post">+ New Post</a>
-            <a href="#/moderation">Moderation Queue</a>
+            <a href="#/moderation">Moderation Queue <span class="nav-badge" id="badge-moderation" style="display:none"></span></a>
             <a href="#/posts">All Posts</a>
+            <a href="#/contact-messages">Contact Messages <span class="nav-badge" id="badge-contact" style="display:none"></span></a>
             <a href="#/crm">CRM Search</a>
             <a href="#/categories">Categories</a>
             <a href="#/pricing">Pricing</a>
@@ -58,10 +59,39 @@ function renderShell() {
         AdminApi.setToken(null);
         window.location.hash = '#/login';
       });
+      startNotificationPolling();
     }
   } else {
     document.getElementById('adminRoot').innerHTML = `<div id="adminContent"></div>`;
   }
+}
+
+let _notifPollTimer = null;
+function startNotificationPolling() {
+  refreshNotificationBadges();
+  if (_notifPollTimer) clearInterval(_notifPollTimer);
+  _notifPollTimer = setInterval(refreshNotificationBadges, 60000);
+}
+
+async function refreshNotificationBadges() {
+  if (!AdminApi.token()) return;
+  let summary;
+  try {
+    summary = await AdminApi.notificationSummary();
+  } catch (e) {
+    return;
+  }
+  const setBadge = (id, count) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (count > 0) { el.textContent = count > 99 ? '99+' : String(count); el.style.display = 'inline-block'; }
+    else { el.style.display = 'none'; }
+  };
+  setBadge('badge-dashboard', (summary.reports || 0) + (summary.pendingApproval || 0));
+  setBadge('badge-moderation', (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0));
+  setBadge('badge-contact', summary.contactMessages || 0);
+  const totalUnread = (summary.reports || 0) + (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0) + (summary.contactMessages || 0);
+  document.title = totalUnread > 0 ? `(${totalUnread > 99 ? '99+' : totalUnread}) Admin — JListings` : 'Admin — JListings';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -70,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/new-post', renderCreatePostPage);
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);
+  AdminRouter.add('#/contact-messages', renderContactMessagesPage);
   AdminRouter.add('#/crm', renderCrmPage);
   AdminRouter.add('#/categories', renderCategoriesPage);
   AdminRouter.add('#/pricing', renderPricingPage);

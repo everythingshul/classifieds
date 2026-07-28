@@ -22,6 +22,9 @@ function addColumnIfMissing(table, column, ddl) {
 }
 addColumnIfMissing('posts', 'click_count', 'click_count INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('pricing_tiers', 'post_type', "post_type TEXT NOT NULL DEFAULT 'classified'");
+addColumnIfMissing('contact_messages', 'archived', 'archived INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('contact_messages', 'reply_text', 'reply_text TEXT');
+addColumnIfMissing('contact_messages', 'replied_at', 'replied_at INTEGER');
 
 function seed() {
   const now = Date.now();

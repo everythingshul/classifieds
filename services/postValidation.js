@@ -1,5 +1,5 @@
 const { LOST_FOUND_OPTIONS } = require('../utils/constants');
-const { isValidEmail, isValidUrl } = require('../utils/validate');
+const { isValidEmail, isValidUrl, normalizeUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
 const { getClassifiedCategoryKeys, findCategory, getOptionNames } = require('./categories');
 const { getListingCategoryKeys, findListingCategory } = require('./listingCategories');
@@ -174,7 +174,7 @@ function validateContact(body, errors) {
   }
   if (hasUrl) {
     if (!isValidUrl(body.contactUrl)) errors.push('contact website is invalid');
-    else contact.url = body.contactUrl;
+    else contact.url = normalizeUrl(body.contactUrl);
   }
   return contact;
 }
@@ -276,7 +276,7 @@ function validateSimchaPayload(body, charLimits) {
   }
   if (body.contactUrl) {
     if (!isValidUrl(body.contactUrl)) errors.push('contact website is invalid');
-    else contact.url = body.contactUrl;
+    else contact.url = normalizeUrl(body.contactUrl);
   }
 
   // Limited to a single surprise recipient by design.

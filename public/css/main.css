@@ -179,6 +179,7 @@ p { margin: 0 0 .7em; }
 @media (max-width: 800px) { .detail-grid { grid-template-columns: 1fr; } }
 .detail-anim { animation: detail-fade-in .35s ease; }
 @keyframes detail-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.detail-main { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
 .detail-topline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .tag-lg { font-size: .74rem; padding: 4px 10px; }
 .detail-posted { font-size: .78rem; color: var(--ink-soft); margin-inline-start: auto; }
@@ -190,6 +191,11 @@ p { margin: 0 0 .7em; }
 .detail-gallery-thumbs { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; }
 .detail-gallery-thumbs img { width: 72px; height: 72px; object-fit: cover; border: 2px solid transparent; opacity: .7; cursor: pointer; flex-shrink: 0; }
 .detail-gallery-thumbs img.active, .detail-gallery-thumbs img:hover { opacity: 1; border-color: var(--cta); }
+.share-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.share-row a, .share-row button {
+  font-size: .8rem; font-weight: 600; color: var(--cta); background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.share-row a:hover, .share-row button:hover { text-decoration: underline; }
 .contact-card { background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--cta); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); position: sticky; top: 66px; }
 .contact-card .btn { width: 100%; margin-bottom: 6px; text-align: center; }
 .detail-meta-list { list-style: none; margin: 14px 0; padding: 0; font-size: .85rem; background: #fff; border: 1px solid var(--border); }

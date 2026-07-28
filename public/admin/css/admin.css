@@ -4,6 +4,10 @@ body { background: #f2f4f6; font-size: .93rem; }
 .admin-sidebar .brand { padding: 0 16px 14px; font-family: var(--font-head); font-size: 1rem; font-weight: 800; }
 .admin-sidebar a { display: block; padding: 8px 16px; color: rgba(255,255,255,.78); font-size: .84rem; font-weight: 500; }
 .admin-sidebar a:hover, .admin-sidebar a.active { background: rgba(255,255,255,.08); color: #fff; }
+.nav-badge {
+  display: inline-block; min-width: 17px; padding: 0 5px; margin-left: 4px; border-radius: 999px;
+  background: var(--danger); color: #fff; font-size: .68rem; font-weight: 700; text-align: center; line-height: 17px;
+}
 .admin-main { flex: 1; padding: 20px 24px; max-width: 1200px; }
 .admin-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .admin-topbar button { background: none; border: 1px solid var(--border); border-radius: 0; padding: 5px 11px; font-size: .78rem; }

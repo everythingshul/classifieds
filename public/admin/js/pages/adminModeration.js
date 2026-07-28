@@ -1,14 +1,35 @@
 async function renderModerationPage() {
-  const data = await AdminApi.posts({ status: 'pending_approval', pageSize: 50 });
+  const [data, urlData] = await Promise.all([
+    AdminApi.posts({ status: 'pending_approval', pageSize: 50 }),
+    AdminApi.posts({ needsUrlApproval: 1, pageSize: 50 }),
+  ]);
   const root = document.getElementById('adminContent');
 
-  if (!data.posts.length) {
+  const urlSection = urlData.posts.length ? `
+    <h2>Websites Awaiting Approval (${urlData.total})</h2>
+    ${urlData.posts.map((p) => `
+      <div class="admin-card" data-post-url="${p.id}">
+        <h3 style="margin-top:0">${escapeHtml(p.title)} <span class="tag">${escapeHtml(p.categoryLabel)}</span></h3>
+        <p><b>Website:</b> <a href="${p.contact?.url}" target="_blank" rel="noopener">${escapeHtml(p.contact?.url || '')}</a></p>
+        <p class="hint">Posted by ${escapeHtml(p.poster.email)}</p>
+        <div style="display:flex;gap:10px">
+          <button class="btn approve-url" data-id="${p.id}">Approve Website</button>
+          <button class="btn btn-danger reject-url" data-id="${p.id}">Remove Website</button>
+          <a class="btn btn-outline" href="#/posts?q=${p.publicId}">Edit</a>
+        </div>
+      </div>
+    `).join('')}
+  ` : '';
+
+  if (!data.posts.length && !urlData.posts.length) {
     root.innerHTML = `<h1>Moderation Queue</h1><p>Nothing waiting for approval.</p>`;
     return;
   }
 
   root.innerHTML = `
-    <h1>Moderation Queue (${data.total})</h1>
+    <h1>Moderation Queue</h1>
+    ${urlSection}
+    ${data.posts.length ? `<h2>Posts Awaiting Approval (${data.total})</h2>` : ''}
     ${data.posts.map((p) => `
       <div class="admin-card" data-post="${p.id}">
         <h3 style="margin-top:0">${escapeHtml(p.title)} <span class="tag">${escapeHtml(p.categoryLabel)}</span></h3>
@@ -50,6 +71,15 @@ async function renderModerationPage() {
   root.querySelectorAll('.reject-post').forEach((btn) => btn.addEventListener('click', async () => {
     const reason = prompt('Reason for rejection (sent to the poster):') || '';
     await AdminApi.rejectPost(btn.dataset.id, reason);
+    renderModerationPage();
+  }));
+  root.querySelectorAll('.approve-url').forEach((btn) => btn.addEventListener('click', async () => {
+    await AdminApi.updatePost(btn.dataset.id, { contactUrlApproved: true });
+    renderModerationPage();
+  }));
+  root.querySelectorAll('.reject-url').forEach((btn) => btn.addEventListener('click', async () => {
+    if (!confirm('Remove this website link from the post? The rest of the post stays live.')) return;
+    await AdminApi.updatePost(btn.dataset.id, { contactUrl: '', contactUrlApproved: false });
     renderModerationPage();
   }));
 }

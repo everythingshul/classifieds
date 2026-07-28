@@ -39,6 +39,7 @@ function formatPostPublic(post, images = []) {
   return {
     id: post.public_id,
     type: post.type,
+    status: post.status,
     category: post.category,
     categoryLabel: categoryLabel(post.category, post.type),
     taxonomyId: post.taxonomy_id || null,

@@ -133,6 +133,9 @@ router.get('/', (req, res) => {
   }
   if (req.query.type) { where.push('type = ?'); params.push(req.query.type); }
   if (req.query.category) { where.push('category = ?'); params.push(req.query.category); }
+  if (req.query.needsUrlApproval) {
+    where.push("contact_url IS NOT NULL AND contact_url != '' AND contact_url_approved = 0");
+  }
   if (req.query.q) {
     where.push('(title LIKE ? OR description LIKE ? OR poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ? OR public_id LIKE ?)');
     const like = `%${req.query.q}%`;

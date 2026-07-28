@@ -18,7 +18,7 @@ async function renderDetailPage(id, type) {
 
   const contactButtons = [];
   if (post.contact?.phone) contactButtons.push(`<a class="btn contact-link" data-click-type="phone" href="${post.contact.phone.tel}">${I18N.t('call')} ${escapeHtml(post.contact.phone.display)}${post.contact.phone.ext ? ' x' + escapeHtml(post.contact.phone.ext) : ''}</a>`);
-  if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="email" href="${post.contact.email.mailto}">${I18N.t('email')}</a>`);
+  if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="email" href="${post.contact.email.mailto}">${I18N.t('email')} ${escapeHtml(post.contact.email.display)}</a>`);
   if (post.contact?.url) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="website" href="${post.contact.url.href}" target="_blank" rel="noopener">${I18N.t('website')}</a>`);
   const hasContact = contactButtons.length > 0;
 
@@ -30,10 +30,21 @@ async function renderDetailPage(id, type) {
       </div>`
     : '';
 
+  const shareUrl = window.location.href;
+  const shareText = `${post.title} - ${post.categoryLabel}`;
+  const shareRow = `
+    <div class="share-row">
+      <span class="hint">Share:</span>
+      <a href="mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(shareUrl)}" title="Share by email">Email</a>
+      <a href="sms:?&body=${encodeURIComponent(`${shareText} ${shareUrl}`)}" title="Share by text message">SMS</a>
+      <a href="https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}" target="_blank" rel="noopener" title="Share on WhatsApp">WhatsApp</a>
+      <button type="button" id="copyLinkBtn" title="Copy link">Copy Link</button>
+    </div>`;
+
   document.getElementById('app').innerHTML = `
     <div class="container">
       <div class="detail-grid detail-anim">
-        <div>
+        <div class="detail-main">
           <div class="detail-topline">
             <span class="tag tag-lg">${escapeHtml(post.categoryLabel)}</span>
             ${post.isFeatured ? '<span class="badge-featured" style="position:static">Featured</span>' : ''}
@@ -43,6 +54,7 @@ async function renderDetailPage(id, type) {
           ${gallery}
           <p class="detail-desc">${escapeHtml(post.description || '')}</p>
           ${fieldRows.length ? `<ul class="detail-meta-list">${fieldRows.map(([k, v]) => `<li><span>${escapeHtml(String(k))}</span><span>${escapeHtml(String(v))}</span></li>`).join('')}</ul>` : ''}
+          ${shareRow}
         </div>
         <div class="contact-card">
           ${type === 'simcha' ? `
@@ -83,6 +95,23 @@ async function renderDetailPage(id, type) {
     if (reason === null) return;
     await Api.report(id, { reason, reporterEmail: null });
     toast('Report sent. Thank you.');
+  });
+
+  document.getElementById('copyLinkBtn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast('Link copied!');
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = shareUrl;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('Link copied!');
+    }
   });
 
   document.querySelectorAll('.contact-link').forEach((el) => {

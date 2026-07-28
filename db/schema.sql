@@ -168,6 +168,9 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   email TEXT NOT NULL,
   subject TEXT,
   message TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
+  reply_text TEXT,
+  replied_at INTEGER,
   created_at INTEGER NOT NULL
 );
 

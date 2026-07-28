@@ -50,6 +50,7 @@ app.use('/api/admin/listing-categories', require('./routes/admin/listingCategori
 app.use('/api/admin/promo-codes', require('./routes/admin/promoCodes'));
 app.use('/api/admin/reports', require('./routes/admin/reports'));
 app.use('/api/admin/contact-messages', require('./routes/admin/contactMessages'));
+app.use('/api/admin/notifications', require('./routes/admin/notifications'));
 app.use('/api/admin/pricing', require('./routes/admin/pricing'));
 app.use('/api/admin/settings', require('./routes/admin/settings'));
 app.use('/api/admin/posts', require('./routes/admin/posts'));

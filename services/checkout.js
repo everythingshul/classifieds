@@ -23,10 +23,18 @@ async function createCheckoutSession({ lineItems, returnUrl, cancelUrl, metadata
     metadata,
   };
 
-  if (getPublishableKey()) {
-    return stripe.checkout.sessions.create({ ...base, ui_mode: 'embedded', return_url: returnUrl });
+  try {
+    if (getPublishableKey()) {
+      return await stripe.checkout.sessions.create({ ...base, ui_mode: 'embedded', return_url: returnUrl });
+    }
+    return await stripe.checkout.sessions.create({ ...base, success_url: returnUrl, cancel_url: cancelUrl || returnUrl });
+  } catch (e) {
+    // Stripe's own error messages (bad key, mismatched test/live mode, etc.)
+    // are safe and useful to show directly rather than being swallowed by
+    // the generic 500 handler - they're exactly what's needed to fix a
+    // broken Stripe setup.
+    throw Object.assign(new Error(`Stripe error: ${e.message}`), { status: 502, expose: true });
   }
-  return stripe.checkout.sessions.create({ ...base, success_url: returnUrl, cancel_url: cancelUrl || returnUrl });
 }
 
 module.exports = { createCheckoutSession };

@@ -54,6 +54,12 @@
         <p>Your listing is now featured.</p>
         <p><a class="btn" href="${data.post ? postUrl(data.post) : '/'}">View your listing</a></p>
       `);
+    } else if (data.post && data.post.status === 'pending_approval') {
+      render(`
+        <h1>Your post has been submitted!</h1>
+        <p>Thank you! Your payment has been received and an invoice was emailed to you. Since it includes photos, it needs a quick admin review before it goes live - usually within a day.</p>
+        <p><a class="btn btn-outline" href="/">Back to Home</a></p>
+      `);
     } else if (data.post) {
       render(`
         <h1>Your post is live!</h1>

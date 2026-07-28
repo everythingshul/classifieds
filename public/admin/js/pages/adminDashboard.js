@@ -1,5 +1,6 @@
 async function renderDashboardPage() {
-  const [stats, { reports }, { messages }] = await Promise.all([AdminApi.stats(), AdminApi.reports(), AdminApi.contactMessages()]);
+  const [stats, { reports }, { messages: allMessages }] = await Promise.all([AdminApi.stats(), AdminApi.reports(), AdminApi.contactMessages()]);
+  const messages = allMessages.filter((m) => !m.archived);
   const liveCount = stats.byStatus.find((s) => s.status === 'live')?.c || 0;
   const byStatusRows = stats.byStatus.map((s) => `<tr><td>${s.status}</td><td>${s.c}</td></tr>`).join('');
 
@@ -27,7 +28,7 @@ async function renderDashboardPage() {
 
     ${messages.length ? `
     <div class="admin-card">
-      <h3 style="margin-top:0">Contact Messages (${messages.length})</h3>
+      <h3 style="margin-top:0">Contact Messages (${messages.length}) <a href="#/contact-messages" style="font-size:.75rem;font-weight:400">View all &amp; reply →</a></h3>
       <table class="admin-table">
         <thead><tr><th>From</th><th>Subject</th><th>Message</th><th>When</th><th></th></tr></thead>
         <tbody>
@@ -37,7 +38,7 @@ async function renderDashboardPage() {
               <td>${escapeHtml(m.subject || '(no subject)')}</td>
               <td>${escapeHtml(m.message)}</td>
               <td>${formatDate(m.created_at)}</td>
-              <td><button class="btn btn-sm dismiss-contact">Dismiss</button></td>
+              <td><button class="btn btn-sm archive-contact">Archive</button></td>
             </tr>
           `).join('')}
         </tbody>
@@ -76,10 +77,10 @@ async function renderDashboardPage() {
       renderDashboardPage();
     });
   });
-  document.querySelectorAll('.dismiss-contact').forEach((btn) => {
+  document.querySelectorAll('.archive-contact').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.closest('tr').dataset.id;
-      await AdminApi.dismissContactMessage(id);
+      await AdminApi.archiveContactMessage(id, true);
       renderDashboardPage();
     });
   });

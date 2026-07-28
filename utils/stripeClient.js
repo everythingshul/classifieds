@@ -6,7 +6,7 @@ const runtimeConfig = require('../services/runtimeConfig');
 function getStripe() {
   const key = runtimeConfig.get('stripe_secret_key', 'STRIPE_SECRET_KEY');
   if (!key) {
-    throw Object.assign(new Error('Stripe is not configured. Add a Stripe secret key in Admin → Settings.'), { status: 500 });
+    throw Object.assign(new Error('Stripe is not configured. Add a Stripe secret key in Admin → Settings.'), { status: 500, expose: true });
   }
   return new Stripe(key, { apiVersion: '2024-06-20' });
 }

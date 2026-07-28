@@ -524,11 +524,7 @@ function renderPostWizard() {
         document.getElementById('reviewActions').style.display = 'none';
         await mountEmbeddedCheckout(document.getElementById('checkoutContainer'), result.clientSecret);
       } else {
-        document.getElementById('app').innerHTML = `
-          <div class="container" style="padding:60px 0;text-align:center">
-            <h1>Your post is live!</h1>
-            <p><a href="/${result.post.type === 'simcha' ? 'simchas' : result.post.type === 'listing' ? 'listings' : 'classifieds'}/${result.post.id}" class="btn">View your post</a></p>
-          </div>`;
+        document.getElementById('app').innerHTML = postSubmittedHtml(result.post);
       }
     } catch (e) {
       const box = document.getElementById('stepError');
@@ -540,4 +536,25 @@ function renderPostWizard() {
   }
 
   render();
+}
+
+// Shared by the free-post success screen here and by post-success.html
+// (after a paid checkout) - a post can go straight to 'live', or land on
+// 'pending_approval' if it has photos awaiting moderation, in which case
+// there's no public page to link to yet.
+function postSubmittedHtml(post) {
+  const path = `/${post.type === 'simcha' ? 'simchas' : post.type === 'listing' ? 'listings' : 'classifieds'}/${post.id}`;
+  if (post.status === 'pending_approval') {
+    return `
+      <div class="container" style="padding:60px 0;text-align:center;max-width:520px">
+        <h1>Your post has been submitted!</h1>
+        <p>Since it includes photos, it needs a quick admin review before it goes live - usually within a day. You'll see it on the site as soon as it's approved.</p>
+        <p><a href="/" class="btn btn-outline">Back to Home</a></p>
+      </div>`;
+  }
+  return `
+    <div class="container" style="padding:60px 0;text-align:center">
+      <h1>Your post is live!</h1>
+      <p><a href="${path}" class="btn">View your post</a></p>
+    </div>`;
 }

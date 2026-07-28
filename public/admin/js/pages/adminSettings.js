@@ -73,11 +73,14 @@ async function renderSettingsPage() {
 
     <div class="admin-card">
       <h3 style="margin-top:0">Google Maps</h3>
-      <p class="hint">Enables address autocomplete on location fields. Without it, location stays a plain text field. Restrict the key by HTTP referrer in the Google Cloud console.</p>
+      <p class="hint">Enables address autocomplete on location fields. Without it, location stays a plain text field. Needs "Places API (New)" (or the older "Places API") and billing enabled on the Google Cloud project, and the key must not be restricted away from this domain.</p>
       <form id="mapsForm">
         <div class="form-row"><label>API key</label><input name="google_maps_api_key" value="${escapeHtml(s.google_maps_api_key || '')}"></div>
         <button class="btn btn-sm" type="submit">Save</button>
       </form>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <button class="btn btn-sm btn-outline" type="button" id="testMapsBtn">Test Maps API</button>
+      <div id="testMapsResult" style="margin-top:8px"></div>
     </div>
 
     <div class="admin-card">
@@ -168,6 +171,45 @@ async function renderSettingsPage() {
     return out;
   }, true);
   bindForm('mapsForm', (fd) => [['google_maps_api_key', fd.google_maps_api_key]]);
+  document.getElementById('testMapsBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('testMapsBtn');
+    const resultEl = document.getElementById('testMapsResult');
+    const key = document.querySelector('#mapsForm input[name="google_maps_api_key"]').value.trim();
+    if (!key) { resultEl.innerHTML = `<p class="hint" style="color:var(--danger)">Enter an API key above first (it doesn't need to be saved yet).</p>`; return; }
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+    resultEl.innerHTML = `<p class="hint">Loading Google Maps…</p>`;
+    try {
+      await new Promise((resolve, reject) => {
+        const existing = document.getElementById('mapsTestScript');
+        if (existing) existing.remove();
+        const script = document.createElement('script');
+        script.id = 'mapsTestScript';
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('The Google Maps script itself failed to load - check the key is correct and not blocked by HTTP referrer restrictions for this domain.'));
+        document.head.appendChild(script);
+      });
+      let usedApi = 'new (Autocomplete Data API)';
+      try {
+        const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary('places');
+        if (!AutocompleteSuggestion) throw new Error('AutocompleteSuggestion not available');
+        await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: 'New York', sessionToken: new AutocompleteSessionToken() });
+      } catch (newApiErr) {
+        usedApi = 'legacy (classic Autocomplete widget)';
+        if (!window.google?.maps?.places?.Autocomplete) throw newApiErr;
+        // Just confirming the constructor doesn't throw - it needs a live DOM input, which we don't want to leave behind.
+        const probe = document.createElement('input');
+        new google.maps.places.Autocomplete(probe, { types: ['geocode'] });
+      }
+      resultEl.innerHTML = `<p class="hint" style="color:var(--success)">Working! Using the ${usedApi} path.</p>`;
+    } catch (e) {
+      resultEl.innerHTML = `<p class="hint" style="color:var(--danger)">Failed: ${escapeHtml(e.message || String(e))}</p>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Test Maps API';
+    }
+  });
   bindForm('rulesForm', (fd) => [
     ['simcha_retention_days', Number(fd.simcha_retention_days)],
     ['simcha_retention_max_days', Number(fd.simcha_retention_max_days)],
