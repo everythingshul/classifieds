@@ -61,8 +61,9 @@ p { margin: 0 0 .7em; }
 .site-header .container { display: flex; align-items: center; gap: 16px; height: 52px; }
 .brand { display: flex; align-items: center; gap: 8px; color: #fff; font-family: var(--font-head); font-size: 1.08rem; font-weight: 800; letter-spacing: -.01em; }
 /* The logo artwork is navy - the same color as the header/footer background
-   - so it's inverted to white here to actually be visible against them. */
-.brand img { height: 40px; filter: brightness(0) invert(1); }
+   - so it sits on a light chip here to stay visible while keeping its own
+   navy color (rather than recoloring the artwork itself). */
+.brand img { height: 40px; background: #fff; padding: 4px 10px; }
 .main-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
 .main-nav a { color: rgba(255,255,255,.82); padding: 6px 10px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
 .main-nav a:hover, .main-nav a.active { background: rgba(255,255,255,.12); color: #fff; }
@@ -244,8 +245,8 @@ p { margin: 0 0 .7em; }
 .site-footer a { color: rgba(255,255,255,.85); }
 .footer-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .footer-links { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
-/* Same navy-on-navy issue as the header logo - inverted to white. */
-.footer-logo { height: 34px; filter: brightness(0) invert(1); opacity: .9; }
+/* Same navy-on-navy issue as the header logo - light chip instead of recoloring. */
+.footer-logo { height: 34px; background: #fff; padding: 4px 10px; }
 @media (max-width: 600px) { .footer-row { flex-direction: column-reverse; align-items: flex-start; } }
 
 /* ---------- Misc ---------- */
