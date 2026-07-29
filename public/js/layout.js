@@ -9,7 +9,10 @@ function renderLayout(siteName) {
     <header class="site-header">
       <div class="container">
         <button class="hamburger" id="hamburgerBtn" aria-label="Menu"><span></span><span></span><span></span></button>
-        <a href="/" class="brand"><img src="/img/logo.png" onerror="this.style.display='none'" alt="">${escapeHtml(siteName)}</a>
+        <a href="/" class="brand">
+          <img src="/img/logo.png" alt="${escapeHtml(siteName)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline'">
+          <span class="brand-fallback" style="display:none">${escapeHtml(siteName)}</span>
+        </a>
         <nav class="main-nav" id="mainNav">
           <a href="/" data-i18n="nav_home">Home</a>
           <a href="/classifieds" data-i18n="nav_classifieds">Classifieds</a>

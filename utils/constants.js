@@ -41,11 +41,16 @@ const DEFAULT_BROOKLYN_LOCATION = {
 // Stripe account is configured for.
 const CURRENCIES = [
   { code: 'USD', symbol: '$', label: 'US Dollar (USD)' },
+  { code: 'ILS', symbol: '₪', label: 'NIS - Israeli Shekel (ILS)' },
   { code: 'CAD', symbol: 'CA$', label: 'Canadian Dollar (CAD)' },
-  { code: 'ILS', symbol: '₪', label: 'Israeli Shekel (ILS)' },
   { code: 'EUR', symbol: '€', label: 'Euro (EUR)' },
   { code: 'GBP', symbol: '£', label: 'British Pound (GBP)' },
   { code: 'AUD', symbol: 'A$', label: 'Australian Dollar (AUD)' },
+  { code: 'ZAR', symbol: 'R', label: 'South African Rand (ZAR)' },
+  { code: 'ARS', symbol: 'AR$', label: 'Argentine Peso (ARS)' },
+  { code: 'BRL', symbol: 'R$', label: 'Brazilian Real (BRL)' },
+  { code: 'MXN', symbol: 'MX$', label: 'Mexican Peso (MXN)' },
+  { code: 'CHF', symbol: 'CHF', label: 'Swiss Franc (CHF)' },
 ];
 const CURRENCY_CODES = CURRENCIES.map((c) => c.code);
 

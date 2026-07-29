@@ -9,7 +9,6 @@ async function renderHomePage() {
       <div class="home-grid">
         <div class="home-main">
           <div style="padding:30px 0 6px">
-            <h1>${escapeHtml(window.SITE_CONFIG?.siteName || 'JListings')}</h1>
             <a href="/post" class="btn btn-gold" data-i18n="nav_post">Post an Ad</a>
           </div>
 

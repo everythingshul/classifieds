@@ -59,6 +59,7 @@ async function renderSettingsPage() {
           ${secretField('brevo_api_key', 'API Key', s.brevo_api_key_isSet, 'xkeysib-...')}
         </div>
         <div class="form-row"><label>From address</label><input name="mail_from" placeholder="JListings &lt;no-reply@example.com&gt;" value="${escapeHtml(s.mail_from || '')}"></div>
+        <div class="form-row"><label>Reply-To address <span class="hint">(optional - where replies to any outgoing email land, e.g. a support inbox)</span></label><input name="mail_reply_to" placeholder="support@example.com" value="${escapeHtml(s.mail_reply_to || '')}"></div>
         <button class="btn btn-sm" type="submit">Save</button>
       </form>
       <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
@@ -163,7 +164,7 @@ async function renderSettingsPage() {
   });
   bindForm('mailForm', (fd) => {
     const out = [
-      ['mail_provider', fd.mail_provider], ['mail_from', fd.mail_from],
+      ['mail_provider', fd.mail_provider], ['mail_from', fd.mail_from], ['mail_reply_to', fd.mail_reply_to],
       ['smtp_host', fd.smtp_host], ['smtp_port', fd.smtp_port], ['smtp_user', fd.smtp_user], ['smtp_secure', fd.smtp_secure === '1'],
     ];
     if (fd.smtp_pass) out.push(['smtp_pass', fd.smtp_pass]);

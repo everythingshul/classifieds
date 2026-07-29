@@ -67,6 +67,10 @@ async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments
 async function sendMail({ to, subject, html, text, attachments, replyTo }) {
   const from = runtimeConfig.get('mail_from', 'MAIL_FROM') || 'no-reply@example.com';
   const provider = runtimeConfig.get('mail_provider', 'MAIL_PROVIDER') || 'smtp';
+  // Falls back to the configured Reply-To address so every outgoing email
+  // (invoices, notifications, etc.) uses it automatically without every
+  // call site having to pass it explicitly - callers can still override.
+  if (!replyTo) replyTo = runtimeConfig.get('mail_reply_to', 'MAIL_REPLY_TO') || undefined;
 
   if (provider === 'brevo') {
     const apiKey = runtimeConfig.get('brevo_api_key', 'BREVO_API_KEY');

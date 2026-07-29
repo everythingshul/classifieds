@@ -137,6 +137,7 @@ function seed() {
   seed('smtp_user', process.env.SMTP_USER || '');
   seed('smtp_pass', process.env.SMTP_PASS || '');
   seed('mail_from', process.env.MAIL_FROM || '');
+  seed('mail_reply_to', process.env.MAIL_REPLY_TO || '');
   seed('mail_provider', process.env.MAIL_PROVIDER || 'smtp'); // 'smtp' | 'brevo'
   seed('brevo_api_key', process.env.BREVO_API_KEY || '');
 
