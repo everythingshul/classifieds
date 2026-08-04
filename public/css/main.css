@@ -50,31 +50,33 @@ p { margin: 0 0 .7em; }
 .container { max-width: var(--max-width); margin: 0 auto; padding: 0 18px; }
 
 /* ---------- Header ---------- */
+/* Redesign: white header, navy limited to accents (text/links/icons/borders)
+   instead of a solid navy panel - the previous dark-fill header/footer/sidebar
+   was the specific thing flagged as too heavy. */
 .site-header {
-  background: var(--navy);
-  color: #fff;
+  background: #fff;
+  color: var(--navy);
   position: sticky;
   top: 0;
   z-index: 40;
-  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--border);
 }
 .site-header .container { display: flex; align-items: center; gap: 16px; height: 68px; }
-.brand { display: flex; align-items: center; height: 100%; color: #fff; font-family: var(--font-head); font-size: 1.08rem; font-weight: 800; letter-spacing: -.01em; }
-/* The logo artwork is navy - the same color as the header/footer background
-   - so it sits on a light panel here to stay visible while keeping its own
-   navy color (rather than recoloring the artwork itself). Stretches to the
-   header's full height so it reads as a panel, not a floating box. */
-.brand img { height: 100%; background: #fff; padding: 10px 18px; box-sizing: border-box; }
+/* Scoped to .site-header specifically - .brand alone would also match the
+   unrelated "Admin Portal" sidebar brand div in the admin portal, which
+   doesn't use this file's grid/height rules and broke badly when it did. */
+.site-header .brand { display: flex; align-items: center; height: 100%; color: var(--navy); font-family: var(--font-head); font-size: 1.08rem; font-weight: 800; letter-spacing: -.01em; }
+.site-header .brand img { height: 48px; }
 .main-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
-.main-nav a { color: rgba(255,255,255,.82); padding: 6px 10px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
-.main-nav a:hover, .main-nav a.active { background: rgba(255,255,255,.12); color: #fff; }
+.main-nav a { color: var(--ink-soft); padding: 6px 10px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
+.main-nav a:hover, .main-nav a.active { background: rgba(31,59,87,.08); color: var(--navy); }
 .site-search { flex-shrink: 1; min-width: 0; }
 .site-search input {
-  width: 100%; min-width: 90px; max-width: 220px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08);
-  color: #fff; border-radius: 0; padding: 6px 10px; font-size: .82rem;
+  width: 100%; min-width: 90px; max-width: 220px; border: 1px solid var(--border); background: #fff;
+  color: var(--ink); border-radius: 0; padding: 6px 10px; font-size: .82rem;
 }
-.site-search input::placeholder { color: rgba(255,255,255,.55); }
-.site-search input:focus { outline: none; background: #fff; color: var(--ink); }
+.site-search input::placeholder { color: var(--ink-soft); }
+.site-search input:focus { outline: none; border-color: var(--navy); }
 .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 @media (max-width: 600px) { .site-search input { max-width: 120px; } }
 .btn-post {
@@ -83,14 +85,14 @@ p { margin: 0 0 .7em; }
 }
 .btn-post:hover { background: var(--cta-dark); color: #fff; }
 .lang-toggle, .bookmarks-link {
-  background: transparent; border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 0;
+  background: transparent; border: 1px solid var(--border); color: var(--navy); border-radius: 0;
   padding: 5px 11px; font-size: .78rem;
 }
 .hamburger { display: none; background: none; border: none; width: 26px; height: 20px; padding: 0; flex-direction: column; justify-content: space-between; }
-.hamburger span { display: block; height: 2px; width: 100%; background: #fff; }
+.hamburger span { display: block; height: 2px; width: 100%; background: var(--navy); }
 
 @media (max-width: 860px) {
-  .main-nav { display: none; position: absolute; top: 52px; inset-inline: 0; background: var(--navy-dark); flex-direction: column; padding: 6px; }
+  .main-nav { display: none; position: absolute; top: 68px; inset-inline: 0; background: #fff; border-bottom: 1px solid var(--border); box-shadow: var(--shadow); flex-direction: column; padding: 6px; }
   .main-nav.open { display: flex; }
   .hamburger { display: flex; }
 }
@@ -242,12 +244,11 @@ p { margin: 0 0 .7em; }
 .error-list ul { margin: 4px 0 0; padding-inline-start: 18px; }
 
 /* ---------- Footer ---------- */
-.site-footer { background: var(--navy-dark); color: rgba(255,255,255,.7); margin-top: 44px; padding: 24px 0; font-size: .8rem; }
-.site-footer a { color: rgba(255,255,255,.85); }
+.site-footer { background: #fff; border-top: 1px solid var(--border); color: var(--ink-soft); margin-top: 44px; padding: 24px 0; font-size: .8rem; }
+.site-footer a { color: var(--navy); }
 .footer-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .footer-links { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
-/* Same navy-on-navy issue as the header logo - light chip instead of recoloring. */
-.footer-logo { height: 52px; background: #fff; padding: 8px 16px; box-sizing: border-box; }
+.footer-logo { height: 40px; }
 @media (max-width: 600px) { .footer-row { flex-direction: column-reverse; align-items: flex-start; } }
 
 /* ---------- Misc ---------- */

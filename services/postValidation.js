@@ -43,6 +43,7 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
         if (!payPeriods.includes(f.payPeriod)) errors.push('payPeriod must be one of ' + payPeriods.join(', '));
         out.payAmount = amt;
         out.payPeriod = f.payPeriod;
+        out.payCurrency = CURRENCY_CODES.includes(f.payCurrency) ? f.payCurrency : 'USD';
       }
       break;
     }

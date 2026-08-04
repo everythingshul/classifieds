@@ -16,7 +16,7 @@ function cardMetaLine(post) {
   const f = post.fields || {};
   const parts = [];
   if (f.jobType) parts.push(String(f.jobType).replace('_', ' '));
-  if (f.payAmount) parts.push(`${formatCents(f.payAmount * 100)}/${f.payPeriod}`);
+  if (f.payAmount) parts.push(`${formatMoney(f.payAmount * 100, f.payCurrency)}/${f.payPeriod}`);
   if (f.lostOrFound) parts.push(f.lostOrFound.toUpperCase());
   if (f.experience) parts.push(f.experience);
   if (post.location?.text) parts.push(post.location.text);

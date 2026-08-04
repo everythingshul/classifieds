@@ -130,7 +130,12 @@ function renderPostWizard() {
             <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">Select…</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
           </div>
           <div class="form-cols">
-            <div class="form-row"><label>Pay Amount <span class="hint">(optional)</span></label><input type="number" id="f_payAmount" min="0" step="0.01"></div>
+            <div class="form-row"><label>Pay Amount <span class="hint">(optional)</span></label>
+              <div style="display:flex;gap:6px">
+                <input type="number" id="f_payAmount" min="0" step="0.01" style="flex:1">
+                <select id="f_payCurrency" style="width:90px">${(cfg.currencies || [{ code: 'USD' }]).map((c) => `<option value="${c.code}" ${c.code === 'USD' ? 'selected' : ''}>${escapeHtml(c.code)}</option>`).join('')}</select>
+              </div>
+            </div>
             <div class="form-row"><label>Per</label><select id="f_payPeriod">${cfg.payPeriods.map((p) => `<option value="${p}">${p}</option>`).join('')}</select></div>
           </div>`;
       case 'seeking-a-job':
@@ -276,7 +281,7 @@ function renderPostWizard() {
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
         if (!fields.taxonomyId) errs.push('Job category is required');
         const pay = document.getElementById('f_payAmount').value;
-        if (pay) { fields.payAmount = pay; fields.payPeriod = document.getElementById('f_payPeriod').value; }
+        if (pay) { fields.payAmount = pay; fields.payPeriod = document.getElementById('f_payPeriod').value; fields.payCurrency = document.getElementById('f_payCurrency').value; }
       } else if (state.category === 'seeking-a-job') {
         fields.taxonomyId = document.getElementById('f_taxonomyId').value;
         if (!fields.taxonomyId) errs.push('Job category is required');
@@ -420,7 +425,7 @@ function renderPostWizard() {
         const tax = cfg.taxonomies.find((t) => String(t.id) === String(f.taxonomyId));
         if (tax) rows.push([state.category === 'real-estate' ? 'Real Estate Category' : 'Job Category', tax.name]);
       }
-      if (f.payAmount) rows.push(['Pay', `${formatCents(f.payAmount * 100)} / ${f.payPeriod}`]);
+      if (f.payAmount) rows.push(['Pay', `${formatMoney(f.payAmount * 100, f.payCurrency)} / ${f.payPeriod}`]);
       if (f.experience) rows.push(['Experience', f.experience]);
       if (f.lostOrFound) rows.push(['Status', f.lostOrFound === 'lost' ? 'Lost' : 'Found']);
       if (f.price !== undefined && f.price !== null && f.price !== '') rows.push(['Price', formatMoney(Number(f.price) * 100, f.currency)]);

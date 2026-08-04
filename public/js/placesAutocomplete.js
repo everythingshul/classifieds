@@ -124,6 +124,18 @@ async function tryNewAutocomplete(inputEl, { onSelect }) {
 // silent no-op) for projects that only have the classic "Places API"
 // enabled rather than "Places API (New)".
 async function tryLegacyAutocomplete(inputEl, { onSelect }) {
+  // With `loading=async` on the bootstrap script, simply having
+  // `&libraries=places` in the URL doesn't reliably attach the places
+  // classes anymore - each library needs its own importLibrary() call.
+  // Without this, google.maps.places can still be undefined here even
+  // after the base script has loaded, which looked like "AutocompleteService
+  // not available" regardless of what's actually enabled on the account.
+  try {
+    await google.maps.importLibrary('places');
+  } catch (e) {
+    // Fall through to the same not-available check below - if the import
+    // itself fails, there's nothing this path can do either.
+  }
   if (!window.google?.maps?.places?.AutocompleteService) return false;
   const service = new google.maps.places.AutocompleteService();
   const placesService = new google.maps.places.PlacesService(document.createElement('div'));

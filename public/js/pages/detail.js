@@ -10,7 +10,7 @@ async function renderDetailPage(id, type) {
     if (tax) fieldRows.push(['Category', tax.name]);
   }
   if (post.fields?.jobType) fieldRows.push(['Job Type', post.fields.jobType.replace('_', ' ')]);
-  if (post.fields?.payAmount) fieldRows.push(['Pay', `${formatCents(post.fields.payAmount * 100)} / ${post.fields.payPeriod}`]);
+  if (post.fields?.payAmount) fieldRows.push(['Pay', `${formatMoney(post.fields.payAmount * 100, post.fields.payCurrency)} / ${post.fields.payPeriod}`]);
   if (post.fields?.experience) fieldRows.push(['Experience', post.fields.experience]);
   if (post.fields?.lostOrFound) fieldRows.push(['Status', post.fields.lostOrFound.toUpperCase()]);
   if (post.fields?.price !== undefined && post.fields?.price !== null) fieldRows.push(['Price', formatMoney(post.fields.price * 100, post.fields.currency)]);
