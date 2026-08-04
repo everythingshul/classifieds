@@ -29,6 +29,11 @@ function renderPostWizard() {
   function currentCatDef() {
     return currentCategories().find((c) => c.key === state.category);
   }
+  // Striking/oversized/boost pricing is separate per post type (simchas
+  // don't offer any of these, so this is undefined for that type).
+  function currentAddons() {
+    return cfg.addons?.[state.postType];
+  }
 
   function render() {
     if (state.step === 0) return renderTypeStep();
@@ -187,7 +192,7 @@ function renderPostWizard() {
       <div class="form-row"><label>Description</label><textarea id="f_description" rows="5" maxlength="${descLimit}">${escapeHtml(state.data.description || '')}</textarea><div class="char-counter" id="descCounter"></div></div>
       <label class="addon-row" style="margin:-4px 0 14px">
         <input type="checkbox" id="f_wantsOversized" ${wantsOversized ? 'checked' : ''}>
-        Need more space? Oversized post (up to ${over.title} title / ${over.description} description characters)${cfg.addons.oversized ? ` — ${formatCents(cfg.addons.oversized.price_cents)}` : ''}
+        Need more space? Oversized post (up to ${over.title} title / ${over.description} description characters)${currentAddons()?.oversized ? ` — ${formatCents(currentAddons().oversized.price_cents)}` : ''}
       </label>
       ${categorySpecificFieldsHtml()}
       <div class="form-row"><label>Location</label><input type="text" id="f_location" placeholder="City, State" value="${escapeHtml(state.data.locationText || '')}" required></div>
@@ -395,8 +400,8 @@ function renderPostWizard() {
         ${tiers.map((t) => `<div class="tier-tile ${state.data.pricingTierId == t.id ? 'selected' : ''}" data-id="${t.id}"><div>${escapeHtml(t.name)}</div><div class="price">${formatCents(t.price_cents)}</div></div>`).join('')}
       </div>`}
       <h3>Add-ons</h3>
-      <label class="addon-row"><input type="checkbox" id="wantsStrike" ${state.data.wantsStrike ? 'checked' : ''}> Featured / Striking listing — ${cfg.addons.strike ? formatCents(cfg.addons.strike.price_cents) : ''}</label>
-      ${state.data.wantsOversized ? `<p class="hint">Oversized post add-on selected on the Details step${cfg.addons.oversized ? ` — ${formatCents(cfg.addons.oversized.price_cents)}` : ''}.</p>` : ''}
+      <label class="addon-row"><input type="checkbox" id="wantsStrike" ${state.data.wantsStrike ? 'checked' : ''}> Featured / Striking listing — ${currentAddons()?.strike ? formatCents(currentAddons().strike.price_cents) : ''}</label>
+      ${state.data.wantsOversized ? `<p class="hint">Oversized post add-on selected on the Details step${currentAddons()?.oversized ? ` — ${formatCents(currentAddons().oversized.price_cents)}` : ''}.</p>` : ''}
       <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     document.querySelectorAll('.tier-tile').forEach((el) => el.addEventListener('click', () => {
@@ -446,9 +451,17 @@ function renderPostWizard() {
       const tier = cfg.pricingTiers.find((t) => String(t.id) === String(state.data.pricingTierId));
       const lines = [];
       if (tier) lines.push({ label: `${tier.name} listing`, amount: tier.price_cents });
-      if (state.data.wantsStrike && cfg.addons.strike) lines.push({ label: cfg.addons.strike.config.label || 'Featured / Striking listing', amount: cfg.addons.strike.price_cents });
-      if (state.data.wantsOversized && cfg.addons.oversized) lines.push({ label: cfg.addons.oversized.config.label || 'Oversized post', amount: cfg.addons.oversized.price_cents });
-      const total = lines.reduce((s, l) => s + l.amount, 0);
+      if (state.data.wantsStrike && currentAddons()?.strike) lines.push({ label: currentAddons().strike.config.label || 'Featured / Striking listing', amount: currentAddons().strike.price_cents });
+      if (state.data.wantsOversized && currentAddons()?.oversized) lines.push({ label: currentAddons().oversized.config.label || 'Oversized post', amount: currentAddons().oversized.price_cents });
+      let total = lines.reduce((s, l) => s + l.amount, 0);
+      const promo = state.data.promo;
+      if (promo && total > 0) {
+        const discounted = promo.percentOff
+          ? Math.max(0, Math.round(total * (1 - promo.percentOff / 100)))
+          : Math.max(0, total - (promo.amountOffCents || 0));
+        lines.push({ label: `Promo (${promo.code})`, amount: discounted - total });
+        total = discounted;
+      }
       return { lines, total };
     }
 
@@ -476,6 +489,18 @@ function renderPostWizard() {
           ${pricing.lines.map((l) => `<li><span>${escapeHtml(l.label)}</span><span>${formatCents(l.amount)}</span></li>`).join('')}
           <li><span><b>Total</b></span><span><b>${formatCents(pricing.total)}</b></span></li>
         </ul>
+        ${pricing.total > 0 || state.data.promo ? `
+          <div class="form-row" style="max-width:320px">
+            <label>Promo code</label>
+            <div style="display:flex;gap:6px">
+              <input type="text" id="promoInput" style="flex:1;text-transform:uppercase" placeholder="e.g. SAVE10" value="${escapeHtml(state.data.promo?.code || '')}" ${state.data.promo ? 'disabled' : ''}>
+              ${state.data.promo
+                ? `<button type="button" class="btn btn-sm btn-outline" id="removePromoBtn">Remove</button>`
+                : `<button type="button" class="btn btn-sm btn-outline" id="applyPromoBtn">Apply</button>`}
+            </div>
+            <div id="promoMsg" class="hint"></div>
+          </div>
+        ` : ''}
       ` : ''}
       <p class="hint">By submitting, you agree to our <a href="/terms" target="_blank">Terms &amp; Conditions</a> and <a href="/refund-policy" target="_blank">Refund Policy</a>.</p>
       <div id="stepError" class="error-list" style="display:none"></div>
@@ -487,6 +512,31 @@ function renderPostWizard() {
     `);
     document.getElementById('backBtn').addEventListener('click', () => go(state.postType === 'simcha' ? 3 : 3));
     document.getElementById('submitBtn').addEventListener('click', submitPost);
+
+    const applyPromoBtn = document.getElementById('applyPromoBtn');
+    if (applyPromoBtn) applyPromoBtn.addEventListener('click', async () => {
+      const input = document.getElementById('promoInput');
+      const code = input.value.trim();
+      const msg = document.getElementById('promoMsg');
+      if (!code) return;
+      applyPromoBtn.disabled = true;
+      applyPromoBtn.textContent = 'Checking…';
+      try {
+        const promo = await Api.validatePromo(code);
+        state.data.promo = promo;
+        renderReviewStep();
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.style.color = 'var(--danger)';
+        applyPromoBtn.disabled = false;
+        applyPromoBtn.textContent = 'Apply';
+      }
+    });
+    const removePromoBtn = document.getElementById('removePromoBtn');
+    if (removePromoBtn) removePromoBtn.addEventListener('click', () => {
+      state.data.promo = null;
+      renderReviewStep();
+    });
   }
 
   async function submitPost() {
@@ -520,6 +570,7 @@ function renderPostWizard() {
         if (state.data.pricingTierId) fd.set('pricingTierId', state.data.pricingTierId);
         fd.set('wantsStrike', state.data.wantsStrike ? '1' : '');
         fd.set('wantsOversized', state.data.wantsOversized ? '1' : '');
+        if (state.data.promo) fd.set('promoCode', state.data.promo.code);
         state.files.forEach((f) => fd.append('images', f));
       } else {
         fd.set('description', state.data.description || '');

@@ -88,7 +88,7 @@ async function openEditor(id) {
       <hr style="margin:18px 0;border:none;border-top:1px solid var(--border)">
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${p.status === 'pending_approval' ? `<button class="btn btn-gold" id="approveBtn">Approve &amp; Publish</button><button class="btn btn-danger" id="rejectBtn">Reject</button>` : ''}
-        <button class="btn btn-outline" id="boostBtn">Boost to Top</button>
+        ${p.type !== 'simcha' ? `<button class="btn btn-outline" id="boostBtn">Boost to Top</button>` : ''}
         <button class="btn btn-outline" id="extendBtn">Extend 30 Days</button>
         <button class="btn btn-outline" id="saveForeverBtn">${p.savedForever ? 'Saved Forever' : 'Save Forever'}</button>
         <button class="btn btn-danger" id="deleteBtn">Remove Listing</button>
@@ -122,7 +122,8 @@ async function openEditor(id) {
     toast('Saved');
     openEditor(id);
   });
-  document.getElementById('boostBtn').addEventListener('click', async () => { await AdminApi.boostPost(id); toast('Boosted'); });
+  const boostBtn = document.getElementById('boostBtn');
+  if (boostBtn) boostBtn.addEventListener('click', async () => { await AdminApi.boostPost(id); toast('Boosted'); });
   document.getElementById('extendBtn').addEventListener('click', async () => { await AdminApi.extendPost(id, 30); toast('Extended 30 days'); openEditor(id); });
   document.getElementById('saveForeverBtn').addEventListener('click', async () => { await AdminApi.saveForever(id); toast('Saved forever'); openEditor(id); });
   document.getElementById('deleteBtn').addEventListener('click', async () => {

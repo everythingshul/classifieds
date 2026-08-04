@@ -4,7 +4,8 @@ function escapeHtml(str) {
 }
 
 function formatCents(cents) {
-  return `$${(Number(cents || 0) / 100).toFixed(2)}`;
+  const n = Number(cents || 0);
+  return `${n < 0 ? '-' : ''}$${(Math.abs(n) / 100).toFixed(2)}`;
 }
 
 // For a poster's own listed price, which can be in a currency other than

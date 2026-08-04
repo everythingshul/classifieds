@@ -26,6 +26,26 @@ addColumnIfMissing('contact_messages', 'archived', 'archived INTEGER NOT NULL DE
 addColumnIfMissing('contact_messages', 'reply_text', 'reply_text TEXT');
 addColumnIfMissing('contact_messages', 'replied_at', 'replied_at INTEGER');
 
+// One-time migration: boost/strike/oversized add-on pricing used to be one
+// shared row per add-on regardless of post type. Splits each into its own
+// classified_X / listing_X row, carrying the old shared price forward as the
+// starting value for both, then drops the legacy row. Simchas intentionally
+// don't get their own rows here - they don't offer these add-ons.
+(function migrateAddonPricingPerType() {
+  ['boost', 'strike', 'oversized'].forEach((legacyKey) => {
+    const legacy = db.prepare('SELECT * FROM addon_pricing WHERE key = ?').get(legacyKey);
+    if (!legacy) return;
+    ['classified', 'listing'].forEach((postType) => {
+      const newKey = `${postType}_${legacyKey}`;
+      const exists = db.prepare('SELECT 1 FROM addon_pricing WHERE key = ?').get(newKey);
+      if (!exists) {
+        db.prepare('INSERT INTO addon_pricing (key, price_cents, config) VALUES (?, ?, ?)').run(newKey, legacy.price_cents, legacy.config);
+      }
+    });
+    db.prepare('DELETE FROM addon_pricing WHERE key = ?').run(legacyKey);
+  });
+})();
+
 function seed() {
   const now = Date.now();
 
@@ -52,13 +72,15 @@ function seed() {
   const addonCount = db.prepare('SELECT COUNT(*) AS c FROM addon_pricing').get().c;
   if (addonCount === 0) {
     const insert = db.prepare('INSERT INTO addon_pricing (key, price_cents, config) VALUES (?, ?, ?)');
-    insert.run('boost', 500, JSON.stringify({ label: 'Boost to top' }));
-    insert.run('strike', 1000, JSON.stringify({ label: 'Featured / Striking listing' }));
-    insert.run(
-      'oversized',
-      300,
-      JSON.stringify({ label: 'Oversized post', titleLimit: 140, descriptionLimit: 3000 })
-    );
+    ['classified', 'listing'].forEach((postType) => {
+      insert.run(`${postType}_boost`, 500, JSON.stringify({ label: 'Boost to top' }));
+      insert.run(`${postType}_strike`, 1000, JSON.stringify({ label: 'Featured / Striking listing' }));
+      insert.run(
+        `${postType}_oversized`,
+        300,
+        JSON.stringify({ label: 'Oversized post', titleLimit: 140, descriptionLimit: 3000 })
+      );
+    });
   }
 
   const taxCount = db.prepare('SELECT COUNT(*) AS c FROM taxonomies').get().c;

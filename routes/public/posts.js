@@ -49,6 +49,15 @@ async function processUploadedImages(files) {
   return out;
 }
 
+// Lets the post wizard preview a promo code's discount before final submit,
+// without creating anything - the actual discount is still re-applied (and
+// re-validated) server-side in applyPromoToCharges() at submit time.
+router.post('/promo/validate', (req, res) => {
+  const promo = getActivePromo(req.body.code);
+  if (!promo) return res.status(400).json({ error: 'That promo code is invalid or expired' });
+  res.json({ code: promo.code, percentOff: promo.percent_off, amountOffCents: promo.amount_off_cents });
+});
+
 router.post('/', upload.array('images', 6), async (req, res, next) => {
   try {
     const type = req.body.type === 'simcha' ? 'simcha' : req.body.type === 'listing' ? 'listing' : 'classified';
@@ -208,8 +217,9 @@ router.post('/:publicId/boost', async (req, res, next) => {
     const email = String(req.body.email || '').toLowerCase();
     if (!isValidEmail(email)) return res.status(400).json({ error: 'A valid email is required' });
     if (email !== post.poster_email) return res.status(403).json({ error: 'Email does not match the email used to post this listing' });
+    if (post.type === 'simcha') return res.status(400).json({ error: 'Boost is not available for simchas' });
 
-    const addon = getAddon('boost');
+    const addon = getAddon(`${post.type}_boost`);
     const amount = addon ? addon.price_cents : 0;
 
     if (amount === 0) {
@@ -241,8 +251,9 @@ router.post('/:publicId/strike', async (req, res, next) => {
     const email = String(req.body.email || '').toLowerCase();
     if (!isValidEmail(email)) return res.status(400).json({ error: 'A valid email is required' });
     if (email !== post.poster_email) return res.status(403).json({ error: 'Email does not match the email used to post this listing' });
+    if (post.type === 'simcha') return res.status(400).json({ error: 'Featuring is not available for simchas' });
 
-    const addon = getAddon('strike');
+    const addon = getAddon(`${post.type}_strike`);
     const amount = addon ? addon.price_cents : 0;
 
     if (amount === 0) {

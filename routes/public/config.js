@@ -25,10 +25,11 @@ router.get('/', (req, res) => {
     currencies: CURRENCIES,
     taxonomies,
     pricingTiers,
+    // Striking/oversized/boost pricing is separate per post type - simchas
+    // don't offer any of these, so there's no 'simcha' entry here.
     addons: {
-      strike: getAddon('strike'),
-      oversized: getAddon('oversized'),
-      boost: getAddon('boost'),
+      classified: { strike: getAddon('classified_strike'), oversized: getAddon('classified_oversized'), boost: getAddon('classified_boost') },
+      listing: { strike: getAddon('listing_strike'), oversized: getAddon('listing_oversized'), boost: getAddon('listing_boost') },
     },
     charLimits: getClassifiedCharLimits(),
     simchaCharLimits: getSimchaCharLimits(),

@@ -54,21 +54,30 @@ async function renderPricingPage() {
       </form>
     </div>
 
-    <div class="admin-card">
-      <h3 style="margin-top:0">Add-ons</h3>
-      <table class="admin-table">
-        <thead><tr><th>Add-on</th><th>Price</th><th></th></tr></thead>
-        <tbody>
-          ${addons.map((a) => `
-            <tr data-key="${a.key}">
-              <td>${a.config.label || a.key}</td>
-              <td><input class="addon-price" type="number" step="0.01" value="${(a.price_cents / 100).toFixed(2)}" style="width:90px"></td>
-              <td><button class="btn btn-sm save-addon">Save</button></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
+    ${(() => {
+      // Striking/oversized/boost pricing is separate per post type -
+      // simchas don't offer any of these add-ons at all.
+      function addonTable(prefix, label) {
+        const rows = addons.filter((a) => a.key.startsWith(`${prefix}_`));
+        return `
+          <div class="admin-card">
+            <h3 style="margin-top:0">${label} Add-ons</h3>
+            <table class="admin-table">
+              <thead><tr><th>Add-on</th><th>Price</th><th></th></tr></thead>
+              <tbody>
+                ${rows.map((a) => `
+                  <tr data-key="${a.key}">
+                    <td>${escapeHtml(a.config.label || a.key)}</td>
+                    <td><input class="addon-price" type="number" step="0.01" value="${(a.price_cents / 100).toFixed(2)}" style="width:90px"></td>
+                    <td><button class="btn btn-sm save-addon">Save</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      }
+      return addonTable('classified', 'Classifieds') + addonTable('listing', 'Listings');
+    })()}
 
     <div class="admin-card">
       <h3 style="margin-top:0">Promo Codes</h3>

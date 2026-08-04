@@ -66,11 +66,11 @@ function buildClassifiedCharges({ category, categoryDef, pricingTierId, wantsStr
   lineItems.push({ kind: 'listing', label: `${tier.name} listing`, amount_cents: tier.price_cents });
 
   if (wantsStrike) {
-    const strike = getAddon('strike');
+    const strike = getAddon('classified_strike');
     if (strike) lineItems.push({ kind: 'strike', label: strike.config.label || 'Featured / Striking listing', amount_cents: strike.price_cents });
   }
   if (wantsOversized) {
-    const oversized = getAddon('oversized');
+    const oversized = getAddon('classified_oversized');
     if (oversized) lineItems.push({ kind: 'oversized', label: oversized.config.label || 'Oversized post', amount_cents: oversized.price_cents });
   }
 
@@ -97,11 +97,11 @@ function buildListingCharges({ category, categoryDef, pricingTierId, wantsStrike
   lineItems.push({ kind: 'listing', label: `${tier.name} listing`, amount_cents: tier.price_cents });
 
   if (wantsStrike) {
-    const strike = getAddon('strike');
+    const strike = getAddon('listing_strike');
     if (strike) lineItems.push({ kind: 'strike', label: strike.config.label || 'Featured / Striking listing', amount_cents: strike.price_cents });
   }
   if (wantsOversized) {
-    const oversized = getAddon('oversized');
+    const oversized = getAddon('listing_oversized');
     if (oversized) lineItems.push({ kind: 'oversized', label: oversized.config.label || 'Oversized post', amount_cents: oversized.price_cents });
   }
 
