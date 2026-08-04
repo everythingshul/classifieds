@@ -133,10 +133,11 @@ p { margin: 0 0 .7em; }
 /* ---------- Carousels ---------- */
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin: 24px 0 10px; }
 .section-heading a { font-size: .82rem; font-weight: 600; }
-.carousel { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
-.carousel::-webkit-scrollbar { height: 5px; }
-.carousel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0; }
-.carousel .card { scroll-snap-align: start; flex: 0 0 210px; }
+/* Wraps instead of horizontally scrolling - with only a handful of recent
+   items, a fixed-width scroll row left a large empty gap next to the home
+   sidebar instead of using the space. */
+.carousel { display: flex; flex-wrap: wrap; gap: 10px; }
+.carousel .card { flex: 1 1 210px; }
 
 /* ---------- Cards ---------- */
 /* Square corners by design - no image, the card is a compact text summary;
