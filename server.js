@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const { UPLOAD_DIR } = require('./middleware/upload');
+const runtimeConfig = require('./services/runtimeConfig');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -21,6 +22,27 @@ app.use(
 );
 app.use(cors());
 app.use(cookieParser());
+
+// Canonical-domain redirect: if the site is reachable on more than one host
+// (e.g. both jlistings.com and www.jlistings.com), the Google Maps API key's
+// HTTP referrer restriction only ever allows one of them - visitors landing
+// on the other host see Maps silently fail, which looks like it "works once,
+// then not" depending on which host they happened to be on. Redirecting
+// every page load to the configured Site URL (Admin -> Settings -> Site)
+// means every visitor ends up on the one host that's actually authorized.
+// Only applies to full page loads (GET, non-API) - never redirects /api/*
+// calls or the Stripe webhook, which must hit the exact URL as requested.
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+  const appUrl = runtimeConfig.get('app_url', 'APP_URL');
+  if (!appUrl) return next();
+  let canonicalHost;
+  try { canonicalHost = new URL(appUrl).hostname; } catch (e) { return next(); }
+  if (canonicalHost && req.hostname && req.hostname !== canonicalHost) {
+    return res.redirect(301, `${req.protocol}://${canonicalHost}${req.originalUrl}`);
+  }
+  next();
+});
 
 // Stripe needs the raw body to verify webhook signatures, so mount it before json().
 app.use('/api/webhook', express.raw({ type: 'application/json' }), require('./routes/public/webhook'));

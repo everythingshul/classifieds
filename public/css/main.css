@@ -232,6 +232,11 @@ p { margin: 0 0 .7em; }
 }
 .places-suggestions li { padding: 8px 10px; font-size: .85rem; cursor: pointer; }
 .places-suggestions li:hover { background: var(--paper); }
+
+/* Stripe's Embedded Checkout mounts an auto-resizing iframe into this div -
+   Stripe's own guidance is that the mount target must be a flex container
+   or the iframe can fail to size itself correctly. */
+#checkoutContainer, #boostCheckoutContainer { display: flex; flex-direction: column; }
 .category-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 @media (max-width: 700px) { .category-grid { grid-template-columns: repeat(2, 1fr); } }
 .category-tile { border: 2px solid var(--border); border-radius: var(--radius); padding: 12px 8px; text-align: center; background: #fff; font-size: .82rem; font-weight: 600; }
