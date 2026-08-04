@@ -94,7 +94,18 @@ async function openEditor(id) {
         <button class="btn btn-danger" id="deleteBtn">Remove Listing</button>
       </div>
 
-      ${p.images.length ? `<h4>Images</h4><div style="display:flex;gap:10px;flex-wrap:wrap">${p.images.map((img) => `<div><img class="thumb-mini" style="width:100px;height:100px" src="${img.url}"><div>${img.approved ? 'Approved' : 'Pending'}</div></div>`).join('')}</div>` : ''}
+      <h4>Images ${p.images.length ? `(${p.images.length}/6)` : ''}</h4>
+      ${p.images.length ? `<div id="imageList" style="display:flex;gap:10px;flex-wrap:wrap">${p.images.map((img) => `
+        <div style="text-align:center">
+          <img class="thumb-mini" style="width:100px;height:100px" src="${img.url}">
+          <div class="hint">${img.approved ? 'Approved' : 'Pending'}</div>
+          <button type="button" class="btn btn-sm btn-danger remove-image-btn" data-image-id="${img.id}" style="margin-top:4px">Remove</button>
+        </div>`).join('')}</div>` : '<p class="hint">No images yet.</p>'}
+      <form id="addImagesForm" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="file" name="images" accept="image/*" multiple ${p.images.length >= 6 ? 'disabled' : ''}>
+        <button class="btn btn-sm btn-outline" type="submit" ${p.images.length >= 6 ? 'disabled' : ''}>Upload</button>
+        ${p.images.length >= 6 ? '<span class="hint">Max 6 images reached - remove one to add more.</span>' : ''}
+      </form>
 
       ${p.payments?.length ? `<h4>Payment History</h4><table class="admin-table"><thead><tr><th>Kind</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>${p.payments.map((pay) => `<tr><td>${pay.kind}</td><td>${formatCents(pay.amount_cents)}</td><td>${pay.status}</td><td>${formatDate(pay.created_at)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}
@@ -128,5 +139,33 @@ async function openEditor(id) {
     await AdminApi.rejectPost(id, reason);
     toast('Rejected');
     openEditor(id);
+  });
+
+  document.querySelectorAll('.remove-image-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Remove this image?')) return;
+      await AdminApi.removeImage(id, btn.dataset.imageId);
+      toast('Image removed');
+      openEditor(id);
+    });
+  });
+  document.getElementById('addImagesForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = e.target.querySelector('input[type="file"]');
+    if (!input.files.length) return;
+    const fd = new FormData();
+    for (const file of input.files) fd.append('images', file);
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    try {
+      await AdminApi.addImages(id, fd);
+      toast('Image(s) added');
+      openEditor(id);
+    } catch (err) {
+      toast(err.message);
+      btn.disabled = false;
+      btn.textContent = 'Upload';
+    }
   });
 }

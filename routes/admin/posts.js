@@ -278,6 +278,36 @@ router.post('/:id/save-forever', (req, res) => {
   res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
 });
 
+// Adds images to an existing post - live or otherwise. Unlike public
+// submissions these are pre-approved (admin is trusted), same as images
+// uploaded through the admin create-post flow.
+router.post('/:id/images', upload.array('images', 6), async (req, res, next) => {
+  try {
+    const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Not found' });
+    const existing = imagesFor(post.id);
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: 'No images uploaded' });
+    if (existing.length + files.length > 6) {
+      return res.status(400).json({ error: `A post can have at most 6 images (this one already has ${existing.length}).` });
+    }
+
+    const now = Date.now();
+    let sortOrder = existing.reduce((max, img) => Math.max(max, img.sort_order), -1) + 1;
+    const stmt = db.prepare(
+      'INSERT INTO post_images (post_id, filename, original_name, approved, sort_order, created_at) VALUES (?, ?, ?, 1, ?, ?)'
+    );
+    for (const file of files) {
+      const filename = await processAndSaveImage(file.buffer);
+      stmt.run(post.id, filename, file.originalname || null, sortOrder++, now);
+    }
+    db.prepare('UPDATE posts SET updated_at = ? WHERE id = ?').run(now, post.id);
+    res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.post('/:id/images/:imageId/approve', (req, res) => {
   db.prepare('UPDATE post_images SET approved = 1 WHERE id = ? AND post_id = ?').run(req.params.imageId, req.params.id);
   res.json({ ok: true });

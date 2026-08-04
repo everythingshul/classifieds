@@ -39,6 +39,7 @@ const AdminApi = (() => {
     saveForever: (id) => req(`/posts/${id}/save-forever`, { method: 'POST' }),
     approveImage: (postId, imageId) => req(`/posts/${postId}/images/${imageId}/approve`, { method: 'POST' }),
     removeImage: (postId, imageId) => req(`/posts/${postId}/images/${imageId}`, { method: 'DELETE' }),
+    addImages: (postId, formData) => req(`/posts/${postId}/images`, { method: 'POST', body: formData }),
     crmSearch: (q) => req(`/crm/search?q=${encodeURIComponent(q)}`),
     taxonomies: (grp) => req(`/taxonomies${grp ? `?grp=${encodeURIComponent(grp)}` : ''}`),
     createTaxonomy: (body) => req('/taxonomies', { method: 'POST', body }),
