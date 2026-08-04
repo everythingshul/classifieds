@@ -1,13 +1,30 @@
 let _placesLoading = null;
+let _authFailureMsg = null;
 function loadGoogleMaps(apiKey) {
   if (!apiKey) return Promise.resolve(false);
   if (window.google?.maps) return Promise.resolve(true);
   if (_placesLoading) return _placesLoading;
   _placesLoading = new Promise((resolve) => {
+    // Google calls this global specifically for auth-level failures - an
+    // invalid key, a key restricted away from this domain/referrer, or
+    // billing not enabled on the project. Those fail completely differently
+    // from "Places product not enabled" (the script still loads "fine" and
+    // google.maps.places classes can still exist), so without this hook an
+    // auth failure and a missing-Places-product looked identical: both just
+    // showed up later as "AutocompleteService not available". This lets us
+    // surface Google's actual reason instead of guessing.
+    window.gm_authFailure = () => {
+      _authFailureMsg = 'Google rejected this Maps API key (gm_authFailure) - this means the key is invalid, restricted away from this domain/HTTP referrer, or billing is not enabled on the Google Cloud project. Check Google Cloud Console -> APIs & Services -> Credentials for this key\'s "Application restrictions", and Billing for the project.';
+      console.error(`[maps] ${_authFailureMsg}`);
+    };
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async`;
     script.async = true;
-    script.onload = () => resolve(true);
+    // Small delay before resolving so gm_authFailure (fired by the script
+    // itself right after it evaluates the key) has a chance to run first -
+    // otherwise attachLocationAutocomplete below would already be past this
+    // check by the time Google reports the real reason.
+    script.onload = () => setTimeout(() => resolve(true), 60);
     script.onerror = () => { console.error('[maps] Failed to load the Google Maps script - check that the API key is correct and unrestricted for this domain.'); resolve(false); };
     document.head.appendChild(script);
   });
@@ -190,7 +207,12 @@ async function attachLocationAutocomplete(inputEl, { onSelect } = {}) {
     console.warn(`[maps] ${msg}`);
     return { ok: false, error: msg };
   }
+  _authFailureMsg = null;
   const ok = await loadGoogleMaps(apiKey);
+  // Checked before the generic load-failed case below - an auth failure
+  // still lets the script "load" successfully (script.onload fires either
+  // way), so this is the only way to tell the two apart.
+  if (_authFailureMsg) return { ok: false, error: _authFailureMsg };
   if (!ok || !window.google?.maps) {
     const msg = 'The Google Maps script failed to load - check the key is correct and not blocked by HTTP referrer restrictions for this domain.';
     return { ok: false, error: msg };
