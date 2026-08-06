@@ -12,7 +12,18 @@ class ValidationError extends Error {
   }
 }
 
+// Browsers convert \n to \r\n when serializing a textarea's value into
+// multipart/form-data (what the post wizard submits through), so a
+// description a poster saw as "N characters" client-side (.value.length
+// counts \n as 1) could arrive here longer than that (each line break
+// counted as 2) - normalizing before counting means the length checked
+// here always matches what they actually saw and were shown as their limit.
+function normalizeLineEndings(v) {
+  return typeof v === 'string' ? v.replace(/\r\n/g, '\n') : v;
+}
+
 function requireString(v, field, errors, { max } = {}) {
+  v = normalizeLineEndings(v);
   if (typeof v !== 'string' || !v.trim()) {
     errors.push(`${field} is required`);
     return '';
@@ -124,7 +135,7 @@ function validateClassifiedPayload(body, charLimits) {
   if (!CATEGORIES_NOT_REQUIRING_DESCRIPTION.has(category)) {
     description = requireString(body.description, 'description', errors, { max: charLimits.description });
   } else if (body.description) {
-    description = String(body.description).slice(0, charLimits.description);
+    description = normalizeLineEndings(String(body.description)).slice(0, charLimits.description);
   }
 
   const locationText = requireString(body.locationText, 'location', errors, { max: 200 });
@@ -281,7 +292,7 @@ function validateSimchaPayload(body, charLimits) {
   // Simchas have no title, date, or location field to fill in - just a
   // category and (optional) details. The title is auto-generated from the
   // chosen category name once we have DB access (see routes/public/posts.js).
-  const description = body.description ? String(body.description).slice(0, charLimits.description) : '';
+  const description = body.description ? normalizeLineEndings(String(body.description)).slice(0, charLimits.description) : '';
   const taxonomyId = Number(body.taxonomyId);
   if (!taxonomyId) errors.push('a simcha category is required');
 

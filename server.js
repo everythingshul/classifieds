@@ -33,6 +33,7 @@ app.use('/api', apiLimiter);
 
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
 app.use(require('./routes/public/sitemap'));
+app.use(require('./routes/public/favicon'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/config', require('./routes/public/config'));
