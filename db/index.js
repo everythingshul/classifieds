@@ -26,6 +26,7 @@ addColumnIfMissing('contact_messages', 'archived', 'archived INTEGER NOT NULL DE
 addColumnIfMissing('contact_messages', 'reply_text', 'reply_text TEXT');
 addColumnIfMissing('contact_messages', 'replied_at', 'replied_at INTEGER');
 addColumnIfMissing('post_payments', 'refunded_cents', 'refunded_cents INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('promo_codes', 'applies_to', 'applies_to TEXT');
 
 // Simcha pricing tiers used to be stored with post_type defaulting to
 // 'classified' (only distinguished by category = 'simcha'), which mixed

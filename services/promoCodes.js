@@ -9,6 +9,17 @@ function getActivePromo(code) {
   return promo;
 }
 
+// Whether a promo code is usable for a given post type ('classified' |
+// 'listing' | 'simcha') - NULL/empty applies_to means "every section", the
+// same behavior every promo code had before section-scoping existed.
+function promoAppliesTo(promo, postType) {
+  if (!promo.applies_to) return true;
+  let scopes;
+  try { scopes = JSON.parse(promo.applies_to); } catch (e) { return true; }
+  if (!Array.isArray(scopes) || !scopes.length) return true;
+  return scopes.includes(postType);
+}
+
 function applyDiscount(totalCents, promo) {
   if (!promo) return totalCents;
   if (promo.percent_off) return Math.max(0, Math.round(totalCents * (1 - promo.percent_off / 100)));
@@ -21,4 +32,4 @@ function recordUse(promo) {
   db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?').run(promo.id);
 }
 
-module.exports = { getActivePromo, applyDiscount, recordUse };
+module.exports = { getActivePromo, applyDiscount, recordUse, promoAppliesTo };

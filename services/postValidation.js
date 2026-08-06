@@ -17,7 +17,7 @@ function requireString(v, field, errors, { max } = {}) {
     errors.push(`${field} is required`);
     return '';
   }
-  if (max && v.length > max) errors.push(`${field} must be ${max} characters or fewer`);
+  if (max && v.length > max) errors.push(`${field} must be ${max} characters or fewer (currently ${v.length})`);
   return v.trim();
 }
 

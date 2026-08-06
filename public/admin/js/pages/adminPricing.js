@@ -97,18 +97,25 @@ async function renderPricingPage() {
     <div class="admin-card">
       <h3 style="margin-top:0">Promo Codes</h3>
       <table class="admin-table">
-        <thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Expires</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>Code</th><th>Discount</th><th>Applies To</th><th>Uses</th><th>Expires</th><th>Active</th><th></th></tr></thead>
         <tbody>
-          ${promoCodes.map((p) => `
+          ${promoCodes.map((p) => {
+            let sections = 'All sections';
+            if (p.applies_to) {
+              try { sections = JSON.parse(p.applies_to).map((s) => ({ classified: 'Classifieds', listing: 'Listings', simcha: 'Simchas' }[s] || s)).join(', '); } catch (e) { /* leave as "All sections" */ }
+            }
+            return `
             <tr data-id="${p.id}">
               <td><b>${escapeHtml(p.code)}</b></td>
               <td>${p.percent_off ? p.percent_off + '% off' : formatCents(p.amount_off_cents) + ' off'}</td>
+              <td>${escapeHtml(sections)}</td>
               <td>${p.used_count}${p.max_uses ? ' / ' + p.max_uses : ''}</td>
               <td>${p.expires_at ? formatDate(p.expires_at) : '—'}</td>
               <td>${p.active ? 'Yes' : 'No'}</td>
               <td><button class="btn btn-sm toggle-promo">${p.active ? 'Deactivate' : 'Activate'}</button> <button class="btn btn-sm btn-danger del-promo">Delete</button></td>
             </tr>
-          `).join('')}
+          `;
+          }).join('')}
         </tbody>
       </table>
       <form id="addPromoForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
@@ -116,6 +123,14 @@ async function renderPricingPage() {
         <div class="field"><label>% off</label><input name="percentOff" type="number" min="1" max="100" placeholder="e.g. 20"></div>
         <div class="field"><label>or $ off</label><input name="amountOff" type="number" step="0.01" placeholder="e.g. 5.00"></div>
         <div class="field"><label>Max uses <span class="hint">(optional)</span></label><input name="maxUses" type="number" min="1"></div>
+        <div class="field">
+          <label>Applies to <span class="hint">(default: all)</span></label>
+          <div style="display:flex;gap:8px;align-items:center;height:34px">
+            <label style="font-weight:400;display:flex;align-items:center;gap:3px"><input type="checkbox" name="appliesTo" value="classified" checked>Classifieds</label>
+            <label style="font-weight:400;display:flex;align-items:center;gap:3px"><input type="checkbox" name="appliesTo" value="listing" checked>Listings</label>
+            <label style="font-weight:400;display:flex;align-items:center;gap:3px"><input type="checkbox" name="appliesTo" value="simcha" checked>Simchas</label>
+          </div>
+        </div>
         <button class="btn btn-sm" type="submit">Add Code</button>
       </form>
     </div>
@@ -183,6 +198,7 @@ async function renderPricingPage() {
         percentOff: fd.get('percentOff') || null,
         amountOffCents: fd.get('amountOff') ? Math.round(Number(fd.get('amountOff')) * 100) : null,
         maxUses: fd.get('maxUses') || null,
+        appliesTo: fd.getAll('appliesTo'),
       });
       renderPricingPage();
     } catch (err) {

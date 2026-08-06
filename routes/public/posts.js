@@ -5,7 +5,7 @@ const { validateClassifiedPayload, validateSimchaPayload, validateListingPayload
 const { buildClassifiedCharges, buildListingCharges, buildSimchaCharges, getAddon, getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits } = require('../../services/pricing');
 const { findCategory } = require('../../services/categories');
 const { findListingCategory } = require('../../services/listingCategories');
-const { getActivePromo, applyDiscount, recordUse } = require('../../services/promoCodes');
+const { getActivePromo, applyDiscount, recordUse, promoAppliesTo } = require('../../services/promoCodes');
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive, fulfillCheckoutSession } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
 const { createCheckoutSession } = require('../../services/checkout');
@@ -25,13 +25,18 @@ function postUrlPath(post) {
   return `/classifieds/${post.public_id}`;
 }
 
+const SECTION_LABELS = { classified: 'classifieds', listing: 'listings', simcha: 'simchas' };
+
 // Mutates `charges` in place: collapses its line items into a single
 // discounted "listing" line so Stripe (and the invoice) show one clean total
 // rather than a per-line discount, and records the promo's use.
-function applyPromoToCharges(charges, code) {
+function applyPromoToCharges(charges, code, postType) {
   if (!code) return null;
   const promo = getActivePromo(code);
   if (!promo) throw Object.assign(new Error('That promo code is invalid or expired'), { status: 400 });
+  if (!promoAppliesTo(promo, postType)) {
+    throw Object.assign(new Error(`That promo code isn't valid for ${SECTION_LABELS[postType] || postType}`), { status: 400 });
+  }
   const discounted = applyDiscount(charges.totalCents, promo);
   charges.lineItems = [{ kind: 'listing', label: `Listing (promo ${promo.code} applied)`, amount_cents: discounted }];
   charges.totalCents = discounted;
@@ -55,6 +60,9 @@ async function processUploadedImages(files) {
 router.post('/promo/validate', (req, res) => {
   const promo = getActivePromo(req.body.code);
   if (!promo) return res.status(400).json({ error: 'That promo code is invalid or expired' });
+  if (!promoAppliesTo(promo, req.body.postType)) {
+    return res.status(400).json({ error: `That promo code isn't valid for ${SECTION_LABELS[req.body.postType] || req.body.postType}` });
+  }
   res.json({ code: promo.code, percentOff: promo.percent_off, amountOffCents: promo.amount_off_cents });
 });
 
@@ -94,7 +102,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
         wantsStrike: payload.wantsStrike,
         wantsOversized: payload.wantsOversized,
       });
-      applyPromoToCharges(charges, req.body.promoCode);
+      applyPromoToCharges(charges, req.body.promoCode, 'classified');
 
       const post = insertPost({ type: 'classified', category: payload.category, payload, hasImages: uploaded.length > 0 });
       attachImages(post.id, uploaded);
@@ -125,7 +133,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
         wantsStrike: payload.wantsStrike,
         wantsOversized: payload.wantsOversized,
       });
-      applyPromoToCharges(charges, req.body.promoCode);
+      applyPromoToCharges(charges, req.body.promoCode, 'listing');
 
       const post = insertPost({ type: 'listing', category: payload.category, payload, hasImages: uploaded.length > 0 });
       attachImages(post.id, uploaded);
@@ -147,7 +155,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
     if (!taxonomy) return res.status(400).json({ error: 'Validation failed', details: ['a valid simcha category is required'] });
     payload.title = taxonomy.name;
     const charges = buildSimchaCharges();
-    applyPromoToCharges(charges, req.body.promoCode);
+    applyPromoToCharges(charges, req.body.promoCode, 'simcha');
     const post = insertPost({ type: 'simcha', category: 'simcha', payload, hasImages: false });
     attachSimchaSurprises(post.id, payload.surpriseEmails, `${payload.posterFirstName || ''} ${payload.posterLastName || ''}`.trim());
     const payment = recordPayment({

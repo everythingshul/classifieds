@@ -11,11 +11,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // timeseries and the "recurring visitor" (active on >1 distinct day) check.
 const DAY_EXPR = "date(created_at / 1000, 'unixepoch')";
 
-router.get('/', (req, res) => {
-  const to = req.query.to ? Number(req.query.to) : Date.now();
-  const from = req.query.from ? Number(req.query.from) : to - 30 * DAY_MS;
-
-  const totals = {
+function computeTotals(from, to) {
+  return {
     pageviews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'pageview' AND created_at BETWEEN ? AND ?").get(from, to).c,
     postViews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'post_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
     postClicks: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'post_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
@@ -27,6 +24,33 @@ router.get('/', (req, res) => {
       )
     `).get(from, to).c,
   };
+}
+
+router.get('/', (req, res) => {
+  const to = req.query.to ? Number(req.query.to) : Date.now();
+  const from = req.query.from ? Number(req.query.from) : to - 30 * DAY_MS;
+
+  const totals = computeTotals(from, to);
+
+  // Same-length window immediately preceding this one, so each stat card
+  // can show a "vs previous period" delta rather than a bare number with
+  // no sense of whether that's trending up or down.
+  const spanMs = Math.max(1, to - from);
+  const prevTo = from - 1;
+  const prevFrom = prevTo - spanMs;
+  const previousTotals = computeTotals(prevFrom, prevTo);
+
+  // New = this is the first time we've ever seen this visitor_id at all.
+  // Returning = they had at least one event before this period started.
+  // "returning" is a reserved SQLite keyword (RETURNING clause), so the SQL
+  // aliases avoid it even though the JS/JSON field name is fine.
+  const newVsReturningRow = db.prepare(`
+    SELECT
+      SUM(CASE WHEN EXISTS (SELECT 1 FROM analytics_events e2 WHERE e2.visitor_id = v.visitor_id AND e2.created_at < ?) THEN 1 ELSE 0 END) AS returning_count,
+      SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM analytics_events e2 WHERE e2.visitor_id = v.visitor_id AND e2.created_at < ?) THEN 1 ELSE 0 END) AS new_count
+    FROM (SELECT DISTINCT visitor_id FROM analytics_events WHERE created_at BETWEEN ? AND ?) v
+  `).get(from, from, from, to);
+  const newVsReturning = { returning: newVsReturningRow.returning_count, new: newVsReturningRow.new_count };
 
   const timeseries = db.prepare(`
     SELECT ${DAY_EXPR} AS date,
@@ -68,7 +92,7 @@ router.get('/', (req, res) => {
     GROUP BY p.id ORDER BY views DESC LIMIT 10
   `).all(from, to);
 
-  res.json({ from, to, totals, timeseries, byPostType, byCategory, topPages, topPosts });
+  res.json({ from, to, totals, previousTotals, newVsReturning, timeseries, byPostType, byCategory, topPages, topPosts });
 });
 
 module.exports = router;

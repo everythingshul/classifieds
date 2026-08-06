@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   used_count INTEGER NOT NULL DEFAULT 0,
   expires_at INTEGER,
   active INTEGER NOT NULL DEFAULT 1,
+  applies_to TEXT, -- JSON array of post types ['classified','listing','simcha'] - NULL/empty = all sections
   created_at INTEGER NOT NULL
 );
 
