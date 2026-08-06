@@ -42,6 +42,7 @@ app.use('/api/listings', require('./routes/public/listings'));
 app.use('/api/simchas', require('./routes/public/simchas'));
 app.use('/api/posts', require('./routes/public/posts'));
 app.use('/api/contact', require('./routes/public/contact'));
+app.use('/api/analytics', require('./routes/public/analytics'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
@@ -56,6 +57,7 @@ app.use('/api/admin/settings', require('./routes/admin/settings'));
 app.use('/api/admin/posts', require('./routes/admin/posts'));
 app.use('/api/admin/crm', require('./routes/admin/crm'));
 app.use('/api/admin/stats', require('./routes/admin/stats'));
+app.use('/api/admin/analytics', require('./routes/admin/analytics'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));

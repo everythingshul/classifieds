@@ -28,6 +28,18 @@ function currencyOrDefault(f) {
   return CURRENCY_CODES.includes(f.currency) ? f.currency : 'USD';
 }
 
+// Price/pay fields accept a numeric amount, arbitrary free text (e.g. "Call
+// for price", "DOE"), or nothing at all - callers decide whether blank is
+// allowed. Returns at most one of amount/text set, never both.
+function parseAmountOrText(raw) {
+  if (raw === undefined || raw === null) return { amount: null, text: null };
+  const str = String(raw).trim();
+  if (!str) return { amount: null, text: null };
+  const num = Number(str);
+  if (Number.isFinite(num)) return { amount: num, text: null };
+  return { amount: null, text: str.slice(0, 60) };
+}
+
 function validateCategoryFields(category, fields, errors, categoryDef) {
   const f = fields || {};
   const out = {};
@@ -37,13 +49,18 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
       if (!jobTypes.includes(f.jobType)) errors.push('jobType must be one of ' + jobTypes.join(', '));
       out.jobType = f.jobType;
       if (f.payAmount !== undefined && f.payAmount !== null && f.payAmount !== '') {
-        const amt = Number(f.payAmount);
-        if (Number.isNaN(amt) || amt < 0) errors.push('payAmount must be a positive number');
-        const payPeriods = getOptionNames('pay_period');
-        if (!payPeriods.includes(f.payPeriod)) errors.push('payPeriod must be one of ' + payPeriods.join(', '));
-        out.payAmount = amt;
-        out.payPeriod = f.payPeriod;
-        out.payCurrency = CURRENCY_CODES.includes(f.payCurrency) ? f.payCurrency : 'USD';
+        const { amount, text } = parseAmountOrText(f.payAmount);
+        if (amount !== null && amount < 0) errors.push('payAmount must be a positive number');
+        out.payAmount = amount;
+        out.payAmountText = text;
+        // A period only makes sense alongside a numeric amount - free text
+        // like "DOE" or "Competitive" already says everything on its own.
+        if (amount !== null) {
+          const payPeriods = getOptionNames('pay_period');
+          if (!payPeriods.includes(f.payPeriod)) errors.push('payPeriod must be one of ' + payPeriods.join(', '));
+          out.payPeriod = f.payPeriod;
+          out.payCurrency = CURRENCY_CODES.includes(f.payCurrency) ? f.payCurrency : 'USD';
+        }
       }
       break;
     }
@@ -53,10 +70,11 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
     }
     case 'items-for-sale':
     case 'items-for-rent': {
-      const price = Number(f.price);
-      if (Number.isNaN(price) || price < 0) errors.push('price is required and must be a positive number');
-      out.price = price;
-      out.currency = currencyOrDefault(f);
+      const { amount, text } = parseAmountOrText(f.price);
+      if (amount !== null && amount < 0) errors.push('price must be a positive number');
+      out.price = amount;
+      out.priceText = text;
+      if (amount !== null) out.currency = currencyOrDefault(f);
       break;
     }
     case 'lost-found': {
@@ -65,12 +83,11 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
       break;
     }
     case 'real-estate': {
-      if (f.price !== undefined && f.price !== null && f.price !== '') {
-        const price = Number(f.price);
-        if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
-        out.price = price;
-        out.currency = currencyOrDefault(f);
-      }
+      const { amount, text } = parseAmountOrText(f.price);
+      if (amount !== null && amount < 0) errors.push('price must be a positive number');
+      out.price = amount;
+      out.priceText = text;
+      if (amount !== null) out.currency = currencyOrDefault(f);
       break;
     }
     case 'free-giveaways':
@@ -79,11 +96,12 @@ function validateCategoryFields(category, fields, errors, categoryDef) {
       break;
     default:
       // Admin-added custom category - generic optional price field.
-      if (categoryDef?.hasPrice && f.price !== undefined && f.price !== null && f.price !== '') {
-        const price = Number(f.price);
-        if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
-        out.price = price;
-        out.currency = currencyOrDefault(f);
+      if (categoryDef?.hasPrice) {
+        const { amount, text } = parseAmountOrText(f.price);
+        if (amount !== null && amount < 0) errors.push('price must be a positive number');
+        out.price = amount;
+        out.priceText = text;
+        if (amount !== null) out.currency = currencyOrDefault(f);
       }
       break;
   }
@@ -205,11 +223,12 @@ function validateListingPayload(body, charLimits) {
   const locationText = requireString(body.locationText, 'location', errors, { max: 200 });
 
   const fields = {};
-  if (categoryDef.hasPrice && body.fields?.price !== undefined && body.fields?.price !== null && body.fields?.price !== '') {
-    const price = Number(body.fields.price);
-    if (Number.isNaN(price) || price < 0) errors.push('price must be a positive number');
-    fields.price = price;
-    fields.currency = currencyOrDefault(body.fields || {});
+  if (categoryDef.hasPrice) {
+    const { amount, text } = parseAmountOrText(body.fields?.price);
+    if (amount !== null && amount < 0) errors.push('price must be a positive number');
+    fields.price = amount;
+    fields.priceText = text;
+    if (amount !== null) fields.currency = currencyOrDefault(body.fields || {});
   }
 
   // Optional: only used if the admin has defined sub-categories for this
@@ -318,4 +337,4 @@ function validateSimchaPayload(body, charLimits) {
   };
 }
 
-module.exports = { ValidationError, validateClassifiedPayload, validateSimchaPayload, validateListingPayload, validateCategoryFields };
+module.exports = { ValidationError, validateClassifiedPayload, validateSimchaPayload, validateListingPayload, validateCategoryFields, parseAmountOrText };

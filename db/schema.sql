@@ -192,8 +192,28 @@ CREATE TABLE IF NOT EXISTS post_payments (
   stripe_payment_intent TEXT,
   payer_email TEXT,
   status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | failed
+  refunded_cents INTEGER NOT NULL DEFAULT 0,
   invoice_number TEXT,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_post_payments_post ON post_payments(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_payments_email ON post_payments(payer_email);
+
+-- Every page load and post view/click, tagged with an anonymous per-browser
+-- visitor id (localStorage, no cookies/PII) so the admin analytics dashboard
+-- can report unique vs. recurring visitors over any date range, not just
+-- lifetime totals (posts.view_count/click_count already cover that).
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL, -- 'pageview' | 'post_view' | 'post_click'
+  path TEXT,
+  post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
+  post_type TEXT, -- denormalized from posts.type at event time, for fast breakdowns without a join
+  category TEXT, -- denormalized from posts.category at event time
+  visitor_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_visitor ON analytics_events(visitor_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(type);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_post ON analytics_events(post_id);

@@ -39,6 +39,7 @@ function renderShell() {
           <aside class="admin-sidebar">
             <div class="brand">Admin Portal</div>
             <a href="#/dashboard">Dashboard <span class="nav-badge" id="badge-dashboard" style="display:none"></span></a>
+            <a href="#/analytics">Analytics</a>
             <a href="#/new-post">+ New Post</a>
             <a href="#/moderation">Moderation Queue <span class="nav-badge" id="badge-moderation" style="display:none"></span></a>
             <a href="#/posts">All Posts</a>
@@ -98,6 +99,7 @@ async function refreshNotificationBadges() {
 document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/login', renderLoginPage);
   AdminRouter.add('#/dashboard', renderDashboardPage);
+  AdminRouter.add('#/analytics', renderAnalyticsPage);
   AdminRouter.add('#/new-post', renderCreatePostPage);
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);

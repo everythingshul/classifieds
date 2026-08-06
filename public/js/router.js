@@ -27,6 +27,7 @@ const Router = (() => {
           root().innerHTML = `<div class="container"><p class="error-list">${escapeHtml(e.message || 'Something went wrong.')}</p></div>`;
         }
         highlightNav();
+        if (typeof Analytics !== 'undefined') Analytics.trackPageview(path);
         return;
       }
     }

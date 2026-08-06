@@ -10,10 +10,12 @@ async function renderDetailPage(id, type) {
     if (tax) fieldRows.push(['Category', tax.name]);
   }
   if (post.fields?.jobType) fieldRows.push(['Job Type', post.fields.jobType.replace('_', ' ')]);
-  if (post.fields?.payAmount) fieldRows.push(['Pay', `${formatMoney(post.fields.payAmount * 100, post.fields.payCurrency)} / ${post.fields.payPeriod}`]);
+  if (post.fields?.payAmount !== undefined && post.fields?.payAmount !== null) fieldRows.push(['Pay', `${formatMoney(post.fields.payAmount * 100, post.fields.payCurrency)} / ${post.fields.payPeriod}`]);
+  else if (post.fields?.payAmountText) fieldRows.push(['Pay', post.fields.payAmountText]);
   if (post.fields?.experience) fieldRows.push(['Experience', post.fields.experience]);
   if (post.fields?.lostOrFound) fieldRows.push(['Status', post.fields.lostOrFound.toUpperCase()]);
-  if (post.fields?.price !== undefined && post.fields?.price !== null) fieldRows.push(['Price', formatMoney(post.fields.price * 100, post.fields.currency)]);
+  const priceDisplay = formatPriceField(post.fields?.price, post.fields?.priceText, post.fields?.currency);
+  if (priceDisplay) fieldRows.push(['Price', priceDisplay]);
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
 
   const contactButtons = [];

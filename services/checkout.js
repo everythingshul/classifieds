@@ -37,4 +37,18 @@ async function createCheckoutSession({ lineItems, returnUrl, cancelUrl, metadata
   }
 }
 
-module.exports = { createCheckoutSession };
+// Partial or full refund against an already-captured payment intent.
+// amountCents omitted (or falsy) refunds the payment in full.
+async function createRefund({ paymentIntentId, amountCents }) {
+  const stripe = getStripe();
+  try {
+    return await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      ...(amountCents ? { amount: amountCents } : {}),
+    });
+  } catch (e) {
+    throw Object.assign(new Error(`Stripe error: ${e.message}`), { status: 502, expose: true });
+  }
+}
+
+module.exports = { createCheckoutSession, createRefund };

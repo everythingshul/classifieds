@@ -19,7 +19,7 @@ async function renderCreatePostPage() {
 
   function priceFieldHtml() {
     const currencies = cfg.currencies || [{ code: 'USD' }];
-    return `<div class="form-row"><label>Price</label><div style="display:flex;gap:6px"><input type="number" id="f_price" style="flex:1"><select id="f_currency" style="width:90px">${currencies.map((c) => `<option value="${c.code}">${escapeHtml(c.code)}</option>`).join('')}</select></div></div>`;
+    return `<div class="form-row"><label>Price <span class="hint">(amount, text like "Call for price", or leave blank)</span></label><div style="display:flex;gap:6px"><input type="text" id="f_price" style="flex:1"><select id="f_currency" style="width:90px">${currencies.map((c) => `<option value="${c.code}">${escapeHtml(c.code)}</option>`).join('')}</select></div></div>`;
   }
 
   function categoryFieldsHtml() {

@@ -110,7 +110,7 @@ function buildListingCharges({ category, categoryDef, pricingTierId, wantsStrike
 }
 
 function buildSimchaCharges() {
-  const tier = db.prepare("SELECT * FROM pricing_tiers WHERE category = 'simcha' AND active = 1 LIMIT 1").get();
+  const tier = db.prepare("SELECT * FROM pricing_tiers WHERE post_type = 'simcha' AND active = 1 ORDER BY sort_order LIMIT 1").get();
   const lineItems = [{ kind: 'listing', label: tier ? tier.name : 'Simcha posting', amount_cents: tier ? tier.price_cents : 0 }];
   const totalCents = lineItems.reduce((s, i) => s + i.amount_cents, 0);
   return { tier, lineItems, totalCents };

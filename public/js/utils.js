@@ -20,6 +20,26 @@ function formatMoney(cents, currency) {
   }
 }
 
+// Price/pay fields may be a numeric amount, free text (e.g. "Call for
+// price", "DOE"), or absent entirely - returns null when there's nothing to
+// show, so callers can skip rendering the row/line altogether.
+function formatPriceField(amount, text, currency) {
+  if (amount !== undefined && amount !== null && amount !== '') return formatMoney(amount * 100, currency);
+  if (text) return text;
+  return null;
+}
+
+// Client-side mirror of the server's parseAmountOrText (services/postValidation.js)
+// - used to preview a raw wizard input as either a price/pay amount or free text
+// before it's actually submitted.
+function parseAmountOrText(raw) {
+  if (raw === undefined || raw === null) return { amount: null, text: null };
+  const str = String(raw).trim();
+  if (!str) return { amount: null, text: null };
+  const num = Number(str);
+  return Number.isFinite(num) ? { amount: num, text: null } : { amount: null, text: str };
+}
+
 function formatDate(ms) {
   if (!ms) return '';
   return new Date(ms).toLocaleDateString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });

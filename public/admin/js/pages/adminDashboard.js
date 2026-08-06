@@ -49,7 +49,7 @@ async function renderDashboardPage() {
       <div class="stat-card"><div class="num">${liveCount}</div><div class="label">Live Posts</div></div>
       <div class="stat-card"><div class="num">${stats.pendingApproval}</div><div class="label">Pending Approval</div></div>
       <div class="stat-card"><div class="num">${reports.length}</div><div class="label">Open Reports</div></div>
-      <div class="stat-card"><div class="num">${formatCents(stats.revenueCents)}</div><div class="label">Total Revenue</div></div>
+      <div class="stat-card"><div class="num">${formatCents(stats.revenueCents)}</div><div class="label">Total Revenue</div>${stats.refundedCents > 0 ? `<div class="hint" style="margin-top:2px">${formatCents(stats.refundedCents)} refunded</div>` : ''}</div>
       <div class="stat-card"><div class="num">${stats.totalViews}</div><div class="label">Total Views</div></div>
       <div class="stat-card"><div class="num">${stats.totalClicks}</div><div class="label">Total Clicks</div></div>
     </div>

@@ -121,6 +121,7 @@ p { margin: 0 0 .7em; }
 .combo-zman-row { display: flex; flex-direction: column; gap: 5px; color: var(--ink-soft); font-size: .74rem; }
 .combo-zman-row span { display: flex; justify-content: space-between; gap: 8px; }
 .combo-zman-row b { color: var(--ink); font-weight: 600; }
+.zman-disclaimer { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid var(--border); font-size: .68rem; color: var(--ink-soft); text-align: center; direction: rtl; }
 
 .weather-widget .weather-day { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
 .weather-widget .weather-day:last-of-type { border-bottom: none; }

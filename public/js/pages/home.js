@@ -10,6 +10,7 @@ async function renderHomePage() {
         <div class="home-main">
           <div style="padding:30px 0 6px">
             <a href="/post" class="btn btn-gold" data-i18n="nav_post">Post an Ad</a>
+            <span class="hint" style="margin-inline-start:10px">Lost &amp; Found posts are always free.</span>
           </div>
 
           <div class="section-heading">
@@ -47,6 +48,7 @@ async function renderHomePage() {
               <span><b data-i18n="tzeit60">Tzeis 60</b> ${formatTime(z.tzeit60)}</span>
               <span><b data-i18n="tzeit72">Tzeis 72</b> ${formatTime(z.tzeit72)}</span>
             </div>
+            <p class="zman-disclaimer">נא להחמיר על הזמנים בכמה דקות.</p>
           </div>
           <div id="weatherWidget"></div>
         </aside>

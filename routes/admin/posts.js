@@ -10,8 +10,9 @@ const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { findCategory } = require('../../services/categories');
 const { findListingCategory } = require('../../services/listingCategories');
-const { validateCategoryFields } = require('../../services/postValidation');
+const { validateCategoryFields, parseAmountOrText } = require('../../services/postValidation');
 const { normalizeUrl } = require('../../utils/validate');
+const { createRefund } = require('../../services/checkout');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -44,11 +45,12 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
       if (fieldErrors.length) return res.status(400).json({ error: 'Validation failed', details: fieldErrors });
     } else if (type === 'listing') {
       const nextFields = {};
-      if (catDef.hasPrice && fields.price !== undefined && fields.price !== null && fields.price !== '') {
-        const price = Number(fields.price);
-        if (Number.isNaN(price) || price < 0) return res.status(400).json({ error: 'Validation failed', details: ['price must be a positive number'] });
-        nextFields.price = price;
-        nextFields.currency = CURRENCY_CODES.includes(fields.currency) ? fields.currency : 'USD';
+      if (catDef.hasPrice) {
+        const { amount, text } = parseAmountOrText(fields.price);
+        if (amount !== null && amount < 0) return res.status(400).json({ error: 'Validation failed', details: ['price must be a positive number'] });
+        nextFields.price = amount;
+        nextFields.priceText = text;
+        if (amount !== null) nextFields.currency = CURRENCY_CODES.includes(fields.currency) ? fields.currency : 'USD';
       }
       fields = nextFields;
     }
@@ -316,6 +318,35 @@ router.post('/:id/images/:imageId/approve', (req, res) => {
 router.delete('/:id/images/:imageId', (req, res) => {
   db.prepare('DELETE FROM post_images WHERE id = ? AND post_id = ?').run(req.params.imageId, req.params.id);
   res.json({ ok: true });
+});
+
+// Partial or full refund on a captured payment - amountCents omitted (or 0)
+// refunds whatever's left un-refunded on this payment. Reflected in the
+// dashboard/analytics revenue figures via post_payments.refunded_cents,
+// never by deleting or overwriting the original payment record.
+router.post('/:id/payments/:paymentId/refund', async (req, res, next) => {
+  try {
+    const payment = db.prepare('SELECT * FROM post_payments WHERE id = ? AND post_id = ?').get(req.params.paymentId, req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    if (payment.status !== 'paid') return res.status(400).json({ error: 'Only paid payments can be refunded' });
+    if (!payment.stripe_payment_intent) return res.status(400).json({ error: 'This payment has no Stripe payment intent on record - it may predate Stripe or was recorded manually, so it can\'t be refunded automatically' });
+
+    const remaining = payment.amount_cents - payment.refunded_cents;
+    if (remaining <= 0) return res.status(400).json({ error: 'This payment is already fully refunded' });
+
+    let amountCents = req.body.amountCents !== undefined && req.body.amountCents !== null && req.body.amountCents !== ''
+      ? Number(req.body.amountCents)
+      : remaining;
+    if (!Number.isFinite(amountCents) || amountCents <= 0) return res.status(400).json({ error: 'amountCents must be a positive number' });
+    if (amountCents > remaining) return res.status(400).json({ error: `Cannot refund more than the remaining ${remaining} cents on this payment` });
+
+    await createRefund({ paymentIntentId: payment.stripe_payment_intent, amountCents });
+    db.prepare('UPDATE post_payments SET refunded_cents = refunded_cents + ? WHERE id = ?').run(amountCents, payment.id);
+
+    res.json(db.prepare('SELECT * FROM post_payments WHERE id = ?').get(payment.id));
+  } catch (e) {
+    next(e);
+  }
 });
 
 module.exports = router;

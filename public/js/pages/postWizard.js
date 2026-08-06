@@ -110,12 +110,12 @@ function renderPostWizard() {
     return `<div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${opts.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
   }
 
-  function priceFieldHtml({ required } = {}) {
+  function priceFieldHtml() {
     const currencies = cfg.currencies || [{ code: 'USD', symbol: '$', label: 'US Dollar (USD)' }];
     return `
-      <div class="form-row"><label>Price${required ? '' : ' <span class="hint">(optional)</span>'}</label>
+      <div class="form-row"><label>Price <span class="hint">(optional - enter an amount, text like "Call for price", or leave blank)</span></label>
         <div style="display:flex;gap:6px">
-          <input type="number" id="f_price" min="0" step="0.01" style="flex:1" ${required ? 'required' : ''}>
+          <input type="text" id="f_price" style="flex:1">
           <select id="f_currency" style="width:110px">${currencies.map((c) => `<option value="${c.code}" ${c.code === 'USD' ? 'selected' : ''}>${escapeHtml(c.code)}</option>`).join('')}</select>
         </div>
       </div>`;
@@ -135,13 +135,13 @@ function renderPostWizard() {
             <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">Select…</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
           </div>
           <div class="form-cols">
-            <div class="form-row"><label>Pay Amount <span class="hint">(optional)</span></label>
+            <div class="form-row"><label>Pay Amount <span class="hint">(optional - enter an amount, text like "DOE", or leave blank)</span></label>
               <div style="display:flex;gap:6px">
-                <input type="number" id="f_payAmount" min="0" step="0.01" style="flex:1">
+                <input type="text" id="f_payAmount" style="flex:1">
                 <select id="f_payCurrency" style="width:90px">${(cfg.currencies || [{ code: 'USD' }]).map((c) => `<option value="${c.code}" ${c.code === 'USD' ? 'selected' : ''}>${escapeHtml(c.code)}</option>`).join('')}</select>
               </div>
             </div>
-            <div class="form-row"><label>Per</label><select id="f_payPeriod">${cfg.payPeriods.map((p) => `<option value="${p}">${p}</option>`).join('')}</select></div>
+            <div class="form-row"><label>Per <span class="hint">(only used with a numeric amount)</span></label><select id="f_payPeriod">${cfg.payPeriods.map((p) => `<option value="${p}">${p}</option>`).join('')}</select></div>
           </div>`;
       case 'seeking-a-job':
         return `
@@ -149,17 +149,17 @@ function renderPostWizard() {
           <div class="form-row"><label>Experience</label><textarea id="f_experience" rows="3"></textarea></div>`;
       case 'items-for-sale':
       case 'items-for-rent':
-        return `${genericTaxonomyFieldHtml()}${priceFieldHtml({ required: true })}`;
+        return `${genericTaxonomyFieldHtml()}${priceFieldHtml()}`;
       case 'lost-found':
         return `${genericTaxonomyFieldHtml()}<div class="form-row"><label>Lost or Found</label><select id="f_lostOrFound"><option value="lost">Lost</option><option value="found">Found</option></select></div>`;
       case 'real-estate':
         return `
           <div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${reTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
-          ${priceFieldHtml({ required: false })}`;
+          ${priceFieldHtml()}`;
       default: {
         // Admin-added custom classifieds category, or a Listing (always generic).
         const catDef = currentCatDef();
-        return `${genericTaxonomyFieldHtml()}${catDef?.hasPrice ? priceFieldHtml({ required: false }) : ''}`;
+        return `${genericTaxonomyFieldHtml()}${catDef?.hasPrice ? priceFieldHtml() : ''}`;
       }
     }
   }
@@ -293,7 +293,6 @@ function renderPostWizard() {
         fields.experience = document.getElementById('f_experience').value;
       } else if (['items-for-sale', 'items-for-rent'].includes(state.category)) {
         fields.price = document.getElementById('f_price').value;
-        if (!fields.price) errs.push('Price is required');
         if (genericTaxSelect) fields.taxonomyId = genericTaxSelect.value;
       } else if (state.category === 'lost-found') {
         fields.lostOrFound = document.getElementById('f_lostOrFound').value;
@@ -343,18 +342,15 @@ function renderPostWizard() {
     shell(`
       <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
-      <h3>Contact Info <span class="hint">(optional)</span></h3>
-      <div class="form-cols">
-        <div class="form-row"><label>Phone</label><div style="display:flex;gap:6px"><select id="c_phoneCountry" style="width:90px"></select><input type="tel" id="c_phone" value="${escapeHtml(state.data.contactPhone || '')}"></div></div>
-        <div class="form-row"><label>Email</label><input type="email" id="c_email" value="${escapeHtml(state.data.contactEmail || '')}"></div>
-      </div>
-      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
-      <h3>Your Info</h3>
+      <h3>Your Info <span class="hint">(never shown publicly - for our records only)</span></h3>
       <div class="form-cols">
         <div class="form-row"><label>First Name <span class="hint">(optional)</span></label><input type="text" id="p_first" value="${escapeHtml(state.data.posterFirstName || '')}"></div>
         <div class="form-row"><label>Last Name <span class="hint">(optional)</span></label><input type="text" id="p_last" value="${escapeHtml(state.data.posterLastName || '')}"></div>
       </div>
-      <div class="form-row"><label>Email <span class="hint">(required)</span></label><input type="email" id="p_email" value="${escapeHtml(state.data.posterEmail || '')}" required></div>
+      <div class="form-cols">
+        <div class="form-row"><label>Phone <span class="hint">(optional)</span></label><div style="display:flex;gap:6px"><select id="p_phoneCountry" style="width:90px"></select><input type="tel" id="p_phone" value="${escapeHtml(state.data.posterPhone || '')}"></div></div>
+        <div class="form-row"><label>Email <span class="hint">(required)</span></label><input type="email" id="p_email" value="${escapeHtml(state.data.posterEmail || '')}" required></div>
+      </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Surprise a Friend! <span class="hint">(optional)</span></h3>
       <p class="hint">Enter one friend's email and we'll surprise them with a Mazel Tov message and a link to this simcha.</p>
@@ -362,7 +358,7 @@ function renderPostWizard() {
       <div id="stepError" class="error-list" style="display:none"></div>
       <div style="margin-top:20px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
-    populateCountrySelect(document.getElementById('c_phoneCountry'), state.data.contactPhoneCountry);
+    populateCountrySelect(document.getElementById('p_phoneCountry'), state.data.posterPhoneCountry);
     document.getElementById('backBtn').addEventListener('click', () => go(1));
     document.getElementById('nextBtn').addEventListener('click', () => {
       const errs = [];
@@ -379,10 +375,9 @@ function renderPostWizard() {
       const surpriseEmails = surpriseEmailVal ? [{ email: surpriseEmailVal, senderDisplayName: senderName }] : [];
       Object.assign(state.data, {
         description: document.getElementById('f_description').value.trim(),
-        contactPhone: document.getElementById('c_phone').value.trim(),
-        contactPhoneCountry: document.getElementById('c_phoneCountry').value,
-        contactEmail: document.getElementById('c_email').value.trim(),
         posterFirstName: document.getElementById('p_first').value.trim(), posterLastName: document.getElementById('p_last').value.trim(),
+        posterPhone: document.getElementById('p_phone').value.trim(),
+        posterPhoneCountry: document.getElementById('p_phoneCountry').value,
         posterEmail, surpriseEmails,
       });
       go(3);
@@ -430,10 +425,16 @@ function renderPostWizard() {
         const tax = cfg.taxonomies.find((t) => String(t.id) === String(f.taxonomyId));
         if (tax) rows.push([state.category === 'real-estate' ? 'Real Estate Category' : 'Job Category', tax.name]);
       }
-      if (f.payAmount) rows.push(['Pay', `${formatMoney(f.payAmount * 100, f.payCurrency)} / ${f.payPeriod}`]);
+      if (f.payAmount) {
+        const pay = parseAmountOrText(f.payAmount);
+        rows.push(['Pay', pay.amount !== null ? `${formatMoney(pay.amount * 100, f.payCurrency)} / ${f.payPeriod}` : pay.text]);
+      }
       if (f.experience) rows.push(['Experience', f.experience]);
       if (f.lostOrFound) rows.push(['Status', f.lostOrFound === 'lost' ? 'Lost' : 'Found']);
-      if (f.price !== undefined && f.price !== null && f.price !== '') rows.push(['Price', formatMoney(Number(f.price) * 100, f.currency)]);
+      if (f.price !== undefined && f.price !== null && f.price !== '') {
+        const price = parseAmountOrText(f.price);
+        rows.push(['Price', price.amount !== null ? formatMoney(price.amount * 100, f.currency) : price.text]);
+      }
       return rows;
     }
 
@@ -446,7 +447,11 @@ function renderPostWizard() {
     }
 
     function pricingSummary() {
-      if (state.postType === 'simcha') return null;
+      if (state.postType === 'simcha') {
+        const simchaTier = cfg.pricingTiers.find((t) => t.post_type === 'simcha' && t.active);
+        if (!simchaTier || simchaTier.price_cents === 0) return null;
+        return { lines: [{ label: simchaTier.name, amount: simchaTier.price_cents }], total: simchaTier.price_cents };
+      }
       if (currentCatDef()?.free) return { lines: [{ label: 'Standard (Free)', amount: 0 }], total: 0 };
       const tier = cfg.pricingTiers.find((t) => String(t.id) === String(state.data.pricingTierId));
       const lines = [];
@@ -575,13 +580,13 @@ function renderPostWizard() {
       } else {
         fd.set('description', state.data.description || '');
         fd.set('taxonomyId', state.data.taxonomyId);
-        fd.set('contactPhone', state.data.contactPhone || '');
-        fd.set('contactPhoneCountry', state.data.contactPhoneCountry || 'US');
-        fd.set('contactEmail', state.data.contactEmail || '');
         fd.set('posterFirstName', state.data.posterFirstName || '');
         fd.set('posterLastName', state.data.posterLastName || '');
+        fd.set('posterPhone', state.data.posterPhone || '');
+        fd.set('posterPhoneCountry', state.data.posterPhoneCountry || 'US');
         fd.set('posterEmail', state.data.posterEmail);
         fd.set('surpriseEmails', JSON.stringify(state.data.surpriseEmails || []));
+        if (state.data.promo) fd.set('promoCode', state.data.promo.code);
       }
 
       const result = await Api.createPost(fd);

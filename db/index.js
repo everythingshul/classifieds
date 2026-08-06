@@ -25,6 +25,14 @@ addColumnIfMissing('pricing_tiers', 'post_type', "post_type TEXT NOT NULL DEFAUL
 addColumnIfMissing('contact_messages', 'archived', 'archived INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('contact_messages', 'reply_text', 'reply_text TEXT');
 addColumnIfMissing('contact_messages', 'replied_at', 'replied_at INTEGER');
+addColumnIfMissing('post_payments', 'refunded_cents', 'refunded_cents INTEGER NOT NULL DEFAULT 0');
+
+// Simcha pricing tiers used to be stored with post_type defaulting to
+// 'classified' (only distinguished by category = 'simcha'), which mixed
+// them into the admin Pricing page's Classifieds table with no dedicated
+// section of their own. Gives them their own post_type so they're properly
+// separate everywhere.
+db.prepare("UPDATE pricing_tiers SET post_type = 'simcha' WHERE category = 'simcha' AND post_type != 'simcha'").run();
 
 // One-time migration: boost/strike/oversized add-on pricing used to be one
 // shared row per add-on regardless of post type. Splits each into its own
@@ -52,18 +60,18 @@ function seed() {
   const tierCount = db.prepare('SELECT COUNT(*) AS c FROM pricing_tiers').get().c;
   if (tierCount === 0) {
     const insert = db.prepare(
-      `INSERT INTO pricing_tiers (category, name, duration_days, price_cents, sort_order, active)
-       VALUES (@category, @name, @duration_days, @price_cents, @sort_order, 1)`
+      `INSERT INTO pricing_tiers (category, post_type, name, duration_days, price_cents, sort_order, active)
+       VALUES (@category, @post_type, @name, @duration_days, @price_cents, @sort_order, 1)`
     );
     const generic = [
-      { category: null, name: '7 Days', duration_days: 7, price_cents: 1000, sort_order: 1 },
-      { category: null, name: '14 Days', duration_days: 14, price_cents: 1500, sort_order: 2 },
-      { category: null, name: '30 Days', duration_days: 30, price_cents: 2500, sort_order: 3 },
-      { category: null, name: '60 Days', duration_days: 60, price_cents: 4000, sort_order: 4 },
+      { category: null, post_type: 'classified', name: '7 Days', duration_days: 7, price_cents: 1000, sort_order: 1 },
+      { category: null, post_type: 'classified', name: '14 Days', duration_days: 14, price_cents: 1500, sort_order: 2 },
+      { category: null, post_type: 'classified', name: '30 Days', duration_days: 30, price_cents: 2500, sort_order: 3 },
+      { category: null, post_type: 'classified', name: '60 Days', duration_days: 60, price_cents: 4000, sort_order: 4 },
     ];
     const freeTiers = [
-      { category: 'lost-found', name: 'Standard (Free)', duration_days: 30, price_cents: 0, sort_order: 1 },
-      { category: 'simcha', name: 'Standard (Free)', duration_days: 30, price_cents: 0, sort_order: 1 },
+      { category: 'lost-found', post_type: 'classified', name: 'Standard (Free)', duration_days: 30, price_cents: 0, sort_order: 1 },
+      { category: 'simcha', post_type: 'simcha', name: 'Standard (Free)', duration_days: 30, price_cents: 0, sort_order: 1 },
     ];
     const txn = db.transaction((rows) => rows.forEach((r) => insert.run(r)));
     txn([...generic, ...freeTiers]);

@@ -147,6 +147,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
     if (!taxonomy) return res.status(400).json({ error: 'Validation failed', details: ['a valid simcha category is required'] });
     payload.title = taxonomy.name;
     const charges = buildSimchaCharges();
+    applyPromoToCharges(charges, req.body.promoCode);
     const post = insertPost({ type: 'simcha', category: 'simcha', payload, hasImages: false });
     attachSimchaSurprises(post.id, payload.surpriseEmails, `${payload.posterFirstName || ''} ${payload.posterLastName || ''}`.trim());
     const payment = recordPayment({
@@ -301,6 +302,21 @@ router.post('/:publicId/report', async (req, res, next) => {
   }
 });
 
+// Logs individual, timestamped analytics_events rows (in addition to the
+// simple running counters on posts.view_count/click_count below) so the
+// admin analytics dashboard can report per-post traffic over any date
+// range, not just lifetime totals - and roll it up by type/category.
+function logPostEvents(type, ids, visitorId) {
+  if (!visitorId || !ids.length) return;
+  const placeholders = ids.map(() => '?').join(',');
+  const posts = db.prepare(`SELECT id, type, category FROM posts WHERE public_id IN (${placeholders})`).all(...ids);
+  if (!posts.length) return;
+  const now = Date.now();
+  const stmt = db.prepare('INSERT INTO analytics_events (type, post_id, post_type, category, visitor_id, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+  const txn = db.transaction((rows) => rows.forEach((p) => stmt.run(type, p.id, p.type, p.category, visitorId, now)));
+  txn(posts);
+}
+
 // Views are counted as impressions (shown in a carousel/list/detail page),
 // not gated behind clicking through to the detail page.
 router.post('/impressions', (req, res, next) => {
@@ -309,6 +325,7 @@ router.post('/impressions', (req, res, next) => {
     if (!ids.length) return res.json({ ok: true });
     const placeholders = ids.map(() => '?').join(',');
     db.prepare(`UPDATE posts SET view_count = view_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
+    logPostEvents('post_view', ids, req.body.visitorId);
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -323,6 +340,7 @@ router.post('/clicks', (req, res, next) => {
     if (!ids.length) return res.json({ ok: true });
     const placeholders = ids.map(() => '?').join(',');
     db.prepare(`UPDATE posts SET click_count = click_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
+    logPostEvents('post_click', ids, req.body.visitorId);
     res.json({ ok: true });
   } catch (e) {
     next(e);

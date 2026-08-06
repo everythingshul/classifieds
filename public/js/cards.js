@@ -16,7 +16,8 @@ function cardMetaLine(post) {
   const f = post.fields || {};
   const parts = [];
   if (f.jobType) parts.push(String(f.jobType).replace('_', ' '));
-  if (f.payAmount) parts.push(`${formatMoney(f.payAmount * 100, f.payCurrency)}/${f.payPeriod}`);
+  if (f.payAmount !== undefined && f.payAmount !== null) parts.push(`${formatMoney(f.payAmount * 100, f.payCurrency)}/${f.payPeriod}`);
+  else if (f.payAmountText) parts.push(f.payAmountText);
   if (f.lostOrFound) parts.push(f.lostOrFound.toUpperCase());
   if (f.experience) parts.push(f.experience);
   if (post.location?.text) parts.push(post.location.text);
@@ -24,7 +25,7 @@ function cardMetaLine(post) {
 }
 
 function postCardHtml(post) {
-  const priceField = post.fields && (post.fields.price !== undefined ? post.fields.price : null);
+  const priceDisplay = formatPriceField(post.fields?.price, post.fields?.priceText, post.fields?.currency);
   const meta = cardMetaLine(post);
   return `
     <a class="card ${post.isFeatured ? 'featured' : ''}" href="${postUrl(post)}">
@@ -36,7 +37,7 @@ function postCardHtml(post) {
         <span class="title">${escapeHtml(post.title)}</span>
         ${post.description ? `<p class="card-desc">${escapeHtml(post.description)}</p>` : ''}
         ${meta ? `<span class="meta">${escapeHtml(meta)}</span>` : ''}
-        ${priceField !== null && priceField !== undefined ? `<span class="price">${formatMoney(priceField * 100, post.fields.currency)}</span>` : ''}
+        ${priceDisplay ? `<span class="price">${escapeHtml(priceDisplay)}</span>` : ''}
       </div>
     </a>`;
 }

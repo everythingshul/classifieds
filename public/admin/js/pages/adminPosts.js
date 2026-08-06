@@ -54,8 +54,60 @@ async function renderPostsPage(query) {
   }
 }
 
+// Category-specific fields (price, job type, pay amount, etc.) aren't plain
+// post columns - they live in the fields JSON blob and vary by category, so
+// the editor builds the same inputs the posting wizard/admin create-post
+// screen use, pre-filled with the post's current values.
+function fieldsEditorHtml(p, cfg) {
+  if (p.type === 'simcha') return '';
+  const f = p.fields || {};
+  const currencies = cfg.currencies || [{ code: 'USD' }];
+  const currencyOptions = (selected) => currencies.map((c) => `<option value="${c.code}" ${c.code === selected ? 'selected' : ''}>${escapeHtml(c.code)}</option>`).join('');
+  const priceValue = f.price !== undefined && f.price !== null ? f.price : (f.priceText || '');
+  const priceFieldHtml = () => `<div class="form-row"><label>Price <span class="hint">(amount, text, or blank)</span></label><div style="display:flex;gap:6px"><input type="text" name="f_price" value="${escapeHtml(String(priceValue))}" style="flex:1"><select name="f_currency" style="width:90px">${currencyOptions(f.currency)}</select></div></div>`;
+
+  const catList = p.type === 'listing' ? cfg.listingCategories : cfg.categories;
+  const catDef = catList.find((c) => c.key === p.category);
+
+  if (p.type === 'classified' && p.category === 'job-offers') {
+    const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
+    const payValue = f.payAmount !== undefined && f.payAmount !== null ? f.payAmount : (f.payAmountText || '');
+    return `
+      <h4 style="margin-bottom:6px">Category Details</h4>
+      <div class="form-cols">
+        <div class="form-row"><label>Job Type</label><select name="f_jobType">${(cfg.jobTypes || []).map((t) => `<option value="${t}" ${t === f.jobType ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Job Category</label><select name="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}" ${String(t.id) === String(p.taxonomyId) ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select></div>
+      </div>
+      <div class="form-cols">
+        <div class="form-row"><label>Pay Amount <span class="hint">(amount, text, or blank)</span></label><div style="display:flex;gap:6px"><input type="text" name="f_payAmount" value="${escapeHtml(String(payValue))}" style="flex:1"><select name="f_payCurrency" style="width:90px">${currencyOptions(f.payCurrency)}</select></div></div>
+        <div class="form-row"><label>Per</label><select name="f_payPeriod">${(cfg.payPeriods || []).map((per) => `<option value="${per}" ${per === f.payPeriod ? 'selected' : ''}>${per}</option>`).join('')}</select></div>
+      </div>`;
+  }
+  if (p.type === 'classified' && p.category === 'seeking-a-job') {
+    const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
+    return `
+      <h4 style="margin-bottom:6px">Category Details</h4>
+      <div class="form-row"><label>Job Category</label><select name="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}" ${String(t.id) === String(p.taxonomyId) ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Experience</label><textarea name="f_experience" rows="2">${escapeHtml(f.experience || '')}</textarea></div>`;
+  }
+  if (p.type === 'classified' && p.category === 'lost-found') {
+    return `
+      <h4 style="margin-bottom:6px">Category Details</h4>
+      <div class="form-row"><label>Lost or Found</label><select name="f_lostOrFound"><option value="lost" ${f.lostOrFound === 'lost' ? 'selected' : ''}>Lost</option><option value="found" ${f.lostOrFound === 'found' ? 'selected' : ''}>Found</option></select></div>`;
+  }
+  if (p.type === 'classified' && p.category === 'real-estate') {
+    const reTax = cfg.taxonomies.filter((t) => t.grp === 'real_estate');
+    return `
+      <h4 style="margin-bottom:6px">Category Details</h4>
+      <div class="form-row"><label>Real Estate Category</label><select name="f_taxonomyId"><option value="">—</option>${reTax.map((t) => `<option value="${t.id}" ${String(t.id) === String(p.taxonomyId) ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select></div>
+      ${priceFieldHtml()}`;
+  }
+  if (catDef?.hasPrice) return `<h4 style="margin-bottom:6px">${p.type === 'listing' ? 'Listing' : 'Category'} Details</h4>${priceFieldHtml()}`;
+  return '';
+}
+
 async function openEditor(id) {
-  const p = await AdminApi.post(id);
+  const [p, cfg] = await Promise.all([AdminApi.post(id), fetch('/api/config').then((r) => r.json())]);
   const panel = document.getElementById('editorPanel');
   panel.innerHTML = `
     <div class="admin-card">
@@ -73,6 +125,7 @@ async function openEditor(id) {
           <div class="form-row"><label>Location</label><input name="locationText" value="${escapeHtml(p.location.text || '')}"></div>
           <div class="form-row"><label>Featured/Striking</label><select name="isFeaturedStrike"><option value="0" ${!p.isFeaturedStrike ? 'selected' : ''}>No</option><option value="1" ${p.isFeaturedStrike ? 'selected' : ''}>Yes</option></select></div>
         </div>
+        ${fieldsEditorHtml(p, cfg)}
         <div class="form-cols">
           <div class="form-row"><label>Contact Phone</label><input name="contactPhone" value="${escapeHtml(p.contact.phone || '')}"></div>
           <div class="form-row"><label>Contact Email</label><input name="contactEmail" value="${escapeHtml(p.contact.email || '')}"></div>
@@ -107,17 +160,57 @@ async function openEditor(id) {
         ${p.images.length >= 6 ? '<span class="hint">Max 6 images reached - remove one to add more.</span>' : ''}
       </form>
 
-      ${p.payments?.length ? `<h4>Payment History</h4><table class="admin-table"><thead><tr><th>Kind</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>${p.payments.map((pay) => `<tr><td>${pay.kind}</td><td>${formatCents(pay.amount_cents)}</td><td>${pay.status}</td><td>${formatDate(pay.created_at)}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${p.payments?.length ? `<h4>Payment History</h4><table class="admin-table"><thead><tr><th>Kind</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>${p.payments.map((pay) => {
+        const remaining = pay.amount_cents - (pay.refunded_cents || 0);
+        const refundLabel = pay.refunded_cents > 0 ? (remaining <= 0 ? `Refunded ${formatCents(pay.refunded_cents)}` : `Partially refunded ${formatCents(pay.refunded_cents)}`) : '';
+        const canRefund = pay.status === 'paid' && pay.stripe_payment_intent && remaining > 0;
+        return `<tr>
+          <td>${pay.kind}</td>
+          <td>${formatCents(pay.amount_cents)}${refundLabel ? `<br><span class="hint">${refundLabel}</span>` : ''}</td>
+          <td>${pay.status}</td>
+          <td>${formatDate(pay.created_at)}</td>
+          <td>${canRefund ? `<button type="button" class="btn btn-sm btn-danger refund-btn" data-payment-id="${pay.id}" data-remaining="${remaining}">Refund</button>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody></table>` : ''}
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}
     </div>
   `;
 
   document.getElementById('editForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const body = Object.fromEntries(fd.entries());
-    body.isFeaturedStrike = body.isFeaturedStrike === '1';
-    body.contactUrlApproved = body.contactUrlApproved === '1';
+    const raw = Object.fromEntries(new FormData(e.target).entries());
+    const body = {
+      title: raw.title, status: raw.status, description: raw.description,
+      locationText: raw.locationText, isFeaturedStrike: raw.isFeaturedStrike === '1',
+      contactPhone: raw.contactPhone, contactEmail: raw.contactEmail,
+      contactUrl: raw.contactUrl, contactUrlApproved: raw.contactUrlApproved === '1',
+      adminNotes: raw.adminNotes,
+    };
+    if ('f_taxonomyId' in raw) body.taxonomyId = raw.f_taxonomyId ? Number(raw.f_taxonomyId) : null;
+
+    // Category-specific fields live in the fields JSON blob, not as top-level
+    // post columns - merge any edited ones over the post's existing fields
+    // rather than replacing the whole object, so untouched fields survive.
+    const fields = { ...p.fields };
+    if ('f_jobType' in raw) fields.jobType = raw.f_jobType;
+    if ('f_lostOrFound' in raw) fields.lostOrFound = raw.f_lostOrFound;
+    if ('f_experience' in raw) fields.experience = raw.f_experience;
+    if ('f_price' in raw) {
+      const parsed = parseAmountOrText(raw.f_price);
+      fields.price = parsed.amount;
+      fields.priceText = parsed.text;
+      if (parsed.amount !== null) fields.currency = raw.f_currency;
+      else delete fields.currency;
+    }
+    if ('f_payAmount' in raw) {
+      const parsed = parseAmountOrText(raw.f_payAmount);
+      fields.payAmount = parsed.amount;
+      fields.payAmountText = parsed.text;
+      if (parsed.amount !== null) { fields.payCurrency = raw.f_payCurrency; fields.payPeriod = raw.f_payPeriod; }
+      else { delete fields.payCurrency; delete fields.payPeriod; }
+    }
+    body.fields = fields;
+
     await AdminApi.updatePost(id, body);
     toast('Saved');
     openEditor(id);
@@ -168,5 +261,24 @@ async function openEditor(id) {
       btn.disabled = false;
       btn.textContent = 'Upload';
     }
+  });
+
+  document.querySelectorAll('.refund-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const remaining = Number(btn.dataset.remaining);
+      const input = prompt(`Refund amount in dollars (up to ${formatCents(remaining)}). Leave as-is for a full refund of the remaining amount.`, (remaining / 100).toFixed(2));
+      if (input === null) return;
+      const amountCents = input.trim() === '' ? remaining : Math.round(Number(input) * 100);
+      if (!Number.isFinite(amountCents) || amountCents <= 0) return toast('Enter a valid refund amount');
+      if (amountCents > remaining) return toast(`Cannot refund more than ${formatCents(remaining)}`);
+      if (!confirm(`Refund ${formatCents(amountCents)}? This cannot be undone.`)) return;
+      try {
+        await AdminApi.refundPayment(id, btn.dataset.paymentId, amountCents);
+        toast('Refunded');
+        openEditor(id);
+      } catch (err) {
+        toast(err.message);
+      }
+    });
   });
 }

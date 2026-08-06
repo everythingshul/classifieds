@@ -7,6 +7,7 @@ async function renderPricingPage() {
   const listingCategoryKeys = (cfg.listingCategories || []).map((c) => c.key);
   const classifiedTiers = tiers.filter((t) => (t.post_type || 'classified') === 'classified');
   const listingTiers = tiers.filter((t) => t.post_type === 'listing');
+  const simchaTiers = tiers.filter((t) => t.post_type === 'simcha');
 
   function tierTableRows(list) {
     return list.map((t) => `
@@ -31,7 +32,7 @@ async function renderPricingPage() {
         <tbody>${tierTableRows(classifiedTiers)}</tbody>
       </table>
       <form id="addTierForm" data-post-type="classified" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
-        <div class="field"><label>Category</label><select name="category"><option value="">All categories</option>${categoryKeys.map((k) => `<option value="${k}">${k}</option>`).join('')}<option value="simcha">simcha</option></select></div>
+        <div class="field"><label>Category</label><select name="category"><option value="">All categories</option>${categoryKeys.map((k) => `<option value="${k}">${k}</option>`).join('')}</select></div>
         <div class="field"><label>Name</label><input name="name" required></div>
         <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
         <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
@@ -47,6 +48,20 @@ async function renderPricingPage() {
       </table>
       <form id="addListingTierForm" data-post-type="listing" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
         <div class="field"><label>Category</label><select name="category"><option value="">All categories</option>${listingCategoryKeys.map((k) => `<option value="${k}">${k}</option>`).join('')}</select></div>
+        <div class="field"><label>Name</label><input name="name" required></div>
+        <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
+        <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
+        <button class="btn btn-sm" type="submit">Add Tier</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top:0">Simcha Pricing <span class="hint">(separate from Classifieds/Listings)</span></h3>
+      <table class="admin-table">
+        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price</th><th>Active</th><th></th></tr></thead>
+        <tbody>${tierTableRows(simchaTiers)}</tbody>
+      </table>
+      <form id="addSimchaTierForm" data-post-type="simcha" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
         <div class="field"><label>Name</label><input name="name" required></div>
         <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
         <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
@@ -144,7 +159,7 @@ async function renderPricingPage() {
     });
   });
 
-  ['addTierForm', 'addListingTierForm'].forEach((formId) => {
+  ['addTierForm', 'addListingTierForm', 'addSimchaTierForm'].forEach((formId) => {
     document.getElementById(formId).addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);

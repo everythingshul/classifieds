@@ -13,15 +13,19 @@ router.get('/tiers', (req, res) => {
 
 router.post('/tiers', (req, res) => {
   const { category, name, durationDays, priceCents, sortOrder, postType } = req.body;
-  const type = postType === 'listing' ? 'listing' : 'classified';
-  if (category && category !== 'simcha') {
+  const type = postType === 'listing' ? 'listing' : postType === 'simcha' ? 'simcha' : 'classified';
+  // Simcha has exactly one implicit category (there's no separate simcha
+  // sub-category concept), so it's always forced to 'simcha' server-side
+  // regardless of what's sent - it's the only category that type ever uses.
+  const resolvedCategory = type === 'simcha' ? 'simcha' : category;
+  if (type !== 'simcha' && resolvedCategory && resolvedCategory !== 'simcha') {
     const validKeys = type === 'listing' ? getListingCategoryKeys() : getClassifiedCategoryKeys();
-    if (!validKeys.includes(category)) return res.status(400).json({ error: 'Invalid category' });
+    if (!validKeys.includes(resolvedCategory)) return res.status(400).json({ error: 'Invalid category' });
   }
   if (!name || !durationDays) return res.status(400).json({ error: 'name and durationDays are required' });
   const info = db
     .prepare('INSERT INTO pricing_tiers (category, post_type, name, duration_days, price_cents, sort_order, active) VALUES (?, ?, ?, ?, ?, ?, 1)')
-    .run(category || null, type, name, Number(durationDays), Number(priceCents) || 0, Number(sortOrder) || 0);
+    .run(resolvedCategory || null, type, name, Number(durationDays), Number(priceCents) || 0, Number(sortOrder) || 0);
   res.status(201).json(db.prepare('SELECT * FROM pricing_tiers WHERE id = ?').get(info.lastInsertRowid));
 });
 
