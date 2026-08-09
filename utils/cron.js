@@ -11,6 +11,17 @@ function expireStalePosts() {
   if (info.changes > 0) console.log(`[cron] expired ${info.changes} post(s)`);
 }
 
+// Admin-scheduled posts (currently only offered for Listings) go live on
+// their own once their scheduled_at time arrives - expires_at was already
+// computed off scheduledAt at creation time, so nothing else needs updating.
+function publishScheduledPosts() {
+  const now = Date.now();
+  const info = db
+    .prepare("UPDATE posts SET status = 'live', published_at = ?, boosted_at = ?, updated_at = ? WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?")
+    .run(now, now, now, now);
+  if (info.changes > 0) console.log(`[cron] published ${info.changes} scheduled post(s)`);
+}
+
 // Checkouts that were started but never completed are noise, not real posts -
 // they're already hidden from admin views, and get deleted outright once old
 // enough that the poster clearly isn't coming back to finish paying.
@@ -23,8 +34,10 @@ function deleteAbandonedCheckouts() {
 function start() {
   expireStalePosts();
   deleteAbandonedCheckouts();
+  publishScheduledPosts();
   cron.schedule('*/15 * * * *', expireStalePosts);
   cron.schedule('0 * * * *', deleteAbandonedCheckouts);
+  cron.schedule('*/5 * * * *', publishScheduledPosts);
 }
 
-module.exports = { start, expireStalePosts, deleteAbandonedCheckouts };
+module.exports = { start, expireStalePosts, deleteAbandonedCheckouts, publishScheduledPosts };

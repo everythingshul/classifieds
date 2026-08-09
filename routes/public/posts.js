@@ -5,7 +5,7 @@ const { validateClassifiedPayload, validateSimchaPayload, validateListingPayload
 const { buildClassifiedCharges, buildListingCharges, buildSimchaCharges, getAddon, getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits } = require('../../services/pricing');
 const { findCategory } = require('../../services/categories');
 const { findListingCategory } = require('../../services/listingCategories');
-const { getActivePromo, applyDiscount, recordUse, promoAppliesTo } = require('../../services/promoCodes');
+const { getActivePromo, applyDiscount, recordUse, promoAppliesTo, promoAppliesToFeature } = require('../../services/promoCodes');
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive, fulfillCheckoutSession } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
 const { createCheckoutSession } = require('../../services/checkout');
@@ -27,9 +27,11 @@ function postUrlPath(post) {
 
 const SECTION_LABELS = { classified: 'classifieds', listing: 'listings', simcha: 'simchas' };
 
-// Mutates `charges` in place: collapses its line items into a single
-// discounted "listing" line so Stripe (and the invoice) show one clean total
-// rather than a per-line discount, and records the promo's use.
+// Mutates `charges` in place: discounts only the line items the promo is
+// scoped to (via included/excluded features - e.g. a promo can cover the
+// base listing but exclude "oversized"), collapsing that eligible subset
+// into one discounted line so Stripe (and the invoice) show a clean total,
+// while any ineligible line items pass through at full price untouched.
 function applyPromoToCharges(charges, code, postType) {
   if (!code) return null;
   const promo = getActivePromo(code);
@@ -37,9 +39,17 @@ function applyPromoToCharges(charges, code, postType) {
   if (!promoAppliesTo(promo, postType)) {
     throw Object.assign(new Error(`That promo code isn't valid for ${SECTION_LABELS[postType] || postType}`), { status: 400 });
   }
-  const discounted = applyDiscount(charges.totalCents, promo);
-  charges.lineItems = [{ kind: 'listing', label: `Listing (promo ${promo.code} applied)`, amount_cents: discounted }];
-  charges.totalCents = discounted;
+  const eligible = charges.lineItems.filter((li) => promoAppliesToFeature(promo, li.kind));
+  const ineligible = charges.lineItems.filter((li) => !promoAppliesToFeature(promo, li.kind));
+  if (!eligible.length) {
+    throw Object.assign(new Error(`That promo code doesn't apply to any of the selected options`), { status: 400 });
+  }
+  const eligibleSubtotal = eligible.reduce((s, li) => s + li.amount_cents, 0);
+  const discountedEligible = applyDiscount(eligibleSubtotal, promo);
+  const eligibleLabel = eligible.map((li) => li.label).join(' + ');
+
+  charges.lineItems = [...ineligible, { kind: eligible[0].kind, label: `${eligibleLabel} (promo ${promo.code} applied)`, amount_cents: discountedEligible }];
+  charges.totalCents = discountedEligible + ineligible.reduce((s, li) => s + li.amount_cents, 0);
   charges.promo = promo;
   return promo;
 }
@@ -63,7 +73,22 @@ router.post('/promo/validate', (req, res) => {
   if (!promoAppliesTo(promo, req.body.postType)) {
     return res.status(400).json({ error: `That promo code isn't valid for ${SECTION_LABELS[req.body.postType] || req.body.postType}` });
   }
-  res.json({ code: promo.code, percentOff: promo.percent_off, amountOffCents: promo.amount_off_cents });
+  const parseFeatureList = (json) => {
+    if (!json) return null;
+    try {
+      const arr = JSON.parse(json);
+      return Array.isArray(arr) && arr.length ? arr : null;
+    } catch (e) {
+      return null;
+    }
+  };
+  res.json({
+    code: promo.code,
+    percentOff: promo.percent_off,
+    amountOffCents: promo.amount_off_cents,
+    includedFeatures: parseFeatureList(promo.included_features),
+    excludedFeatures: parseFeatureList(promo.excluded_features),
+  });
 });
 
 router.post('/', upload.array('images', 6), async (req, res, next) => {

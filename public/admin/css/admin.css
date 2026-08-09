@@ -25,6 +25,7 @@ table.admin-table tr:last-child td { border-bottom: none; }
 .status-live { background: #e3f3e9; color: var(--success); }
 .status-pending_approval { background: #fdf2dd; color: #9a6b13; }
 .status-pending_payment { background: #eee; color: #666; }
+.status-scheduled { background: #e6eef7; color: #2f6fa1; }
 .status-rejected, .status-removed { background: #fbe4e4; color: var(--danger); }
 .status-expired { background: #eee; color: #888; }
 

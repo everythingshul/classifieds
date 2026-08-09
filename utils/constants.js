@@ -16,7 +16,7 @@ const CLASSIFIED_CATEGORY_KEYS = CLASSIFIED_CATEGORIES.map((c) => c.key);
 
 const LOST_FOUND_OPTIONS = ['lost', 'found'];
 
-const POST_STATUSES = ['pending_payment', 'pending_approval', 'live', 'rejected', 'expired', 'removed'];
+const POST_STATUSES = ['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'];
 
 const DEFAULT_CHAR_LIMITS = {
   title: 80,

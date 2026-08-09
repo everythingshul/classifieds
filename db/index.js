@@ -27,6 +27,9 @@ addColumnIfMissing('contact_messages', 'reply_text', 'reply_text TEXT');
 addColumnIfMissing('contact_messages', 'replied_at', 'replied_at INTEGER');
 addColumnIfMissing('post_payments', 'refunded_cents', 'refunded_cents INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('promo_codes', 'applies_to', 'applies_to TEXT');
+addColumnIfMissing('promo_codes', 'included_features', 'included_features TEXT');
+addColumnIfMissing('promo_codes', 'excluded_features', 'excluded_features TEXT');
+addColumnIfMissing('posts', 'scheduled_at', 'scheduled_at INTEGER');
 
 // Simcha pricing tiers used to be stored with post_type defaulting to
 // 'classified' (only distinguished by category = 'simcha'), which mixed

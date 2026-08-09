@@ -10,7 +10,7 @@ async function renderPostsPage(query) {
     <form class="filters-bar" id="filterForm">
       <div class="field"><label>Search</label><input type="text" name="q" value="${escapeHtml(filters.q)}" placeholder="title, email, phone, name…"></div>
       <div class="field"><label>Status</label>
-        <select name="status"><option value="">Any</option>${['pending_payment', 'pending_approval', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${filters.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <select name="status"><option value="">Any</option>${['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${filters.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Type</label><select name="type"><option value="">Any</option><option value="classified" ${filters.type === 'classified' ? 'selected' : ''}>Classified</option><option value="listing" ${filters.type === 'listing' ? 'selected' : ''}>Listing</option><option value="simcha" ${filters.type === 'simcha' ? 'selected' : ''}>Simcha</option></select></div>
       <button class="btn btn-sm" type="submit">Filter</button>
@@ -52,6 +52,12 @@ async function renderPostsPage(query) {
     const exact = data.posts.find((p) => p.publicId === query.q);
     if (exact) openEditor(exact.id);
   }
+}
+
+function toDatetimeLocalValue(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // Category-specific fields (price, job type, pay amount, etc.) aren't plain
@@ -117,9 +123,12 @@ async function openEditor(id) {
         <div class="form-cols">
           <div class="form-row"><label>Title</label><input name="title" value="${escapeHtml(p.title)}"></div>
           <div class="form-row"><label>Status</label>
-            <select name="status">${['pending_payment', 'pending_approval', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+            <select name="status">${['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
           </div>
         </div>
+        ${p.type === 'listing' || p.status === 'scheduled' ? `
+          <div class="form-row"><label>Scheduled for <span class="hint">(when status is "scheduled" - the site auto-publishes at this time)</span></label><input type="datetime-local" name="scheduledAt" value="${p.scheduledAt ? toDatetimeLocalValue(p.scheduledAt) : ''}"></div>
+        ` : ''}
         <div class="form-row"><label>Description</label><textarea name="description" rows="4">${escapeHtml(p.description || '')}</textarea></div>
         <div class="form-cols">
           <div class="form-row"><label>Location</label><input name="locationText" value="${escapeHtml(p.location.text || '')}"></div>
@@ -186,6 +195,7 @@ async function openEditor(id) {
       contactUrl: raw.contactUrl, contactUrlApproved: raw.contactUrlApproved === '1',
       adminNotes: raw.adminNotes,
     };
+    if ('scheduledAt' in raw) body.scheduledAt = raw.scheduledAt ? new Date(raw.scheduledAt).getTime() : null;
     if ('f_taxonomyId' in raw) body.taxonomyId = raw.f_taxonomyId ? Number(raw.f_taxonomyId) : null;
 
     // Category-specific fields live in the fields JSON blob, not as top-level

@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   expires_at INTEGER,
   active INTEGER NOT NULL DEFAULT 1,
   applies_to TEXT, -- JSON array of post types ['classified','listing','simcha'] - NULL/empty = all sections
+  included_features TEXT, -- JSON array of line-item kinds ['listing','strike','oversized'] this promo discounts - NULL/empty = all
+  excluded_features TEXT, -- JSON array of line-item kinds this promo never discounts, even if included above - NULL/empty = none
   created_at INTEGER NOT NULL
 );
 
@@ -123,12 +125,13 @@ CREATE TABLE IF NOT EXISTS posts (
   is_featured_strike INTEGER NOT NULL DEFAULT 0,
   is_oversized INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending_payment',
-  -- pending_payment | pending_approval | live | rejected | expired | removed
+  -- pending_payment | pending_approval | scheduled | live | rejected | expired | removed
   has_images INTEGER NOT NULL DEFAULT 0,
   view_count INTEGER NOT NULL DEFAULT 0,
   click_count INTEGER NOT NULL DEFAULT 0,
   boosted_at INTEGER,
   published_at INTEGER,
+  scheduled_at INTEGER, -- admin-only: when a 'scheduled' post should go live (cron flips it to 'live' at this time)
   expires_at INTEGER,
   saved_forever INTEGER NOT NULL DEFAULT 0,
   stripe_session_id TEXT,

@@ -20,6 +20,25 @@ function promoAppliesTo(promo, postType) {
   return scopes.includes(postType);
 }
 
+// Whether a promo code discounts a given line-item kind ('listing' | 'strike'
+// | 'oversized') - included_features NULL/empty means "every feature" is
+// eligible; excluded_features (checked after) always wins even over an
+// explicit inclusion, so admins can e.g. include everything but carve out
+// oversized specifically.
+function promoAppliesToFeature(promo, kind) {
+  if (promo.included_features) {
+    let included;
+    try { included = JSON.parse(promo.included_features); } catch (e) { included = null; }
+    if (Array.isArray(included) && included.length && !included.includes(kind)) return false;
+  }
+  if (promo.excluded_features) {
+    let excluded;
+    try { excluded = JSON.parse(promo.excluded_features); } catch (e) { excluded = null; }
+    if (Array.isArray(excluded) && excluded.includes(kind)) return false;
+  }
+  return true;
+}
+
 function applyDiscount(totalCents, promo) {
   if (!promo) return totalCents;
   if (promo.percent_off) return Math.max(0, Math.round(totalCents * (1 - promo.percent_off / 100)));
@@ -32,4 +51,4 @@ function recordUse(promo) {
   db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?').run(promo.id);
 }
 
-module.exports = { getActivePromo, applyDiscount, recordUse, promoAppliesTo };
+module.exports = { getActivePromo, applyDiscount, recordUse, promoAppliesTo, promoAppliesToFeature };

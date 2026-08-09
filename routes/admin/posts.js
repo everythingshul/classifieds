@@ -108,10 +108,23 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
 
     const durationDays = Number(req.body.durationDays) || 30;
     const now = Date.now();
-    const expiresAt = now + durationDays * DAY_MS;
-    db.prepare('UPDATE posts SET status = ?, published_at = ?, expires_at = ?, boosted_at = ?, updated_at = ? WHERE id = ?').run(
-      'live', now, expiresAt, now, now, post.id
-    );
+    // Scheduling a future go-live is admin-only (never exposed to the public
+    // wizard) and currently only offered in the UI for the Listing post type.
+    // expires_at is computed off scheduledAt (not "now") so it reflects the
+    // actual go-live time regardless of how long the post sits scheduled -
+    // the publish cron just flips status/published_at and leaves it as-is.
+    const scheduledAt = req.body.scheduledAt ? Number(req.body.scheduledAt) : null;
+    if (scheduledAt && scheduledAt > now) {
+      const expiresAt = scheduledAt + durationDays * DAY_MS;
+      db.prepare('UPDATE posts SET status = ?, scheduled_at = ?, expires_at = ?, updated_at = ? WHERE id = ?').run(
+        'scheduled', scheduledAt, expiresAt, now, post.id
+      );
+    } else {
+      const expiresAt = now + durationDays * DAY_MS;
+      db.prepare('UPDATE posts SET status = ?, published_at = ?, expires_at = ?, boosted_at = ?, updated_at = ? WHERE id = ?').run(
+        'live', now, expiresAt, now, now, post.id
+      );
+    }
     recordPayment({ postId: post.id, kind: 'listing', amountCents: 0, payerEmail: posterEmail, status: 'paid' });
 
     const finalPost = db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id);
@@ -180,7 +193,7 @@ router.put('/:id', (req, res) => {
       title = ?, description = ?, fields = ?,
       location_text = ?, location_city = ?, location_state = ?, location_lat = ?, location_lng = ?,
       contact_phone = ?, contact_phone_ext = ?, contact_email = ?, contact_url = ?, contact_url_approved = ?,
-      taxonomy_id = ?, status = ?, admin_notes = ?, is_featured_strike = ?, updated_at = ?
+      taxonomy_id = ?, status = ?, admin_notes = ?, is_featured_strike = ?, scheduled_at = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     b.title ?? post.title,
@@ -200,6 +213,7 @@ router.put('/:id', (req, res) => {
     b.status ?? post.status,
     b.adminNotes ?? post.admin_notes,
     b.isFeaturedStrike !== undefined ? (b.isFeaturedStrike ? 1 : 0) : post.is_featured_strike,
+    b.scheduledAt !== undefined ? (b.scheduledAt ? Number(b.scheduledAt) : null) : post.scheduled_at,
     Date.now(),
     req.params.id
   );

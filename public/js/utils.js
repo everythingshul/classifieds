@@ -40,6 +40,15 @@ function parseAmountOrText(raw) {
   return Number.isFinite(num) ? { amount: num, text: null } : { amount: null, text: str };
 }
 
+// Client-side mirror of the server's promoAppliesToFeature (services/promoCodes.js)
+// - promo.includedFeatures/excludedFeatures come back from /api/posts/promo/validate
+// already parsed into arrays (or null), matching this shape.
+function promoCoversFeature(promo, kind) {
+  if (promo.includedFeatures && promo.includedFeatures.length && !promo.includedFeatures.includes(kind)) return false;
+  if (promo.excludedFeatures && promo.excludedFeatures.includes(kind)) return false;
+  return true;
+}
+
 function formatDate(ms) {
   if (!ms) return '';
   return new Date(ms).toLocaleDateString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });

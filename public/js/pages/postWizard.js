@@ -462,26 +462,45 @@ function renderPostWizard() {
       return rows;
     }
 
-    function pricingSummary() {
+    function currentChargeLines() {
       if (state.postType === 'simcha') {
         const simchaTier = cfg.pricingTiers.find((t) => t.post_type === 'simcha' && t.active);
         if (!simchaTier || simchaTier.price_cents === 0) return null;
-        return { lines: [{ label: simchaTier.name, amount: simchaTier.price_cents }], total: simchaTier.price_cents };
+        return [{ kind: 'listing', label: simchaTier.name, amount: simchaTier.price_cents }];
       }
-      if (currentCatDef()?.free) return { lines: [{ label: 'Standard (Free)', amount: 0 }], total: 0 };
+      if (currentCatDef()?.free) return [{ label: 'Standard (Free)', amount: 0 }];
       const tier = cfg.pricingTiers.find((t) => String(t.id) === String(state.data.pricingTierId));
       const lines = [];
-      if (tier) lines.push({ label: `${tier.name} listing`, amount: tier.price_cents });
-      if (state.data.wantsStrike && currentAddons()?.strike) lines.push({ label: currentAddons().strike.config.label || 'Featured / Striking listing', amount: currentAddons().strike.price_cents });
-      if (state.data.wantsOversized && currentAddons()?.oversized) lines.push({ label: currentAddons().oversized.config.label || 'Oversized post', amount: currentAddons().oversized.price_cents });
+      if (tier) lines.push({ kind: 'listing', label: `${tier.name} listing`, amount: tier.price_cents });
+      if (state.data.wantsStrike && currentAddons()?.strike) lines.push({ kind: 'strike', label: currentAddons().strike.config.label || 'Featured / Striking listing', amount: currentAddons().strike.price_cents });
+      if (state.data.wantsOversized && currentAddons()?.oversized) lines.push({ kind: 'oversized', label: currentAddons().oversized.config.label || 'Oversized post', amount: currentAddons().oversized.price_cents });
+      return lines;
+    }
+
+    function pricingSummary() {
+      const lines = currentChargeLines();
+      if (!lines) return null;
+      return applyPromoToLines(lines);
+    }
+
+    // Mirrors the server's per-feature promo scoping (routes/public/posts.js
+    // applyPromoToCharges) so the review-step total the poster sees always
+    // matches what they're actually charged at checkout, even when a promo
+    // is scoped to only some of their selected add-ons.
+    function applyPromoToLines(lines) {
       let total = lines.reduce((s, l) => s + l.amount, 0);
       const promo = state.data.promo;
       if (promo && total > 0) {
-        const discounted = promo.percentOff
-          ? Math.max(0, Math.round(total * (1 - promo.percentOff / 100)))
-          : Math.max(0, total - (promo.amountOffCents || 0));
-        lines.push({ label: `Promo (${promo.code})`, amount: discounted - total });
-        total = discounted;
+        const eligible = lines.filter((l) => promoCoversFeature(promo, l.kind));
+        const ineligible = lines.filter((l) => !promoCoversFeature(promo, l.kind));
+        if (eligible.length) {
+          const eligibleSubtotal = eligible.reduce((s, l) => s + l.amount, 0);
+          const discountedEligible = promo.percentOff
+            ? Math.max(0, Math.round(eligibleSubtotal * (1 - promo.percentOff / 100)))
+            : Math.max(0, eligibleSubtotal - (promo.amountOffCents || 0));
+          lines = [...lines, { label: `Promo (${promo.code})`, amount: discountedEligible - eligibleSubtotal }];
+          total = discountedEligible + ineligible.reduce((s, l) => s + l.amount, 0);
+        }
       }
       return { lines, total };
     }
@@ -544,6 +563,10 @@ function renderPostWizard() {
       applyPromoBtn.textContent = 'Checking…';
       try {
         const promo = await Api.validatePromo(code, state.postType);
+        const lines = currentChargeLines() || [];
+        if (lines.length && !lines.some((l) => promoCoversFeature(promo, l.kind))) {
+          throw new Error(`That promo code doesn't apply to any of your selected options`);
+        }
         state.data.promo = promo;
         renderReviewStep();
       } catch (e) {

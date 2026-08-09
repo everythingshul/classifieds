@@ -114,6 +114,7 @@ function formatPostAdmin(post, images = []) {
     clickCount: post.click_count,
     boostedAt: post.boosted_at,
     publishedAt: post.published_at,
+    scheduledAt: post.scheduled_at,
     expiresAt: post.expires_at,
     savedForever: !!post.saved_forever,
     adminNotes: post.admin_notes,

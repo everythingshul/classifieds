@@ -94,6 +94,9 @@ async function renderCreatePostPage() {
           <div class="form-row"><label>Live for (days)</label><input type="number" id="durationDays" value="30"></div>
           <div class="form-row"><label>Featured / Striking</label><select id="wantsStrike"><option value="">No</option><option value="1">Yes</option></select></div>
         </div>
+        ${type === 'listing' ? `
+          <div class="form-row"><label>Schedule for <span class="hint">(optional - leave blank to publish immediately)</span></label><input type="datetime-local" id="scheduledAt"></div>
+        ` : ''}
         <div id="createError" class="error-list" style="display:none"></div>
         <button class="btn btn-gold" id="submitBtn">Create &amp; Publish</button>
       </div>
@@ -125,6 +128,8 @@ async function renderCreatePostPage() {
       fd.set('posterEmail', document.getElementById('p_email').value.trim());
       fd.set('durationDays', document.getElementById('durationDays').value || '30');
       fd.set('wantsStrike', document.getElementById('wantsStrike').value);
+      const scheduledInput = document.getElementById('scheduledAt');
+      if (scheduledInput && scheduledInput.value) fd.set('scheduledAt', String(new Date(scheduledInput.value).getTime()));
 
       if (type === 'classified' || type === 'listing') {
         if (!category) throw new Error(`No ${type} categories exist yet - add one under Categories first.`);
@@ -156,7 +161,7 @@ async function renderCreatePostPage() {
       }
 
       const post = await AdminApi.createPost(fd);
-      toast('Post created and live');
+      toast(post.status === 'scheduled' ? 'Post created and scheduled' : 'Post created and live');
       window.location.hash = `#/posts?q=${post.publicId}`;
     } catch (e) {
       const box = document.getElementById('createError');
