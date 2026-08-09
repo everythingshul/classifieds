@@ -165,6 +165,11 @@ p { margin: 0 0 .7em; }
    sidebar instead of using the space. */
 .carousel { display: flex; flex-wrap: wrap; gap: 10px; }
 .carousel .card { flex: 1 1 210px; }
+/* Same 2-up minimum as .results-grid below - the 210px flex-basis above only
+   ever fits 1 per row at mobile widths, which is what the .results-grid fix
+   didn't cover since the homepage's "Recent X" sections use .carousel, not
+   .results-grid. */
+@media (max-width: 600px) { .carousel { gap: 7px; } .carousel .card { flex: 1 1 calc(50% - 4px); } }
 
 /* ---------- Cards ---------- */
 /* Square corners by design - no image, the card is a compact text summary;
