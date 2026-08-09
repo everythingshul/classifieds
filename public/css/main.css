@@ -66,7 +66,10 @@ p { margin: 0 0 .7em; }
    unrelated "Admin Portal" sidebar brand div in the admin portal, which
    doesn't use this file's grid/height rules and broke badly when it did. */
 .site-header .brand { display: flex; align-items: center; height: 100%; color: var(--navy); font-family: var(--font-head); font-size: 1.08rem; font-weight: 800; letter-spacing: -.01em; }
-.site-header .brand img { height: 48px; }
+/* width:auto (already the default, made explicit) keeps the logo's aspect
+   ratio intact - it only distorts if something else clamps the width down
+   independently of height, which is what the mobile fix below guards against. */
+.site-header .brand img { height: 48px; width: auto; }
 .main-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
 .main-nav a { color: var(--ink-soft); padding: 6px 10px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
 .main-nav a:hover, .main-nav a.active { background: rgba(31,59,87,.08); color: var(--navy); }
@@ -97,6 +100,26 @@ p { margin: 0 0 .7em; }
   .hamburger { display: flex; }
 }
 
+/* Wider-feeling header on mobile: less side padding gives the logo, search
+   and post button more room, and a smaller logo height keeps its
+   auto-computed width comfortably inside that room. flex-shrink:0 on .brand
+   is what actually guarantees no distortion - without it, a still-too-narrow
+   row would shrink the logo's box (and, since height stays fixed, squash it)
+   before it would ever shrink the search input, which is the one element
+   that's actually meant to give up space here. */
+@media (max-width: 600px) {
+  .container { padding: 0 10px; }
+  .site-header .container { height: 60px; gap: 8px; }
+  .site-header .brand { flex-shrink: 0; }
+  .site-header .brand img { height: 32px; }
+  .site-search input { min-width: 60px; }
+  .lang-toggle { padding: 5px 8px; }
+  .main-nav { top: 60px; }
+}
+@media (max-width: 380px) {
+  .lang-toggle { display: none; }
+}
+
 /* ---------- Buttons ---------- */
 .btn { display: inline-block; padding: 8px 16px; border-radius: var(--radius); border: 1px solid var(--navy); background: var(--navy); color: #fff; font-weight: 600; font-size: .86rem; }
 .btn:hover { background: var(--navy-dark); color: #fff; }
@@ -110,7 +133,10 @@ p { margin: 0 0 .7em; }
 
 /* ---------- Home page layout: main column + sidebar (zmanim/daf yomi/weather) ---------- */
 .home-grid { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
-@media (max-width: 860px) { .home-grid { grid-template-columns: 1fr; } .home-sidebar { order: -1; } }
+/* On mobile the sidebar (zmanim/daf yomi/weather) drops to the bottom, under
+   the listings - it's already the second child in markup, so a single-column
+   grid puts it there on its own; no order override needed (or wanted). */
+@media (max-width: 860px) { .home-grid { grid-template-columns: 1fr; } .home-sidebar { padding-top: 0; } }
 .home-sidebar { display: flex; flex-direction: column; gap: 14px; padding-top: 30px; }
 
 /* ---------- Combo widget (sidebar: date + daf yomi + zmanim, one compact card) ---------- */
@@ -158,6 +184,18 @@ p { margin: 0 0 .7em; }
 .card .meta { font-size: .76rem; color: var(--ink-soft); }
 .card .price { font-weight: 700; color: var(--success); font-size: .88rem; }
 .card.featured { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-light); }
+
+/* Smaller text + tighter padding/gap on the 2-up mobile grid gives each card
+   more usable width relative to its own chrome, instead of the type feeling
+   squeezed into the same spacing built for wide desktop columns. */
+@media (max-width: 600px) {
+  .results-grid { gap: 7px; }
+  .card .body { padding: 9px 10px; gap: 3px; }
+  .card .cat { font-size: .6rem; }
+  .card .title { font-size: .82rem; line-height: 1.25; }
+  .card .card-desc { font-size: .72rem; -webkit-line-clamp: 2; }
+  .card .meta, .card .price { font-size: .7rem; }
+}
 .badge-featured { color: var(--gold); font-size: .9rem; }
 
 /* ---------- List/grid pages ---------- */
@@ -176,6 +214,9 @@ p { margin: 0 0 .7em; }
 .field textarea { resize: vertical; }
 
 .results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+/* Below ~600px, minmax(200px,1fr) collapses to a single column - cards read
+   fine at half that width (small fonts, no image), so force 2 up instead. */
+@media (max-width: 600px) { .results-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
 .empty-state { text-align: center; padding: 44px 16px; color: var(--ink-soft); font-size: .9rem; }
 
 .pagination { display: flex; justify-content: center; gap: 5px; margin: 22px 0; flex-wrap: wrap; }

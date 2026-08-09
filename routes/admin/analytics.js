@@ -16,13 +16,28 @@ function computeTotals(from, to) {
     pageviews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'pageview' AND created_at BETWEEN ? AND ?").get(from, to).c,
     postViews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'post_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
     postClicks: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'post_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
+    // Unique = distinct visitors, alongside (not replacing) the raw counts
+    // above - a visitor who views/clicks 5 posts still only counts once here.
+    uniquePostViews: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'post_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
+    uniquePostClicks: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'post_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
     uniqueVisitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE created_at BETWEEN ? AND ?').get(from, to).c,
+    // A visitor counts as recurring the moment they've been seen more than
+    // once - either multiple events within this window (they came back,
+    // even the same day/session), or they have history from before this
+    // window started. The old "2+ distinct calendar days within the window"
+    // definition meant a same-day repeat visit (or the "Today" range at all)
+    // could never show any recurring visitors.
     recurringVisitors: db.prepare(`
       SELECT COUNT(*) AS c FROM (
-        SELECT visitor_id FROM analytics_events WHERE created_at BETWEEN ? AND ?
-        GROUP BY visitor_id HAVING COUNT(DISTINCT ${DAY_EXPR}) > 1
-      )
-    `).get(from, to).c,
+        SELECT ae.visitor_id,
+          COUNT(*) AS cnt,
+          MAX(CASE WHEN EXISTS (SELECT 1 FROM analytics_events e2 WHERE e2.visitor_id = ae.visitor_id AND e2.created_at < ?) THEN 1 ELSE 0 END) AS had_prior
+        FROM analytics_events ae
+        WHERE ae.created_at BETWEEN ? AND ?
+        GROUP BY ae.visitor_id
+      ) t
+      WHERE cnt > 1 OR had_prior = 1
+    `).get(from, from, to).c,
   };
 }
 
@@ -85,7 +100,9 @@ router.get('/', (req, res) => {
   const topPosts = db.prepare(`
     SELECT p.id, p.public_id AS publicId, p.title, p.type, p.category,
       SUM(CASE WHEN e.type = 'post_view' THEN 1 ELSE 0 END) AS views,
-      SUM(CASE WHEN e.type = 'post_click' THEN 1 ELSE 0 END) AS clicks
+      SUM(CASE WHEN e.type = 'post_click' THEN 1 ELSE 0 END) AS clicks,
+      COUNT(DISTINCT CASE WHEN e.type = 'post_view' THEN e.visitor_id END) AS uniqueViews,
+      COUNT(DISTINCT CASE WHEN e.type = 'post_click' THEN e.visitor_id END) AS uniqueClicks
     FROM analytics_events e
     JOIN posts p ON p.id = e.post_id
     WHERE e.type IN ('post_view', 'post_click') AND e.created_at BETWEEN ? AND ?

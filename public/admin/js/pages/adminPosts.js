@@ -115,21 +115,26 @@ function fieldsEditorHtml(p, cfg) {
 async function openEditor(id) {
   const [p, cfg] = await Promise.all([AdminApi.post(id), fetch('/api/config').then((r) => r.json())]);
   const panel = document.getElementById('editorPanel');
+  const baseLimits = p.type === 'listing' ? cfg.listingCharLimits : p.type === 'simcha' ? cfg.simchaCharLimits : cfg.charLimits;
+  const limits = p.isOversized ? cfg.oversizedCharLimits : baseLimits;
+  const titleLimit = p.type !== 'simcha' ? limits.title : null;
   panel.innerHTML = `
     <div class="admin-card">
       <h3 style="margin-top:0">Edit: ${escapeHtml(p.title)} <span class="status-pill status-${p.status}">${p.status}</span></h3>
-      <p class="hint">${p.viewCount} views · ${p.clickCount} clicks</p>
+      <p class="hint">${p.viewCount} views (${p.uniqueViewCount} unique) · ${p.clickCount} clicks (${p.uniqueClickCount} unique)</p>
       <form id="editForm">
         <div class="form-cols">
-          <div class="form-row"><label>Title</label><input name="title" value="${escapeHtml(p.title)}"></div>
+          <div class="form-row"><label>Title</label><input name="title" value="${escapeHtml(p.title)}" ${titleLimit ? `maxlength="${titleLimit}"` : ''}>${titleLimit ? `<div class="char-counter" id="titleCounter"></div>` : ''}</div>
           <div class="form-row"><label>Status</label>
             <select name="status">${['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
           </div>
         </div>
-        ${p.type === 'listing' || p.status === 'scheduled' ? `
-          <div class="form-row"><label>Scheduled for <span class="hint">(when status is "scheduled" - the site auto-publishes at this time)</span></label><input type="datetime-local" name="scheduledAt" value="${p.scheduledAt ? toDatetimeLocalValue(p.scheduledAt) : ''}"></div>
-        ` : ''}
-        <div class="form-row"><label>Description</label><textarea name="description" rows="4">${escapeHtml(p.description || '')}</textarea></div>
+        <div class="form-row"><label>Scheduled for <span class="hint">(when status is "scheduled" - the site auto-publishes at this time)</span></label><input type="datetime-local" name="scheduledAt" value="${p.scheduledAt ? toDatetimeLocalValue(p.scheduledAt) : ''}"></div>
+        <div class="form-row"><label>Description</label><textarea name="description" rows="4" maxlength="${limits.description}">${escapeHtml(p.description || '')}</textarea><div class="char-counter" id="descCounter"></div></div>
+        <label class="addon-row" style="margin:-4px 0 14px">
+          <input type="checkbox" id="charLimitOverride">
+          Override character limit <span class="hint">(ignore the normal title/description caps)</span>
+        </label>
         <div class="form-cols">
           <div class="form-row"><label>Location</label><input name="locationText" value="${escapeHtml(p.location.text || '')}"></div>
           <div class="form-row"><label>Featured/Striking</label><select name="isFeaturedStrike"><option value="0" ${!p.isFeaturedStrike ? 'selected' : ''}>No</option><option value="1" ${p.isFeaturedStrike ? 'selected' : ''}>Yes</option></select></div>
@@ -184,6 +189,24 @@ async function openEditor(id) {
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}
     </div>
   `;
+
+  const titleInput = panel.querySelector('input[name="title"]');
+  const descInput = panel.querySelector('textarea[name="description"]');
+  const overrideCheckbox = document.getElementById('charLimitOverride');
+  const NO_LIMIT = 100000;
+  function updateCharCounters() {
+    const titleCounter = document.getElementById('titleCounter');
+    if (titleLimit && titleCounter) titleCounter.textContent = `${titleInput.value.length} / ${overrideCheckbox.checked ? 'no limit' : titleInput.maxLength}`;
+    document.getElementById('descCounter').textContent = `${descInput.value.length} / ${overrideCheckbox.checked ? 'no limit' : descInput.maxLength}`;
+  }
+  overrideCheckbox.addEventListener('change', () => {
+    if (titleLimit) titleInput.maxLength = overrideCheckbox.checked ? NO_LIMIT : titleLimit;
+    descInput.maxLength = overrideCheckbox.checked ? NO_LIMIT : limits.description;
+    updateCharCounters();
+  });
+  if (titleLimit) titleInput.addEventListener('input', updateCharCounters);
+  descInput.addEventListener('input', updateCharCounters);
+  updateCharCounters();
 
   document.getElementById('editForm').addEventListener('submit', async (e) => {
     e.preventDefault();

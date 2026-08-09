@@ -11,9 +11,9 @@ function expireStalePosts() {
   if (info.changes > 0) console.log(`[cron] expired ${info.changes} post(s)`);
 }
 
-// Admin-scheduled posts (currently only offered for Listings) go live on
-// their own once their scheduled_at time arrives - expires_at was already
-// computed off scheduledAt at creation time, so nothing else needs updating.
+// Admin-scheduled posts (any post type, created directly from the backend)
+// go live on their own once their scheduled_at time arrives - expires_at was
+// already computed off scheduledAt at creation time, so nothing else needs updating.
 function publishScheduledPosts() {
   const now = Date.now();
   const info = db

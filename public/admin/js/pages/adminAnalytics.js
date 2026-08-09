@@ -110,7 +110,9 @@ async function renderAnalyticsPage(query) {
       <div class="stat-card"><div class="num">${data.totals.uniqueVisitors}</div><div class="label">Unique Visitors</div>${analyticsDelta(data.totals.uniqueVisitors, data.previousTotals.uniqueVisitors)}</div>
       <div class="stat-card"><div class="num">${data.totals.recurringVisitors}</div><div class="label">Recurring Visitors</div>${analyticsDelta(data.totals.recurringVisitors, data.previousTotals.recurringVisitors)}</div>
       <div class="stat-card"><div class="num">${data.totals.postViews}</div><div class="label">Post Views</div>${analyticsDelta(data.totals.postViews, data.previousTotals.postViews)}</div>
+      <div class="stat-card"><div class="num">${data.totals.uniquePostViews}</div><div class="label">Unique Post Views</div>${analyticsDelta(data.totals.uniquePostViews, data.previousTotals.uniquePostViews)}</div>
       <div class="stat-card"><div class="num">${data.totals.postClicks}</div><div class="label">Post Clicks</div>${analyticsDelta(data.totals.postClicks, data.previousTotals.postClicks)}</div>
+      <div class="stat-card"><div class="num">${data.totals.uniquePostClicks}</div><div class="label">Unique Post Clicks</div>${analyticsDelta(data.totals.uniquePostClicks, data.previousTotals.uniquePostClicks)}</div>
       <div class="stat-card"><div class="num">${ctr}</div><div class="label">Click-Through Rate</div><div class="hint" style="margin-top:2px">of post views</div></div>
     </div>
 
@@ -143,7 +145,7 @@ async function renderAnalyticsPage(query) {
 
     <div class="admin-card">
       <h3 style="margin-top:0">Top Posts</h3>
-      ${data.topPosts.length ? `<table class="admin-table"><thead><tr><th>Title</th><th>Type</th><th>Views</th><th>Clicks</th><th>CTR</th></tr></thead><tbody>${data.topPosts.map((p) => `<tr><td><a href="#/posts?q=${escapeHtml(p.publicId)}">${escapeHtml(p.title)}</a></td><td>${p.type}</td><td>${p.views}</td><td>${p.clicks}</td><td>${p.views ? ((p.clicks / p.views) * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
+      ${data.topPosts.length ? `<table class="admin-table"><thead><tr><th>Title</th><th>Type</th><th>Views</th><th>Unique Views</th><th>Clicks</th><th>Unique Clicks</th><th>CTR</th></tr></thead><tbody>${data.topPosts.map((p) => `<tr><td><a href="#/posts?q=${escapeHtml(p.publicId)}">${escapeHtml(p.title)}</a></td><td>${p.type}</td><td>${p.views}</td><td>${p.uniqueViews}</td><td>${p.clicks}</td><td>${p.uniqueClicks}</td><td>${p.views ? ((p.clicks / p.views) * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
     </div>
   `;
 

@@ -13,6 +13,18 @@ const { findListingCategory } = require('../../services/listingCategories');
 const { validateCategoryFields, parseAmountOrText } = require('../../services/postValidation');
 const { normalizeUrl } = require('../../utils/validate');
 const { createRefund } = require('../../services/checkout');
+const { validatePhone } = require('../../utils/phone');
+
+// Admin forms don't collect a country selector (unlike the public wizard),
+// so numbers are parsed against a default US/Canada assumption - matching
+// validatePhone's own default everywhere else it's called without one. A
+// number that doesn't parse is kept as-is rather than rejected, since admin
+// routes are trusted/permissive; it just won't get the dashed display format.
+function normalizeAdminPhone(raw) {
+  if (!raw) return raw;
+  const parsed = validatePhone(raw, 'US');
+  return parsed.valid ? parsed.e164 : raw;
+}
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -65,10 +77,10 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
     if (!posterEmail) return res.status(400).json({ error: 'A poster email is required' });
 
     const contact = {};
-    if (req.body.contactPhone) contact.phone = req.body.contactPhone;
+    if (req.body.contactPhone) contact.phone = normalizeAdminPhone(req.body.contactPhone);
     if (req.body.contactPhoneExt) contact.phoneExt = req.body.contactPhoneExt;
     if (req.body.contactEmail) contact.email = req.body.contactEmail;
-    if (req.body.contactUrl) contact.url = req.body.contactUrl;
+    if (req.body.contactUrl) contact.url = normalizeUrl(req.body.contactUrl);
 
     const taxonomyId = req.body.taxonomyId ? Number(req.body.taxonomyId) : null;
     const payload = {
@@ -86,7 +98,7 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
       posterFirstName: req.body.posterFirstName || null,
       posterLastName: req.body.posterLastName || null,
       posterEmail,
-      posterPhone: req.body.posterPhone || null,
+      posterPhone: req.body.posterPhone ? normalizeAdminPhone(req.body.posterPhone) : null,
       contact,
       pricingTierId: req.body.pricingTierId ? Number(req.body.pricingTierId) : null,
       wantsStrike: !!req.body.wantsStrike,
@@ -101,6 +113,10 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
     const post = insertPost({ type, category: payload.category, payload, hasImages: uploaded.length > 0 });
     attachImages(post.id, uploaded);
     db.prepare('UPDATE post_images SET approved = 1 WHERE post_id = ?').run(post.id);
+    // Admin-entered links skip the same moderation queue admin-uploaded
+    // images already skip above - admin is trusted, so it shouldn't need a
+    // second self-approval step before it shows up publicly.
+    if (contact.url) db.prepare('UPDATE posts SET contact_url_approved = 1 WHERE id = ?').run(post.id);
 
     if (type === 'simcha' && req.body.surpriseEmail) {
       attachSimchaSurprises(post.id, [{ email: req.body.surpriseEmail, senderDisplayName: payload.posterFirstName || '' }], payload.posterFirstName);
@@ -109,8 +125,8 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
     const durationDays = Number(req.body.durationDays) || 30;
     const now = Date.now();
     // Scheduling a future go-live is admin-only (never exposed to the public
-    // wizard) and currently only offered in the UI for the Listing post type.
-    // expires_at is computed off scheduledAt (not "now") so it reflects the
+    // wizard), available for any post type created here. expires_at is
+    // computed off scheduledAt (not "now") so it reflects the
     // actual go-live time regardless of how long the post sits scheduled -
     // the publish cron just flips status/published_at and leaves it as-is.
     const scheduledAt = req.body.scheduledAt ? Number(req.body.scheduledAt) : null;
@@ -179,7 +195,12 @@ router.get('/:id', (req, res) => {
   if (!post) return res.status(404).json({ error: 'Not found' });
   const payments = db.prepare('SELECT * FROM post_payments WHERE post_id = ? ORDER BY created_at DESC').all(post.id);
   const reports = db.prepare('SELECT * FROM reports WHERE post_id = ? ORDER BY created_at DESC').all(post.id);
-  res.json({ ...formatPostAdmin(post, imagesFor(post.id)), payments, reports });
+  // Unique (distinct-visitor) counterparts to the lifetime viewCount/clickCount
+  // running counters - those two keep counting every impression/click as
+  // before, this is purely additive from the analytics_events log.
+  const uniqueViewCount = db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_view'").get(post.id).c;
+  const uniqueClickCount = db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_click'").get(post.id).c;
+  res.json({ ...formatPostAdmin(post, imagesFor(post.id)), payments, reports, uniqueViewCount, uniqueClickCount });
 });
 
 router.put('/:id', (req, res) => {
@@ -204,7 +225,7 @@ router.put('/:id', (req, res) => {
     b.locationState ?? post.location_state,
     b.locationLat !== undefined ? b.locationLat : post.location_lat,
     b.locationLng !== undefined ? b.locationLng : post.location_lng,
-    b.contactPhone ?? post.contact_phone,
+    b.contactPhone !== undefined ? normalizeAdminPhone(b.contactPhone) : post.contact_phone,
     b.contactPhoneExt ?? post.contact_phone_ext,
     b.contactEmail ?? post.contact_email,
     b.contactUrl !== undefined ? normalizeUrl(b.contactUrl) : post.contact_url,

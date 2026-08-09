@@ -9,6 +9,12 @@ async function renderCreatePostPage() {
     return type === 'listing' ? cfg.listingCategories : cfg.categories;
   }
 
+  function charLimitsForType() {
+    if (type === 'listing') return cfg.listingCharLimits;
+    if (type === 'simcha') return cfg.simchaCharLimits;
+    return cfg.charLimits;
+  }
+
   function genericTaxonomyFieldHtml(catDef) {
     const grp = catDef?.taxonomyGroup;
     if (!grp || grp === 'job' || grp === 'real_estate') return '';
@@ -51,6 +57,7 @@ async function renderCreatePostPage() {
   function render() {
     const catDef = categoriesForType().find((c) => c.key === category);
     const simchaTax = cfg.taxonomies.filter((t) => t.grp === 'simcha');
+    const limits = charLimitsForType();
     root.innerHTML = `
       <h1>+ New Post</h1>
       <div class="admin-card" style="max-width:640px">
@@ -63,8 +70,8 @@ async function renderCreatePostPage() {
             <label>Category</label>
             ${categoriesForType().length ? `<select id="categorySelect">${categoriesForType().map((c) => `<option value="${c.key}" ${category === c.key ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select>` : `<p class="hint">No ${type} categories exist yet - add one under Categories first.</p>`}
           </div>
-          <div class="form-row"><label>Title</label><input type="text" id="f_title"></div>
-          <div class="form-row"><label>Description</label><textarea id="f_description" rows="3"></textarea></div>
+          <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${limits.title}"><div class="char-counter" id="titleCounter"></div></div>
+          <div class="form-row"><label>Description</label><textarea id="f_description" rows="3" maxlength="${limits.description}"></textarea><div class="char-counter" id="descCounter"></div></div>
           <div id="catFields">${categoryFieldsHtml()}</div>
           <div class="form-row"><label>Location</label><input type="text" id="f_location"></div>
           ${catDef?.hasImages ? `<div class="form-row"><label>Photos</label><input type="file" id="f_images" accept="image/*" multiple></div>` : ''}
@@ -73,15 +80,20 @@ async function renderCreatePostPage() {
             <label>Simcha Category</label>
             <select id="taxonomySelect"><option value="">—</option>${simchaTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select>
           </div>
-          <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="3"></textarea></div>
+          <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="3" maxlength="${limits.description}"></textarea><div class="char-counter" id="descCounter"></div></div>
           <div class="form-row"><label>Surprise email <span class="hint">(optional, limited to one)</span></label><input type="email" id="f_surprise"></div>
         `}
+        <label class="addon-row" style="margin:-4px 0 14px">
+          <input type="checkbox" id="charLimitOverride">
+          Override character limit <span class="hint">(ignore the normal title/description caps for this post)</span>
+        </label>
         <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
         <h3>Contact Info</h3>
         <div class="form-cols">
           <div class="form-row"><label>Phone</label><input type="tel" id="c_phone"></div>
           <div class="form-row"><label>Email</label><input type="email" id="c_email"></div>
         </div>
+        <div class="form-row"><label>Website <span class="hint">(optional)</span></label><input type="text" id="c_url" placeholder="https://example.com"></div>
         <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
         <h3>Poster Info</h3>
         <div class="form-cols">
@@ -94,9 +106,7 @@ async function renderCreatePostPage() {
           <div class="form-row"><label>Live for (days)</label><input type="number" id="durationDays" value="30"></div>
           <div class="form-row"><label>Featured / Striking</label><select id="wantsStrike"><option value="">No</option><option value="1">Yes</option></select></div>
         </div>
-        ${type === 'listing' ? `
-          <div class="form-row"><label>Schedule for <span class="hint">(optional - leave blank to publish immediately)</span></label><input type="datetime-local" id="scheduledAt"></div>
-        ` : ''}
+        <div class="form-row"><label>Schedule for <span class="hint">(optional - leave blank to publish immediately)</span></label><input type="datetime-local" id="scheduledAt"></div>
         <div id="createError" class="error-list" style="display:none"></div>
         <button class="btn btn-gold" id="submitBtn">Create &amp; Publish</button>
       </div>
@@ -112,6 +122,25 @@ async function renderCreatePostPage() {
     const imgInput = document.getElementById('f_images');
     if (imgInput) imgInput.addEventListener('change', () => { files = Array.from(imgInput.files).slice(0, 6); });
 
+    const titleInput = document.getElementById('f_title');
+    const descInput = document.getElementById('f_description');
+    const overrideCheckbox = document.getElementById('charLimitOverride');
+    const NO_LIMIT = 100000;
+    function updateCounters() {
+      const titleCounter = document.getElementById('titleCounter');
+      if (titleInput && titleCounter) titleCounter.textContent = `${titleInput.value.length} / ${overrideCheckbox.checked ? 'no limit' : titleInput.maxLength}`;
+      const descCounter = document.getElementById('descCounter');
+      if (descInput && descCounter) descCounter.textContent = `${descInput.value.length} / ${overrideCheckbox.checked ? 'no limit' : descInput.maxLength}`;
+    }
+    overrideCheckbox.addEventListener('change', () => {
+      if (titleInput) titleInput.maxLength = overrideCheckbox.checked ? NO_LIMIT : limits.title;
+      if (descInput) descInput.maxLength = overrideCheckbox.checked ? NO_LIMIT : limits.description;
+      updateCounters();
+    });
+    if (titleInput) titleInput.addEventListener('input', updateCounters);
+    if (descInput) descInput.addEventListener('input', updateCounters);
+    updateCounters();
+
     document.getElementById('submitBtn').addEventListener('click', submit);
   }
 
@@ -123,6 +152,7 @@ async function renderCreatePostPage() {
       fd.set('type', type);
       fd.set('contactPhone', document.getElementById('c_phone').value.trim());
       fd.set('contactEmail', document.getElementById('c_email').value.trim());
+      fd.set('contactUrl', document.getElementById('c_url').value.trim());
       fd.set('posterFirstName', document.getElementById('p_first').value.trim());
       fd.set('posterLastName', document.getElementById('p_last').value.trim());
       fd.set('posterEmail', document.getElementById('p_email').value.trim());
