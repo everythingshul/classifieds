@@ -234,12 +234,7 @@ async function renderSettingsPage() {
       btn.textContent = 'Test Maps API';
     }
   });
-  document.querySelectorAll('.rich-toolbar [data-cmd]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.getElementById('instructionsEditor').focus();
-      document.execCommand(btn.dataset.cmd, false, null);
-    });
-  });
+  wireRichToolbars();
   document.getElementById('saveInstructionsBtn').addEventListener('click', async () => {
     const html = document.getElementById('instructionsEditor').innerHTML;
     await AdminApi.updateSetting('editorial_instructions_html', html);

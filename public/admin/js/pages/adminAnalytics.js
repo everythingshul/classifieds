@@ -114,6 +114,7 @@ async function renderAnalyticsPage(query) {
     </div>
 
     <div class="stat-grid">
+      <div class="stat-card"><div class="num">${formatCents(data.totals.revenueCents)}</div><div class="label">Revenue</div>${analyticsDelta(data.totals.revenueCents, data.previousTotals.revenueCents)}</div>
       <div class="stat-card"><div class="num">${data.totals.pageviews}</div><div class="label">Pageviews</div>${analyticsDelta(data.totals.pageviews, data.previousTotals.pageviews)}</div>
       <div class="stat-card"><div class="num">${data.totals.uniqueVisitors}</div><div class="label">Unique Visitors</div>${analyticsDelta(data.totals.uniqueVisitors, data.previousTotals.uniqueVisitors)}</div>
       <div class="stat-card"><div class="num">${data.totals.recurringVisitors}</div><div class="label">Recurring Visitors</div>${analyticsDelta(data.totals.recurringVisitors, data.previousTotals.recurringVisitors)}</div>
@@ -127,6 +128,11 @@ async function renderAnalyticsPage(query) {
     <div class="admin-card">
       <h3 style="margin-top:0">Pageviews Over Time</h3>
       ${analyticsBarChart(data.timeseries, 'pageviews', 'var(--navy)')}
+    </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top:0">Revenue Over Time</h3>
+      ${analyticsBarChart(data.revenueTimeseries.map((d) => ({ date: d.date, revenue: (d.revenueCents || 0) / 100 })), 'revenue', 'var(--gold)')}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -146,14 +152,47 @@ async function renderAnalyticsPage(query) {
         ${analyticsDonut(data.byCategory, (d) => d.category)}
       </div>
       <div class="admin-card">
-        <h3 style="margin-top:0">Top Pages</h3>
-        ${data.topPages.length ? `<table class="admin-table"><thead><tr><th>Path</th><th>Views</th></tr></thead><tbody>${data.topPages.map((p) => `<tr><td>${escapeHtml(p.path)}</td><td>${p.c}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
+        <h3 style="margin-top:0">Revenue by Type</h3>
+        ${data.revenueByKind.length ? analyticsDonut(data.revenueByKind.map((k) => ({ label: k.kind, count: (k.c || 0) / 100 }))) : '<p class="hint">No data for this range yet.</p>'}
       </div>
+    </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top:0">Top Pages</h3>
+      ${data.topPages.length ? `<table class="admin-table"><thead><tr><th>Path</th><th>Views</th></tr></thead><tbody>${data.topPages.map((p) => `<tr><td>${escapeHtml(p.path)}</td><td>${p.c}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
     </div>
 
     <div class="admin-card">
       <h3 style="margin-top:0">Top Posts</h3>
       ${data.topPosts.length ? `<table class="admin-table"><thead><tr><th>Title</th><th>Type</th><th>Views</th><th>Unique Views</th><th>Clicks</th><th>Unique Clicks</th><th>CTR</th></tr></thead><tbody>${data.topPosts.map((p) => `<tr><td><a href="#/posts?q=${escapeHtml(p.publicId)}">${escapeHtml(p.title)}</a></td><td>${p.type}</td><td>${p.views}</td><td>${p.uniqueViews}</td><td>${p.clicks}</td><td>${p.uniqueClicks}</td><td>${p.views ? ((p.clicks / p.views) * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
+    </div>
+
+    <h2 style="margin-bottom:6px">Editorials</h2>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">${data.editorialTotals.total}</div><div class="label">Total Editorials</div></div>
+      <div class="stat-card"><div class="num">${data.editorialTotals.pendingApproval}</div><div class="label">Pending Approval</div></div>
+      <div class="stat-card"><div class="num">${data.editorialTotals.pendingComments}</div><div class="label">Pending Comments</div></div>
+      <div class="stat-card"><div class="num">${data.editorialTotals.totalLikes}</div><div class="label">Total Likes</div></div>
+      <div class="stat-card"><div class="num">${data.totals.editorialViews}</div><div class="label">Editorial Views</div>${analyticsDelta(data.totals.editorialViews, data.previousTotals.editorialViews)}</div>
+      <div class="stat-card"><div class="num">${data.totals.uniqueEditorialViews}</div><div class="label">Unique Editorial Views</div>${analyticsDelta(data.totals.uniqueEditorialViews, data.previousTotals.uniqueEditorialViews)}</div>
+      <div class="stat-card"><div class="num">${data.totals.editorialClicks}</div><div class="label">Editorial Clicks</div>${analyticsDelta(data.totals.editorialClicks, data.previousTotals.editorialClicks)}</div>
+      <div class="stat-card"><div class="num">${data.totals.uniqueEditorialClicks}</div><div class="label">Unique Editorial Clicks</div>${analyticsDelta(data.totals.uniqueEditorialClicks, data.previousTotals.uniqueEditorialClicks)}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="admin-card">
+        <h3 style="margin-top:0">Editorial Views Over Time</h3>
+        ${analyticsBarChart(data.timeseries, 'editorialViews', 'var(--gold)')}
+      </div>
+      <div class="admin-card">
+        <h3 style="margin-top:0">Editorials by Status</h3>
+        ${data.editorialsByStatus.length ? analyticsDonut(data.editorialsByStatus, (d) => d.status) : '<p class="hint">No editorials yet.</p>'}
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top:0">Top Editorials</h3>
+      ${data.topEditorials.length ? `<table class="admin-table"><thead><tr><th>Title</th><th>Views</th><th>Unique Views</th><th>Clicks</th><th>Likes</th></tr></thead><tbody>${data.topEditorials.map((e) => `<tr><td><a href="#/editorials?q=${escapeHtml(e.publicId)}">${escapeHtml(e.title)}</a></td><td>${e.views}</td><td>${e.uniqueViews}</td><td>${e.clicks}</td><td>${e.likeCount}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
     </div>
   `;
 

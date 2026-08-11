@@ -79,6 +79,7 @@ const AdminApi = (() => {
     createPost: (formData) => req('/posts/create', { method: 'POST', body: formData }),
     editorials: (params) => req(`/editorials?${new URLSearchParams(params)}`),
     editorial: (id) => req(`/editorials/${id}`),
+    createEditorial: (formData) => req('/editorials', { method: 'POST', body: formData }),
     updateEditorial: (id, body) => req(`/editorials/${id}`, { method: 'PUT', body }),
     approveEditorial: (id) => req(`/editorials/${id}/approve`, { method: 'POST' }),
     rejectEditorial: (id, reason) => req(`/editorials/${id}/reject`, { method: 'POST', body: { reason } }),

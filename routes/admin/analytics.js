@@ -22,7 +22,18 @@ function computeTotals(from, to) {
     // above - a visitor who views/clicks 5 posts still only counts once here.
     uniquePostViews: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'post_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
     uniquePostClicks: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'post_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
+    editorialViews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'editorial_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
+    editorialClicks: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'editorial_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
+    uniqueEditorialViews: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'editorial_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
+    uniqueEditorialClicks: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'editorial_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
     uniqueVisitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE created_at BETWEEN ? AND ?').get(from, to).c,
+    // Net of refunds, windowed by the payment's own created_at (a refund
+    // issued later still nets out of the period the charge happened in,
+    // matching the lifetime figure on the dashboard).
+    revenueCents: (
+      (db.prepare("SELECT SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
+      - (db.prepare("SELECT SUM(refunded_cents) AS total FROM post_payments WHERE status = 'paid' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
+    ),
     // A visitor counts as recurring the moment they've been seen more than
     // once - either multiple events within this window (they came back,
     // even the same day/session), or they have history from before this
@@ -75,12 +86,29 @@ router.get('/', (req, res) => {
       SUM(CASE WHEN type = 'pageview' THEN 1 ELSE 0 END) AS pageviews,
       SUM(CASE WHEN type = 'post_view' THEN 1 ELSE 0 END) AS postViews,
       SUM(CASE WHEN type = 'post_click' THEN 1 ELSE 0 END) AS postClicks,
+      SUM(CASE WHEN type = 'editorial_view' THEN 1 ELSE 0 END) AS editorialViews,
+      SUM(CASE WHEN type = 'editorial_click' THEN 1 ELSE 0 END) AS editorialClicks,
       COUNT(DISTINCT visitor_id) AS uniqueVisitors
     FROM analytics_events
     WHERE created_at BETWEEN ? AND ?
     GROUP BY date
     ORDER BY date
   `).all(tzOffsetSec, from, to);
+
+  const revenueTimeseries = db.prepare(`
+    SELECT ${DAY_EXPR} AS date, SUM(amount_cents) - SUM(refunded_cents) AS revenueCents
+    FROM post_payments
+    WHERE status = 'paid' AND created_at BETWEEN ? AND ?
+    GROUP BY date
+    ORDER BY date
+  `).all(tzOffsetSec, from, to);
+
+  const revenueByKind = db.prepare(`
+    SELECT kind, SUM(amount_cents) - SUM(refunded_cents) AS c
+    FROM post_payments
+    WHERE status = 'paid' AND created_at BETWEEN ? AND ?
+    GROUP BY kind ORDER BY c DESC
+  `).all(from, to);
 
   const byPostType = db.prepare(`
     SELECT post_type AS type, COUNT(*) AS c FROM analytics_events
@@ -112,7 +140,30 @@ router.get('/', (req, res) => {
     GROUP BY p.id ORDER BY views DESC LIMIT 10
   `).all(from, to);
 
-  res.json({ from, to, totals, previousTotals, newVsReturning, timeseries, byPostType, byCategory, topPages, topPosts });
+  const topEditorials = db.prepare(`
+    SELECT ed.id, ed.public_id AS publicId, ed.title, ed.like_count AS likeCount,
+      SUM(CASE WHEN e.type = 'editorial_view' THEN 1 ELSE 0 END) AS views,
+      SUM(CASE WHEN e.type = 'editorial_click' THEN 1 ELSE 0 END) AS clicks,
+      COUNT(DISTINCT CASE WHEN e.type = 'editorial_view' THEN e.visitor_id END) AS uniqueViews,
+      COUNT(DISTINCT CASE WHEN e.type = 'editorial_click' THEN e.visitor_id END) AS uniqueClicks
+    FROM analytics_events e
+    JOIN editorials ed ON ed.id = e.editorial_id
+    WHERE e.type IN ('editorial_view', 'editorial_click') AND e.created_at BETWEEN ? AND ?
+    GROUP BY ed.id ORDER BY views DESC LIMIT 10
+  `).all(from, to);
+
+  const editorialsByStatus = db.prepare('SELECT status, COUNT(*) AS c FROM editorials GROUP BY status').all();
+  const editorialTotals = {
+    total: db.prepare('SELECT COUNT(*) AS c FROM editorials').get().c,
+    totalLikes: db.prepare('SELECT SUM(like_count) AS c FROM editorials').get().c || 0,
+    pendingApproval: db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'pending_approval'").get().c,
+    pendingComments: db.prepare("SELECT COUNT(*) AS c FROM editorial_comments WHERE status = 'pending_approval'").get().c,
+  };
+
+  res.json({
+    from, to, totals, previousTotals, newVsReturning, timeseries, revenueTimeseries, revenueByKind,
+    byPostType, byCategory, topPages, topPosts, topEditorials, editorialsByStatus, editorialTotals,
+  });
 });
 
 module.exports = router;

@@ -1,3 +1,26 @@
+// A small teaser strip under the weather widget - title, byline, and image
+// (or a text placeholder when there's no cover photo, same as the editorial
+// cards on /editorials) for each of the 3 most recent live editorials.
+function renderHomeEditorialsTeaser(editorials) {
+  if (!editorials || !editorials.length) return '';
+  return `
+    <div class="combo-widget home-editorials-teaser">
+      <p class="combo-label" style="margin-bottom:8px" data-i18n="home_editorials_heading">${I18N.t('home_editorials_heading')}</p>
+      ${editorials.map((ed) => {
+        const cover = ed.images && ed.images[0];
+        return `
+          <a class="home-editorial-item" href="/editorials/${ed.id}">
+            ${cover ? `<div class="home-editorial-thumb" style="background-image:url('${cover}')"></div>` : `<div class="home-editorial-thumb home-editorial-thumb-placeholder"></div>`}
+            <div class="home-editorial-text">
+              <div class="home-editorial-title">${escapeHtml(ed.title)}</div>
+              <div class="home-editorial-excerpt">${escapeHtml(editorialExcerpt(ed.body, 70))}</div>
+            </div>
+          </a>`;
+      }).join('')}
+      <a href="/editorials" class="home-editorial-viewall" data-i18n="editorials_title">${I18N.t('editorials_title')}</a>
+    </div>`;
+}
+
 async function renderHomePage() {
   const loc = await getBrowserLocation();
   const data = await Api.home(loc ? { lat: loc.lat, lng: loc.lng } : {});
@@ -51,6 +74,7 @@ async function renderHomePage() {
             <p class="zman-disclaimer">נא להחמיר על הזמנים בכמה דקות.</p>
           </div>
           <div id="weatherWidget"></div>
+          ${renderHomeEditorialsTeaser(data.recentEditorials)}
         </aside>
       </div>
     </div>

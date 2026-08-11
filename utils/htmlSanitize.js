@@ -27,4 +27,13 @@ function sanitizeRichText(html) {
     });
 }
 
-module.exports = { sanitizeRichText };
+// Plain-text length of sanitized rich text, for char-limit validation and
+// excerpts - counts what a reader actually sees, not markup bytes.
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+module.exports = { sanitizeRichText, stripHtml };

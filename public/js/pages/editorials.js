@@ -8,7 +8,7 @@ function editorialIsNew(publishedAt) {
 }
 
 function editorialExcerpt(body, max = 160) {
-  const clean = String(body || '').replace(/\s+/g, ' ').trim();
+  const clean = stripHtmlClient(body);
   return clean.length > max ? `${clean.slice(0, max).trim()}…` : clean;
 }
 
@@ -115,6 +115,27 @@ function videoEmbedUrl(rawUrl) {
   return null;
 }
 
+// Thumbs-up is a lightweight, anonymous engagement signal - no account
+// system to tie it to, so "already liked" is just remembered locally
+// (same no-cookies/no-PII pattern as bookmarks/analytics visitor id) purely
+// to stop the same browser from clicking it repeatedly. The count itself is
+// never shown publicly, only to admins.
+const LIKED_EDITORIALS_KEY = 'esc_liked_editorials';
+function editorialIsLiked(id) {
+  try {
+    return JSON.parse(localStorage.getItem(LIKED_EDITORIALS_KEY) || '[]').includes(id);
+  } catch (e) {
+    return false;
+  }
+}
+function markEditorialLiked(id) {
+  try {
+    const liked = JSON.parse(localStorage.getItem(LIKED_EDITORIALS_KEY) || '[]');
+    if (!liked.includes(id)) liked.push(id);
+    localStorage.setItem(LIKED_EDITORIALS_KEY, JSON.stringify(liked));
+  } catch (e) { /* ignore */ }
+}
+
 function editorialCommentHtml(c) {
   return `
     <div class="editorial-comment">
@@ -141,13 +162,9 @@ async function renderEditorialDetailPage(id) {
     .map((src) => `<div class="editorial-video-embed"><iframe src="${src}" frameborder="0" allowfullscreen loading="lazy"></iframe></div>`)
     .join('');
 
-  const bodyParagraphs = String(ed.body || '')
-    .split(/\n{2,}/)
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
-    .join('');
-
   const shareUrl = window.location.href;
   const shareRow = renderShareRow(shareUrl, ed.title);
+  const alreadyLiked = editorialIsLiked(id);
 
   document.getElementById('app').innerHTML = `
     <div class="container">
@@ -159,9 +176,14 @@ async function renderEditorialDetailPage(id) {
         <h1 class="editorial-detail-title">${escapeHtml(ed.title)}</h1>
         <div class="editorial-detail-byline">${I18N.t('by_author')} <b>${escapeHtml(ed.penName)}</b> · ${escapeHtml(formatDate(ed.publishedAt))}</div>
         ${gallery}
-        <div class="editorial-body">${bodyParagraphs}</div>
+        <div class="editorial-body">${ed.body}</div>
         ${videoEmbeds}
-        ${shareRow}
+        <div class="editorial-engagement-row">
+          <button type="button" class="editorial-like-btn ${alreadyLiked ? 'liked' : ''}" id="likeBtn" ${alreadyLiked ? 'disabled' : ''}>
+            <span data-i18n="${alreadyLiked ? 'liked' : 'like'}">${I18N.t(alreadyLiked ? 'liked' : 'like')}</span>
+          </button>
+          ${shareRow}
+        </div>
 
         <hr style="border:none;border-top:1px solid var(--border);margin:28px 0">
         <h2 data-i18n="comments">${I18N.t('comments')} (${ed.comments.length})</h2>
@@ -184,6 +206,19 @@ async function renderEditorialDetailPage(id) {
   I18N.apply();
   setPageTitle(ed.title, editorialExcerpt(ed.body, 160));
   wireShareRow();
+
+  document.getElementById('likeBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('likeBtn');
+    btn.disabled = true;
+    try {
+      await Api.likeEditorial(id);
+      markEditorialLiked(id);
+      btn.classList.add('liked');
+      btn.querySelector('span').textContent = I18N.t('liked');
+    } catch (e) {
+      btn.disabled = false;
+    }
+  });
 
   const thumbs = document.querySelectorAll('.detail-gallery-thumbs img');
   const mainImg = document.getElementById('galleryMain');
@@ -239,7 +274,17 @@ async function renderEditorialSubmitPage() {
         ${instructions.html ? `<div class="editorial-instructions">${instructions.html}</div>` : ''}
         <form id="editorialForm">
           <div class="form-row"><label data-i18n="field_title">${I18N.t('field_title')}</label><input type="text" name="title" required maxlength="150"><div class="char-counter" id="titleCounter"></div></div>
-          <div class="form-row"><label data-i18n="field_body">${I18N.t('field_body')}</label><textarea name="body" rows="14" required maxlength="20000"></textarea><div class="char-counter" id="bodyCounter"></div></div>
+          <div class="form-row">
+            <label data-i18n="field_body">${I18N.t('field_body')}</label>
+            <div class="rich-toolbar">
+              <button type="button" class="btn btn-sm btn-outline" data-cmd="bold"><b>B</b></button>
+              <button type="button" class="btn btn-sm btn-outline" data-cmd="italic"><i>I</i></button>
+              <button type="button" class="btn btn-sm btn-outline" data-cmd="underline"><u>U</u></button>
+              <button type="button" class="btn btn-sm btn-outline" data-cmd="insertUnorderedList">&bull; List</button>
+            </div>
+            <div id="bodyEditor" class="rich-editor" contenteditable="true"></div>
+            <div class="char-counter" id="bodyCounter"></div>
+          </div>
 
           <div class="form-row"><label data-i18n="field_images">${I18N.t('field_images')} <span class="hint">(${'optional, up to 6'})</span></label><input type="file" id="f_images" accept="image/png,image/jpeg,image/webp" multiple><div id="imagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div></div>
 
@@ -270,15 +315,17 @@ async function renderEditorialSubmitPage() {
       </div>`;
     I18N.apply();
 
+    const BODY_MAX = 20000;
     const titleInput = document.querySelector('input[name="title"]');
-    const bodyInput = document.querySelector('textarea[name="body"]');
+    const bodyEditor = document.getElementById('bodyEditor');
     const updateCounters = () => {
       document.getElementById('titleCounter').textContent = `${titleInput.value.length} / ${titleInput.maxLength}`;
-      document.getElementById('bodyCounter').textContent = `${bodyInput.value.length} / ${bodyInput.maxLength}`;
+      document.getElementById('bodyCounter').textContent = `${bodyEditor.textContent.length} / ${BODY_MAX}`;
     };
     titleInput.addEventListener('input', updateCounters);
-    bodyInput.addEventListener('input', updateCounters);
+    bodyEditor.addEventListener('input', updateCounters);
     updateCounters();
+    wireRichToolbars();
 
     const fileInput = document.getElementById('f_images');
     fileInput.addEventListener('change', () => {
@@ -301,6 +348,7 @@ async function renderEditorialSubmitPage() {
       btn.disabled = true;
       try {
         const fd = new FormData(e.target);
+        fd.set('body', document.getElementById('bodyEditor').innerHTML);
         const videoUrls = [fd.get('video1'), fd.get('video2'), fd.get('video3')].filter((v) => v && v.trim());
         fd.set('videoUrls', JSON.stringify(videoUrls));
         fd.delete('video1');

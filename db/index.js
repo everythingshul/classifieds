@@ -30,6 +30,9 @@ addColumnIfMissing('promo_codes', 'applies_to', 'applies_to TEXT');
 addColumnIfMissing('promo_codes', 'included_features', 'included_features TEXT');
 addColumnIfMissing('promo_codes', 'excluded_features', 'excluded_features TEXT');
 addColumnIfMissing('posts', 'scheduled_at', 'scheduled_at INTEGER');
+addColumnIfMissing('editorials', 'scheduled_at', 'scheduled_at INTEGER');
+addColumnIfMissing('editorials', 'like_count', 'like_count INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('analytics_events', 'editorial_id', 'editorial_id INTEGER REFERENCES editorials(id) ON DELETE SET NULL');
 
 // Simcha pricing tiers used to be stored with post_type defaulting to
 // 'classified' (only distinguished by category = 'simcha'), which mixed

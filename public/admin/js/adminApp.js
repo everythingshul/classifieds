@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);
   AdminRouter.add('#/editorials', renderEditorialsPage);
+  AdminRouter.add('#/editorials/new', renderCreateEditorialPage);
   AdminRouter.add('#/contact-messages', renderContactMessagesPage);
   AdminRouter.add('#/crm', renderCrmPage);
   AdminRouter.add('#/categories', renderCategoriesPage);

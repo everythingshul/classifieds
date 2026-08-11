@@ -41,7 +41,8 @@ const Api = (() => {
     editorialInstructions: () => req('/editorials/instructions'),
     submitEditorial: (formData) => req('/editorials', { method: 'POST', body: formData }),
     submitEditorialComment: (id, body) => req(`/editorials/${id}/comments`, { method: 'POST', body }),
-    registerEditorialImpressions: (ids) => req('/editorials/impressions', { method: 'POST', body: { ids } }).catch(() => {}),
-    registerEditorialClicks: (ids) => req('/editorials/clicks', { method: 'POST', body: { ids } }).catch(() => {}),
+    registerEditorialImpressions: (ids) => req('/editorials/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
+    registerEditorialClicks: (ids) => req('/editorials/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
+    likeEditorial: (id) => req(`/editorials/${id}/like`, { method: 'POST' }),
   };
 })();

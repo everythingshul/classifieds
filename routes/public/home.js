@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { getHomeCalendarData } = require('../../utils/hebrewCalendar');
 const { formatPostPublic } = require('../../services/postFormat');
+const { formatEditorialPublic } = require('../../services/editorial');
 const { getSetting } = require('../../services/pricing');
 const { DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
 
@@ -56,11 +57,26 @@ router.get('/', async (req, res, next) => {
 
     const imgMap = imagesForPosts([...recentClassifieds, ...recentListings].map((p) => p.id));
 
+    // A small teaser strip under the weather widget - just enough to draw
+    // eyes to the new section, not a full feed (that's what /editorials is for).
+    const recentEditorials = db
+      .prepare("SELECT * FROM editorials WHERE status = 'live' ORDER BY published_at DESC LIMIT 3")
+      .all();
+    const editorialImages = recentEditorials.length
+      ? db.prepare(`SELECT * FROM editorial_images WHERE editorial_id IN (${recentEditorials.map(() => '?').join(',')}) ORDER BY sort_order`).all(...recentEditorials.map((e) => e.id))
+      : [];
+    const editorialImgMap = new Map();
+    editorialImages.forEach((img) => {
+      if (!editorialImgMap.has(img.editorial_id)) editorialImgMap.set(img.editorial_id, []);
+      editorialImgMap.get(img.editorial_id).push(img);
+    });
+
     res.json({
       calendar,
       recentClassifieds: recentClassifieds.map((p) => formatPostPublic(p, imgMap.get(p.id) || [])),
       recentListings: recentListings.map((p) => formatPostPublic(p, imgMap.get(p.id) || [])),
       recentSimchas: recentSimchas.map((p) => formatPostPublic(p)),
+      recentEditorials: recentEditorials.map((e) => formatEditorialPublic(e, editorialImgMap.get(e.id) || [])),
     });
   } catch (e) {
     next(e);

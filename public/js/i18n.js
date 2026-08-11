@@ -32,6 +32,8 @@ const I18N = (() => {
       editorial_submitted_body: 'Your editorial has been submitted and will be reviewed before publishing. We will email you once it is live.',
       never_public_notice: 'Your name and contact info are never shown publicly - only your pen name is.',
       editorial_read_more: 'Read More',
+      home_editorials_heading: 'From Our Editorials',
+      like: 'Like', liked: 'Liked',
     },
     he: {
       nav_home: 'בית', nav_classifieds: 'מודעות', nav_listings: 'רשימות', nav_simchas: 'שמחות',
@@ -65,6 +67,8 @@ const I18N = (() => {
       editorial_submitted_body: 'המאמר שלך נשלח ויבדק לפני פרסום. נשלח לך אימייל כשהוא יעלה לאתר.',
       never_public_notice: 'שמך ופרטי הקשר שלך לעולם לא יוצגו בפומבי - רק שם העט שלך יוצג.',
       editorial_read_more: 'קרא עוד',
+      home_editorials_heading: 'מהמאמרים שלנו',
+      like: 'אהבתי', liked: 'אהבתי!',
     },
   };
 

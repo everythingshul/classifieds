@@ -31,13 +31,33 @@ function deleteAbandonedCheckouts() {
   if (info.changes > 0) console.log(`[cron] deleted ${info.changes} abandoned checkout(s)`);
 }
 
+// Same scheduling mechanism as posts (see publishScheduledPosts above),
+// applied to admin-scheduled editorials. Sends the "you're live" email here
+// (rather than at approve/create time) since that's the moment it's actually
+// true - requiring editorial.js only when there's actually a row to notify
+// about, to avoid a require cycle at module load.
+function publishScheduledEditorials() {
+  const now = Date.now();
+  const rows = db.prepare("SELECT * FROM editorials WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?").all(now);
+  if (!rows.length) return;
+  const stmt = db.prepare("UPDATE editorials SET status = 'live', published_at = ?, updated_at = ? WHERE id = ?");
+  const { notifyPosterApproved } = require('../services/editorial');
+  rows.forEach((row) => {
+    stmt.run(now, now, row.id);
+    notifyPosterApproved({ ...row, status: 'live', published_at: now }).catch(() => {});
+  });
+  console.log(`[cron] published ${rows.length} scheduled editorial(s)`);
+}
+
 function start() {
   expireStalePosts();
   deleteAbandonedCheckouts();
   publishScheduledPosts();
+  publishScheduledEditorials();
   cron.schedule('*/15 * * * *', expireStalePosts);
   cron.schedule('0 * * * *', deleteAbandonedCheckouts);
   cron.schedule('*/5 * * * *', publishScheduledPosts);
+  cron.schedule('*/5 * * * *', publishScheduledEditorials);
 }
 
-module.exports = { start, expireStalePosts, deleteAbandonedCheckouts, publishScheduledPosts };
+module.exports = { start, expireStalePosts, deleteAbandonedCheckouts, publishScheduledPosts, publishScheduledEditorials };

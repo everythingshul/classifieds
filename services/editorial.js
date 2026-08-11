@@ -7,6 +7,7 @@ const { sendMail, notifyAdmin } = require('../utils/mailer');
 const { ValidationError } = require('./postValidation');
 const { isValidEmail, isValidUrl } = require('../utils/validate');
 const { validatePhone } = require('../utils/phone');
+const { sanitizeRichText, stripHtml } = require('../utils/htmlSanitize');
 const runtimeConfig = require('./runtimeConfig');
 
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
@@ -33,6 +34,22 @@ function requireString(v, field, errors, { max, min } = {}) {
   return trimmed;
 }
 
+// The body field supports rich text (bold/italic/underline/lists) from a
+// contenteditable editor - sanitized to the same allowlist as admin
+// instructions text before storage, with length limits checked against the
+// visible plain text (not markup bytes, which the poster never sees a count of).
+function requireRichText(v, field, errors, { max, min } = {}) {
+  const sanitized = sanitizeRichText(normalizeLineEndings(String(v || '')));
+  const plain = stripHtml(sanitized);
+  if (!plain) {
+    errors.push(`${field} is required`);
+    return '';
+  }
+  if (max && plain.length > max) errors.push(`${field} must be ${max} characters or fewer (currently ${plain.length})`);
+  if (min && plain.length < min) errors.push(`${field} must be at least ${min} characters`);
+  return sanitized;
+}
+
 // Only a small set of known, embeddable video hosts are accepted - anything
 // else would just be a dead/unembeddable link on the detail page.
 const VIDEO_HOST_RE = /^(www\.)?(youtube\.com|youtu\.be|vimeo\.com)$/i;
@@ -52,7 +69,7 @@ function validateVideoUrl(raw) {
 function validateEditorialSubmission(body, charLimits) {
   const errors = [];
   const title = requireString(body.title, 'title', errors, { max: charLimits.title });
-  const editorialBody = requireString(body.body, 'body', errors, { max: charLimits.body, min: 40 });
+  const editorialBody = requireRichText(body.body, 'body', errors, { max: charLimits.body, min: 40 });
   const penName = requireString(body.penName, 'pen name', errors, { max: 60 });
   const posterFirstName = requireString(body.posterFirstName, 'first name', errors, { max: 60 });
   const posterLastName = requireString(body.posterLastName, 'last name', errors, { max: 60 });
@@ -107,12 +124,13 @@ function formatEditorialPublic(ed, images = [], videos = []) {
   return {
     id: ed.public_id,
     title: ed.title,
-    body: ed.body,
+    body: sanitizeRichText(ed.body),
     penName: ed.pen_name,
     isFeatured: !!ed.is_featured,
     publishedAt: ed.published_at,
     images: images.map((i) => `/uploads/${i.filename}`),
     videoUrls: videos.map((v) => v.url),
+    // Like count is intentionally omitted here - admin-only metric, no public tally.
   };
 }
 
@@ -121,7 +139,7 @@ function formatEditorialAdmin(ed, images = [], videos = []) {
     id: ed.id,
     publicId: ed.public_id,
     title: ed.title,
-    body: ed.body,
+    body: sanitizeRichText(ed.body),
     penName: ed.pen_name,
     poster: {
       firstName: ed.poster_first_name,
@@ -135,8 +153,10 @@ function formatEditorialAdmin(ed, images = [], videos = []) {
     isFeatured: !!ed.is_featured,
     viewCount: ed.view_count,
     clickCount: ed.click_count,
+    likeCount: ed.like_count,
     adminNotes: ed.admin_notes,
     publishedAt: ed.published_at,
+    scheduledAt: ed.scheduled_at,
     createdAt: ed.created_at,
     updatedAt: ed.updated_at,
     images: images.map((i) => ({ id: i.id, url: `/uploads/${i.filename}` })),
@@ -162,15 +182,19 @@ function formatCommentAdmin(c) {
 
 // -- Lifecycle (insert + notify) --
 
-function insertEditorial(payload) {
+// status/scheduledAt/publishedAt default to the public self-serve submission
+// flow (always pending_approval). Admin-direct-create passes 'live' or
+// 'scheduled' to publish immediately or on a future date without ever
+// sitting in the moderation queue.
+function insertEditorial(payload, { status = 'pending_approval', scheduledAt = null, publishedAt = null } = {}) {
   const now = Date.now();
   const publicId = newPublicId();
   const info = db
     .prepare(
       `INSERT INTO editorials (
         public_id, title, body, pen_name, poster_first_name, poster_last_name, poster_email, poster_phone,
-        notes_to_admin, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval', ?, ?)`
+        notes_to_admin, status, scheduled_at, published_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       publicId,
@@ -182,6 +206,9 @@ function insertEditorial(payload) {
       payload.posterEmail,
       payload.posterPhone || null,
       payload.notesToAdmin || null,
+      status,
+      scheduledAt,
+      publishedAt,
       now,
       now
     );

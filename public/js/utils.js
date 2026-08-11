@@ -183,3 +183,29 @@ function toast(msg) {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 3500);
 }
+
+// Wires up a bold/italic/underline/list toolbar sitting directly before a
+// contenteditable `.rich-editor` div (same markup pattern used for the admin
+// editorial instructions editor) - shared by the editorial submit form here
+// and the admin editorial editor in the admin app's own copy of this helper.
+function wireRichToolbars(root = document) {
+  root.querySelectorAll('.rich-toolbar').forEach((toolbar) => {
+    const editor = toolbar.nextElementSibling;
+    if (!editor || !editor.classList.contains('rich-editor')) return;
+    toolbar.querySelectorAll('[data-cmd]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        editor.focus();
+        document.execCommand(btn.dataset.cmd, false, null);
+      });
+    });
+  });
+}
+
+// Plain-text length/content of sanitized rich text HTML, for char counters
+// and card excerpts - uses a detached (never-appended) element so nothing
+// in it ever executes or renders.
+function stripHtmlClient(html) {
+  const div = document.createElement('div');
+  div.innerHTML = String(html || '');
+  return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+}

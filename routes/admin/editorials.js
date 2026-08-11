@@ -2,7 +2,19 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { upload, processAndSaveImage } = require('../../middleware/upload');
-const { formatEditorialAdmin, formatCommentAdmin, notifyPosterApproved, notifyPosterRejected } = require('../../services/editorial');
+const {
+  formatEditorialAdmin,
+  formatCommentAdmin,
+  notifyPosterApproved,
+  notifyPosterRejected,
+  validateEditorialSubmission,
+  insertEditorial,
+  attachEditorialImages,
+  attachEditorialVideos,
+} = require('../../services/editorial');
+const { ValidationError } = require('../../services/postValidation');
+const { sanitizeRichText } = require('../../utils/htmlSanitize');
+const { getSetting } = require('../../services/pricing');
 const { sendMail } = require('../../utils/mailer');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
@@ -45,6 +57,42 @@ router.get('/', (req, res) => {
   });
 });
 
+// Admin-authored editorials skip the moderation queue entirely - they go
+// straight to 'live' (or 'scheduled', if a future date is given), the same
+// way an admin-created post skips pending_approval.
+router.post('/', upload.array('images', 6), async (req, res, next) => {
+  try {
+    let body = req.body;
+    if (req.body.videoUrls) {
+      try {
+        body = { ...req.body, videoUrls: JSON.parse(req.body.videoUrls) };
+      } catch (e) {
+        return res.status(400).json({ error: 'videoUrls must be valid JSON' });
+      }
+    }
+    const charLimits = getSetting('editorial_char_limits', { title: 150, body: 20000 });
+    const payload = validateEditorialSubmission(body, charLimits);
+
+    const uploaded = [];
+    for (const file of req.files || []) uploaded.push(await processAndSaveImage(file.buffer));
+
+    const now = Date.now();
+    const scheduledAt = req.body.scheduledAt ? Number(req.body.scheduledAt) : null;
+    const opts = scheduledAt && scheduledAt > now
+      ? { status: 'scheduled', scheduledAt }
+      : { status: 'live', publishedAt: now };
+
+    const editorial = insertEditorial(payload, opts);
+    attachEditorialImages(editorial.id, uploaded);
+    attachEditorialVideos(editorial.id, payload.videoUrls);
+
+    res.status(201).json(formatEditorialAdmin(editorial, imagesFor(editorial.id), videosFor(editorial.id)));
+  } catch (e) {
+    if (e instanceof ValidationError) return res.status(400).json({ error: 'Validation failed', details: e.errors });
+    next(e);
+  }
+});
+
 router.get('/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM editorials WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Not found' });
@@ -56,18 +104,24 @@ router.put('/:id', (req, res) => {
   const row = db.prepare('SELECT * FROM editorials WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Not found' });
   const b = req.body;
+  // A scheduledAt in the future implies status 'scheduled' regardless of what
+  // status was posted, so the cron job (not this save) is what actually
+  // publishes it - mirrors how admin post scheduling works.
+  const scheduledAt = b.scheduledAt !== undefined ? (b.scheduledAt ? Number(b.scheduledAt) : null) : row.scheduled_at;
+  const status = scheduledAt && scheduledAt > Date.now() ? 'scheduled' : (b.status ?? row.status);
   db.prepare(
     `UPDATE editorials SET
-      title = ?, body = ?, pen_name = ?, status = ?, is_featured = ?, admin_notes = ?, rejection_reason = ?, updated_at = ?
+      title = ?, body = ?, pen_name = ?, status = ?, is_featured = ?, admin_notes = ?, rejection_reason = ?, scheduled_at = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     b.title ?? row.title,
-    b.body ?? row.body,
+    b.body !== undefined ? sanitizeRichText(b.body) : row.body,
     b.penName ?? row.pen_name,
-    b.status ?? row.status,
+    status,
     b.isFeatured !== undefined ? (b.isFeatured ? 1 : 0) : row.is_featured,
     b.adminNotes ?? row.admin_notes,
     b.rejectionReason ?? row.rejection_reason,
+    status === 'scheduled' ? scheduledAt : row.scheduled_at,
     Date.now(),
     req.params.id
   );
@@ -79,9 +133,14 @@ router.post('/:id/approve', async (req, res, next) => {
   try {
     const row = db.prepare('SELECT * FROM editorials WHERE id = ?').get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Not found' });
-    db.prepare("UPDATE editorials SET status = 'live', published_at = ?, updated_at = ? WHERE id = ?").run(Date.now(), Date.now(), row.id);
+    const scheduledAt = req.body.scheduledAt ? Number(req.body.scheduledAt) : null;
+    if (scheduledAt && scheduledAt > Date.now()) {
+      db.prepare("UPDATE editorials SET status = 'scheduled', scheduled_at = ?, updated_at = ? WHERE id = ?").run(scheduledAt, Date.now(), row.id);
+    } else {
+      db.prepare("UPDATE editorials SET status = 'live', published_at = ?, updated_at = ? WHERE id = ?").run(Date.now(), Date.now(), row.id);
+    }
     const updated = db.prepare('SELECT * FROM editorials WHERE id = ?').get(row.id);
-    notifyPosterApproved(updated).catch(() => {});
+    if (updated.status === 'live') notifyPosterApproved(updated).catch(() => {});
     res.json(formatEditorialAdmin(updated, imagesFor(updated.id), videosFor(updated.id)));
   } catch (e) {
     next(e);

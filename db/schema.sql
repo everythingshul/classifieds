@@ -209,11 +209,12 @@ CREATE INDEX IF NOT EXISTS idx_post_payments_email ON post_payments(payer_email)
 -- lifetime totals (posts.view_count/click_count already cover that).
 CREATE TABLE IF NOT EXISTS analytics_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL, -- 'pageview' | 'post_view' | 'post_click'
+  type TEXT NOT NULL, -- 'pageview' | 'post_view' | 'post_click' | 'editorial_view' | 'editorial_click'
   path TEXT,
   post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
   post_type TEXT, -- denormalized from posts.type at event time, for fast breakdowns without a join
   category TEXT, -- denormalized from posts.category at event time
+  editorial_id INTEGER REFERENCES editorials(id) ON DELETE SET NULL,
   visitor_id TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
@@ -221,6 +222,7 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(crea
 CREATE INDEX IF NOT EXISTS idx_analytics_events_visitor ON analytics_events(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(type);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_post ON analytics_events(post_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_editorial ON analytics_events(editorial_id);
 
 -- Editorials: a separate, free-to-post content type (opinion pieces/community
 -- writing) - always requires admin approval, unlike classifieds/listings
@@ -239,13 +241,15 @@ CREATE TABLE IF NOT EXISTS editorials (
   poster_phone TEXT,
   notes_to_admin TEXT,
   status TEXT NOT NULL DEFAULT 'pending_approval',
-  -- pending_approval | live | rejected | removed
+  -- pending_approval | scheduled | live | rejected | removed
   rejection_reason TEXT,
   is_featured INTEGER NOT NULL DEFAULT 0,
   view_count INTEGER NOT NULL DEFAULT 0,
   click_count INTEGER NOT NULL DEFAULT 0,
+  like_count INTEGER NOT NULL DEFAULT 0,
   admin_notes TEXT,
   published_at INTEGER,
+  scheduled_at INTEGER, -- admin-only: when a 'scheduled' editorial should go live (cron flips it to 'live' at this time)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
