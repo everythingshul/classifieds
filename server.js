@@ -1,6 +1,7 @@
 require('dotenv').config();
 if (!process.env.TZ) process.env.TZ = 'UTC';
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -9,6 +10,28 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 const { UPLOAD_DIR } = require('./middleware/upload');
+const { getPostPreview, getEditorialPreview } = require('./services/socialPreview');
+
+const indexHtmlTemplate = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+const SOCIAL_META_RE = /<!-- SOCIAL_META_START -->[\s\S]*?<!-- SOCIAL_META_END -->/;
+
+// Detail-page links (classifieds/listings/simchas/editorials) shared on social
+// media are fetched by crawlers that never run JavaScript, so the client-side
+// setPageTitle() call is invisible to them - splice the actual post's title/
+// description/image into the shell server-side before sending it, instead of
+// always serving the same generic site-wide meta tags for every shared link.
+function sendShellWithPreview(res, lookup) {
+  let html = indexHtmlTemplate;
+  try {
+    const meta = lookup();
+    if (meta) html = indexHtmlTemplate.replace(SOCIAL_META_RE, meta);
+  } catch (e) {
+    // Falls back to the generic shell below - a broken preview lookup should
+    // never take the page itself down.
+  }
+  res.set('Content-Type', 'text/html');
+  res.send(html);
+}
 
 const app = express();
 app.set('trust proxy', 1);
@@ -66,14 +89,25 @@ app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
 });
 
-// Client-side routed pages (classified/listing/simcha detail, view-all, etc.) all serve the same shell.
+// Client-side routed pages (classified/listing/simcha detail, view-all, etc.)
+// all serve the same shell - detail pages (an id as the very next path
+// segment, e.g. /classifieds/abc123, not /classifieds/search or a bare list
+// page) get their post's own social preview meta spliced in first.
+const DETAIL_PREFIXES = {
+  '/classifieds/': (id, urlPath) => getPostPreview(id, 'classified', urlPath),
+  '/listings/': (id, urlPath) => getPostPreview(id, 'listing', urlPath),
+  '/simchas/': (id, urlPath) => getPostPreview(id, 'simcha', urlPath),
+  '/editorials/': (id, urlPath) => id === 'submit' ? null : getEditorialPreview(id, urlPath),
+};
 app.get(['/classifieds/*', '/listings/*', '/simchas/*', '/editorials/*'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const prefix = Object.keys(DETAIL_PREFIXES).find((p) => req.path.startsWith(p));
+  const id = prefix ? req.path.slice(prefix.length).split('/')[0] : null;
+  sendShellWithPreview(res, id ? () => DETAIL_PREFIXES[prefix](id, req.path) : () => null);
 });
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  sendShellWithPreview(res, () => null);
 });
 
 app.use((err, req, res, next) => {
