@@ -28,6 +28,15 @@ async function renderCreatePostPage() {
     return `<div class="form-row"><label>Price <span class="hint">(amount, text like "Call for price", or leave blank)</span></label><div style="display:flex;gap:6px"><input type="text" id="f_price" style="flex:1"><select id="f_currency" style="width:90px">${currencies.map((c) => `<option value="${c.code}">${escapeHtml(c.code)}</option>`).join('')}</select></div></div>`;
   }
 
+  function payFieldHtml() {
+    const currencies = cfg.currencies || [{ code: 'USD' }];
+    return `
+      <div class="form-cols">
+        <div class="form-row"><label>Pay Amount <span class="hint">(amount, text like "DOE", or leave blank)</span></label><div style="display:flex;gap:6px"><input type="text" id="f_payAmount" style="flex:1"><select id="f_payCurrency" style="width:90px">${currencies.map((c) => `<option value="${c.code}">${escapeHtml(c.code)}</option>`).join('')}</select></div></div>
+        <div class="form-row"><label>Per <span class="hint">(only used with a numeric amount)</span></label><select id="f_payPeriod">${(cfg.payPeriods || []).map((p) => `<option value="${p}">${p}</option>`).join('')}</select></div>
+      </div>`;
+  }
+
   function categoryFieldsHtml() {
     const catDef = categoriesForType().find((c) => c.key === category);
     const jobTax = cfg.taxonomies.filter((t) => t.grp === 'job');
@@ -40,7 +49,8 @@ async function renderCreatePostPage() {
         <div class="form-cols">
           <div class="form-row"><label>Job Type</label><select id="f_jobType">${cfg.jobTypes.map((t) => `<option value="${t}">${t}</option>`).join('')}</select></div>
           <div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>
-        </div>`;
+        </div>
+        ${payFieldHtml()}`;
     }
     if (category === 'seeking-a-job') {
       return `<div class="form-row"><label>Job Category</label><select id="f_taxonomyId"><option value="">—</option>${jobTax.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
@@ -178,6 +188,14 @@ async function renderCreatePostPage() {
           fields.price = price.value;
           const currency = document.getElementById('f_currency');
           if (currency) fields.currency = currency.value;
+        }
+        const payAmount = document.getElementById('f_payAmount');
+        if (payAmount) {
+          fields.payAmount = payAmount.value;
+          const payCurrency = document.getElementById('f_payCurrency');
+          if (payCurrency) fields.payCurrency = payCurrency.value;
+          const payPeriod = document.getElementById('f_payPeriod');
+          if (payPeriod) fields.payPeriod = payPeriod.value;
         }
         fd.set('fields', JSON.stringify(fields));
         fd.set('locationText', document.getElementById('f_location').value.trim());
