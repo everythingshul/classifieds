@@ -23,6 +23,12 @@
 * { box-sizing: border-box; }
 html { font-size: 15px; height: 100%; }
 html, body { margin: 0; padding: 0; }
+/* Belt-and-suspenders: on top of the specific min-width/width fixes further
+   down, this guarantees no free-typed post content can ever force a
+   horizontal scrollbar on the page itself, regardless of which nested
+   element's sizing quirk is behind it - X-axis only, so it never clips a
+   vertically-extending dropdown/suggestion list/tooltip. */
+html, body { overflow-x: hidden; }
 body {
   font-family: var(--font-body);
   color: var(--ink);
@@ -34,15 +40,12 @@ body {
 body[dir='rtl'] { direction: rtl; }
 
 #layout { display: flex; flex-direction: column; min-height: 100vh; }
-/* min-width: 0 - #layout is a column-direction flex container, so #app's
-   cross-axis (horizontal) automatic minimum size defaults to its content's
-   min-content width unless overridden - without this, #app (and everything
-   inside it) is capped to whatever oversized width its content's own
-   min-content sizing demands, forcing the whole page wider than the
-   viewport on mobile. Confirmed via live diagnostics: without this line,
-   #app's own min-width was "auto" and every descendant down to .home-main
-   inherited an oversized ~732px width regardless of the 412px viewport. */
-#layout main#app { flex: 1 0 auto; min-width: 0; }
+/* min-width:0 plus an explicit 100% width - see the long comment on
+   .home-main below for why both are here: min-width:0 alone is the
+   textbook fix for a flex item's cross-axis automatic minimum size, but
+   live diagnostics on a real device showed it insufficient by itself, so
+   this forces the width outright rather than just removing the lower bound. */
+#layout main#app { flex: 1 0 auto; min-width: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
 #layout .site-footer { flex-shrink: 0; }
 
 h1, h2, h3, h4 { font-family: var(--font-head); color: var(--navy); margin: 0 0 .4em; font-weight: 800; letter-spacing: -.01em; }
@@ -145,10 +148,15 @@ p { margin: 0 0 .7em; }
    the listings - it's already the second child in markup, so a single-column
    grid puts it there on its own; no order override needed (or wanted). */
 @media (max-width: 860px) { .home-grid { grid-template-columns: 1fr; } .home-sidebar { padding-top: 0; } }
-/* A bare `1fr` track's minimum width defaults to its content's min-content
-   size, not 0 - confirmed via live diagnostics to force this column (and
-   the page) wider than the viewport on mobile without this override. */
-.home-main { min-width: 0; }
+/* min-width:0 alone is the textbook fix here, and it's confirmed applied,
+   but live diagnostics on a real device still showed this box refusing to
+   shrink below its content's width regardless - an actual cross-browser
+   inconsistency in how the "automatic minimum size" spec rule interacts
+   with grid stretch, not something worth chasing further. Forcing an
+   explicit 100% width (not just removing the lower bound) and clipping any
+   residual content overflow is a blunter, more browser-proof fix for the
+   same problem. */
+.home-main { min-width: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
 .home-sidebar { display: flex; flex-direction: column; gap: 14px; padding-top: 30px; }
 
 /* ---------- Combo widget (sidebar: date + daf yomi + zmanim, one compact card) ---------- */
