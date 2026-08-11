@@ -222,7 +222,8 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(crea
 CREATE INDEX IF NOT EXISTS idx_analytics_events_visitor ON analytics_events(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(type);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_post ON analytics_events(post_id);
-CREATE INDEX IF NOT EXISTS idx_analytics_events_editorial ON analytics_events(editorial_id);
+-- idx_analytics_events_editorial is created in db/index.js, after the
+-- editorial_id column migration runs - see the comment there for why.
 
 -- Editorials: a separate, free-to-post content type (opinion pieces/community
 -- writing) - always requires admin approval, unlike classifieds/listings
