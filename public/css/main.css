@@ -34,7 +34,15 @@ body {
 body[dir='rtl'] { direction: rtl; }
 
 #layout { display: flex; flex-direction: column; min-height: 100vh; }
-#layout main#app { flex: 1 0 auto; }
+/* min-width: 0 - #layout is a column-direction flex container, so #app's
+   cross-axis (horizontal) automatic minimum size defaults to its content's
+   min-content width unless overridden - without this, #app (and everything
+   inside it) is capped to whatever oversized width its content's own
+   min-content sizing demands, forcing the whole page wider than the
+   viewport on mobile. Confirmed via live diagnostics: without this line,
+   #app's own min-width was "auto" and every descendant down to .home-main
+   inherited an oversized ~732px width regardless of the 412px viewport. */
+#layout main#app { flex: 1 0 auto; min-width: 0; }
 #layout .site-footer { flex-shrink: 0; }
 
 h1, h2, h3, h4 { font-family: var(--font-head); color: var(--navy); margin: 0 0 .4em; font-weight: 800; letter-spacing: -.01em; }
@@ -137,6 +145,10 @@ p { margin: 0 0 .7em; }
    the listings - it's already the second child in markup, so a single-column
    grid puts it there on its own; no order override needed (or wanted). */
 @media (max-width: 860px) { .home-grid { grid-template-columns: 1fr; } .home-sidebar { padding-top: 0; } }
+/* A bare `1fr` track's minimum width defaults to its content's min-content
+   size, not 0 - confirmed via live diagnostics to force this column (and
+   the page) wider than the viewport on mobile without this override. */
+.home-main { min-width: 0; }
 .home-sidebar { display: flex; flex-direction: column; gap: 14px; padding-top: 30px; }
 
 /* ---------- Combo widget (sidebar: date + daf yomi + zmanim, one compact card) ---------- */
