@@ -34,14 +34,7 @@ async function renderDetailPage(id, type) {
 
   const shareUrl = window.location.href;
   const shareText = `${post.title} - ${post.categoryLabel}`;
-  const shareRow = `
-    <div class="share-row">
-      <span class="hint">Share:</span>
-      <a href="mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(shareUrl)}" title="Share by email">Email</a>
-      <a href="sms:?&body=${encodeURIComponent(`${shareText} ${shareUrl}`)}" title="Share by text message">SMS</a>
-      <a href="https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}" target="_blank" rel="noopener" title="Share on WhatsApp">WhatsApp</a>
-      <button type="button" id="copyLinkBtn" title="Copy link">Copy Link</button>
-    </div>`;
+  const shareRow = renderShareRow(shareUrl, shareText);
 
   document.getElementById('app').innerHTML = `
     <div class="container">
@@ -99,22 +92,7 @@ async function renderDetailPage(id, type) {
     toast('Report sent. Thank you.');
   });
 
-  document.getElementById('copyLinkBtn').addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast('Link copied!');
-    } catch (e) {
-      const ta = document.createElement('textarea');
-      ta.value = shareUrl;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-      toast('Link copied!');
-    }
-  });
+  wireShareRow();
 
   document.querySelectorAll('.contact-link').forEach((el) => {
     el.addEventListener('click', () => Api.registerClicks([id]));

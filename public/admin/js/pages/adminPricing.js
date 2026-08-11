@@ -31,7 +31,7 @@ function promoRowHtml(p) {
       <td>${escapeHtml(sections ? labelList(sections, PROMO_SECTION_LABELS) : 'All sections')}</td>
       <td>${escapeHtml(featuresText)}</td>
       <td>${p.used_count}${p.max_uses ? ' / ' + p.max_uses : ''}</td>
-      <td>${p.expires_at ? formatDate(p.expires_at) : '—'}</td>
+      <td>${p.expires_at ? new Date(p.expires_at).toLocaleString() : '—'}</td>
       <td>${p.active ? 'Yes' : 'No'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm edit-promo">Edit</button>
@@ -53,7 +53,7 @@ function editPromoRowHtml(p) {
           <div class="field"><label>% off</label><input name="percentOff" type="number" min="1" max="100" value="${p.percent_off || ''}" style="width:70px"></div>
           <div class="field"><label>or $ off</label><input name="amountOff" type="number" step="0.01" value="${p.amount_off_cents ? (p.amount_off_cents / 100).toFixed(2) : ''}" style="width:80px"></div>
           <div class="field"><label>Max uses</label><input name="maxUses" type="number" min="1" value="${p.max_uses || ''}" style="width:70px"></div>
-          <div class="field"><label>Expires</label><input name="expiresAt" type="date" value="${p.expires_at ? toDateInputValue(p.expires_at) : ''}" style="width:130px"></div>
+          <div class="field"><label>Expires</label><input name="expiresAt" type="datetime-local" value="${p.expires_at ? toDatetimeLocalValue(p.expires_at) : ''}" style="width:190px"></div>
           <div class="field"><label>Active</label><select name="active" style="height:34px"><option value="1" ${p.active ? 'selected' : ''}>Yes</option><option value="0" ${!p.active ? 'selected' : ''}>No</option></select></div>
           <div class="field">
             <label>Applies to</label>
@@ -183,6 +183,7 @@ async function renderPricingPage() {
         <div class="field"><label>% off</label><input name="percentOff" type="number" min="1" max="100" placeholder="e.g. 20"></div>
         <div class="field"><label>or $ off</label><input name="amountOff" type="number" step="0.01" placeholder="e.g. 5.00"></div>
         <div class="field"><label>Max uses <span class="hint">(optional)</span></label><input name="maxUses" type="number" min="1"></div>
+        <div class="field"><label>Expires <span class="hint">(optional)</span></label><input name="expiresAt" type="datetime-local"></div>
         <div class="field">
           <label>Applies to <span class="hint">(default: all)</span></label>
           <div style="display:flex;gap:8px;align-items:center;height:34px">
@@ -257,7 +258,7 @@ async function renderPricingPage() {
           percentOff: fd.get('percentOff') || null,
           amountOffCents: fd.get('amountOff') ? Math.round(Number(fd.get('amountOff')) * 100) : null,
           maxUses: fd.get('maxUses') || null,
-          expiresAt: fd.get('expiresAt') ? new Date(`${fd.get('expiresAt')}T23:59:59Z`).getTime() : null,
+          expiresAt: fd.get('expiresAt') ? new Date(fd.get('expiresAt')).getTime() : null,
           active: fd.get('active') === '1',
           appliesTo: fd.getAll('appliesTo'),
           includedFeatures: fd.getAll('includedFeatures'),
@@ -302,6 +303,7 @@ async function renderPricingPage() {
         percentOff: fd.get('percentOff') || null,
         amountOffCents: fd.get('amountOff') ? Math.round(Number(fd.get('amountOff')) * 100) : null,
         maxUses: fd.get('maxUses') || null,
+        expiresAt: fd.get('expiresAt') ? new Date(fd.get('expiresAt')).getTime() : null,
         appliesTo: fd.getAll('appliesTo'),
         includedFeatures: fd.getAll('includedFeatures'),
         excludedFeatures: fd.getAll('excludedFeatures'),

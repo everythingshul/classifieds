@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
-const { getAllListingCategories, slugify, uniqueListingSlug } = require('../../services/listingCategories');
+const { getAllListingCategories, slugify, uniqueListingSlug } = require('../../services/taxonomy');
 
 const router = express.Router();
 router.use(requireAdmin);

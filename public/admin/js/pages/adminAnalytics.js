@@ -50,8 +50,13 @@ function analyticsDelta(current, previous) {
   return `<div class="hint" style="color:${color};margin-top:2px">${sign}${pct.toFixed(0)}% vs prev.</div>`;
 }
 
+// Local-calendar-date string for a <input type="date"> value - toISOString()
+// would shift to UTC first, which can land on the wrong day entirely for
+// anyone west of UTC (e.g. 11pm EST is already the next day in UTC).
 function toDateInputValue(ms) {
-  return new Date(ms).toISOString().slice(0, 10);
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 async function renderAnalyticsPage(query) {
@@ -59,24 +64,27 @@ async function renderAnalyticsPage(query) {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const now = Date.now();
 
-  function startOfTodayUTC() {
+  // No trailing "Z" - a bare "YYYY-MM-DDTHH:mm:ss" string is parsed in the
+  // browser's own local timezone, which is what "today"/a picked date
+  // should mean for whoever's actually looking at the dashboard.
+  function startOfTodayLocal() {
     const d = new Date();
-    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   }
 
   let from, to, rangeKey;
   if (query.from && query.to) {
-    from = new Date(`${query.from}T00:00:00Z`).getTime();
-    to = new Date(`${query.to}T23:59:59Z`).getTime();
+    from = new Date(`${query.from}T00:00:00`).getTime();
+    to = new Date(`${query.to}T23:59:59`).getTime();
     rangeKey = 'custom';
   } else {
     rangeKey = query.range || '30';
-    if (rangeKey === 'today') { from = startOfTodayUTC(); to = now; }
+    if (rangeKey === 'today') { from = startOfTodayLocal(); to = now; }
     else if (rangeKey === 'all') { from = 0; to = now; }
     else { from = now - (Number(rangeKey) || 30) * DAY_MS; to = now; }
   }
 
-  const data = await AdminApi.analytics({ from, to });
+  const data = await AdminApi.analytics({ from, to, tzOffsetMinutes: new Date().getTimezoneOffset() });
 
   function presetLink(key, label) {
     const active = rangeKey === key;

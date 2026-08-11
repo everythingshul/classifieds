@@ -1,7 +1,6 @@
 const { formatPhoneDashed } = require('../utils/phone');
 const { normalizeUrl } = require('../utils/validate');
-const { findCategory } = require('./categories');
-const { findListingCategory } = require('./listingCategories');
+const { findCategory, findListingCategory } = require('./taxonomy');
 
 function categoryLabel(category, type) {
   if (category === 'simcha') return 'Simcha';

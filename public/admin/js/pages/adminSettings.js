@@ -113,6 +113,28 @@ async function renderSettingsPage() {
     </div>
 
     <div class="admin-card">
+      <h3 style="margin-top:0">Editorials</h3>
+      <p class="hint">Instructions shown to posters before they write an editorial. Select text and use the buttons to format it.</p>
+      <div class="rich-toolbar">
+        <button type="button" class="btn btn-sm btn-outline" data-cmd="bold"><b>B</b></button>
+        <button type="button" class="btn btn-sm btn-outline" data-cmd="italic"><i>I</i></button>
+        <button type="button" class="btn btn-sm btn-outline" data-cmd="underline"><u>U</u></button>
+        <button type="button" class="btn btn-sm btn-outline" data-cmd="insertUnorderedList">&bull; List</button>
+      </div>
+      <div id="instructionsEditor" class="rich-editor" contenteditable="true">${s.editorial_instructions_html || ''}</div>
+      <button class="btn btn-sm" type="button" id="saveInstructionsBtn" style="margin-top:10px">Save Instructions</button>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <h4>Character Limits</h4>
+      <form id="editorialLimitsForm">
+        <div class="form-cols">
+          <div class="form-row"><label>Title</label><input name="editorial_title" type="number" value="${s.editorial_char_limits?.title ?? 150}"></div>
+          <div class="form-row"><label>Body</label><input name="editorial_body" type="number" value="${s.editorial_char_limits?.body ?? 20000}"></div>
+        </div>
+        <button class="btn btn-sm" type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
       <h3 style="margin-top:0">Default Location</h3>
       <p class="hint">Used for the zmanim/date widgets when a visitor doesn't share their own location.</p>
       <form id="locForm">
@@ -212,6 +234,20 @@ async function renderSettingsPage() {
       btn.textContent = 'Test Maps API';
     }
   });
+  document.querySelectorAll('.rich-toolbar [data-cmd]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.getElementById('instructionsEditor').focus();
+      document.execCommand(btn.dataset.cmd, false, null);
+    });
+  });
+  document.getElementById('saveInstructionsBtn').addEventListener('click', async () => {
+    const html = document.getElementById('instructionsEditor').innerHTML;
+    await AdminApi.updateSetting('editorial_instructions_html', html);
+    toast('Saved');
+  });
+  bindForm('editorialLimitsForm', (fd) => [
+    ['editorial_char_limits', { title: Number(fd.editorial_title), body: Number(fd.editorial_body) }],
+  ]);
   bindForm('rulesForm', (fd) => [
     ['simcha_retention_days', Number(fd.simcha_retention_days)],
     ['simcha_retention_max_days', Number(fd.simcha_retention_max_days)],

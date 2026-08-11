@@ -18,6 +18,7 @@ function renderLayout(siteName) {
           <a href="/classifieds" data-i18n="nav_classifieds">Classifieds</a>
           <a href="/listings" data-i18n="nav_listings">Listings</a>
           <a href="/simchas" data-i18n="nav_simchas">Simchas</a>
+          <a href="/editorials" class="nav-editorials"><span data-i18n="nav_editorials">Editorials</span> <span class="badge-new-pill" data-i18n="badge_new">${I18N.t('badge_new')}</span></a>
           <a href="/bookmarks" data-i18n="nav_bookmarks">Bookmarks</a>
         </nav>
         <form class="site-search" id="siteSearchForm">

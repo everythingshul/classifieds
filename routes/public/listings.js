@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { formatPostPublic } = require('../../services/postFormat');
 const { distanceMiles } = require('../../utils/geo');
-const { getListingCategoryKeys } = require('../../services/listingCategories');
+const { getListingCategoryKeys } = require('../../services/taxonomy');
 
 const router = express.Router();
 

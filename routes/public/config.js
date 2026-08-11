@@ -4,10 +4,8 @@ const { LOST_FOUND_OPTIONS, DEFAULT_BROOKLYN_LOCATION, CURRENCIES } = require('.
 const { getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits, getSetting, getAddon } = require('../../services/pricing');
 const runtimeConfig = require('../../services/runtimeConfig');
 const { getCountryList } = require('../../utils/countries');
-const { getAllClassifiedCategories, getOptionNames } = require('../../services/categories');
-const { getAllListingCategories } = require('../../services/listingCategories');
+const { getAllClassifiedCategories, getOptionNames, getAllListingCategories, orderTaxonomyTree } = require('../../services/taxonomy');
 const { getPublishableKey } = require('../../utils/stripeClient');
-const { orderTaxonomyTree } = require('../../services/taxonomySort');
 
 const router = express.Router();
 

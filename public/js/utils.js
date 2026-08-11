@@ -141,6 +141,41 @@ function setPageTitle(title, description) {
   }
 }
 
+// Shared by post detail pages and the editorial detail page - one markup +
+// wiring implementation so the share behavior stays identical everywhere.
+function renderShareRow(url, text) {
+  return `
+    <div class="share-row">
+      <span class="hint">Share:</span>
+      <a href="mailto:?subject=${encodeURIComponent(text)}&body=${encodeURIComponent(url)}" title="Share by email">Email</a>
+      <a href="sms:?&body=${encodeURIComponent(`${text} ${url}`)}" title="Share by text message">SMS</a>
+      <a href="https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}" target="_blank" rel="noopener" title="Share on WhatsApp">WhatsApp</a>
+      <button type="button" class="copy-link-btn" data-share-url="${escapeHtml(url)}" title="Copy link">Copy Link</button>
+    </div>`;
+}
+
+function wireShareRow(root = document) {
+  root.querySelectorAll('.copy-link-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const url = btn.dataset.shareUrl;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast('Link copied!');
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        toast('Link copied!');
+      }
+    });
+  });
+}
+
 function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';

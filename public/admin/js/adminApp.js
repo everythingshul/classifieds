@@ -43,6 +43,7 @@ function renderShell() {
             <a href="#/new-post">+ New Post</a>
             <a href="#/moderation">Moderation Queue <span class="nav-badge" id="badge-moderation" style="display:none"></span></a>
             <a href="#/posts">All Posts</a>
+            <a href="#/editorials">Editorials <span class="nav-badge" id="badge-editorials" style="display:none"></span></a>
             <a href="#/contact-messages">Contact Messages <span class="nav-badge" id="badge-contact" style="display:none"></span></a>
             <a href="#/crm">CRM Search</a>
             <a href="#/categories">Categories</a>
@@ -92,7 +93,9 @@ async function refreshNotificationBadges() {
   setBadge('badge-dashboard', (summary.reports || 0) + (summary.pendingApproval || 0));
   setBadge('badge-moderation', (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0));
   setBadge('badge-contact', summary.contactMessages || 0);
-  const totalUnread = (summary.reports || 0) + (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0) + (summary.contactMessages || 0);
+  setBadge('badge-editorials', (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0));
+  const totalUnread = (summary.reports || 0) + (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0) + (summary.contactMessages || 0)
+    + (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0);
   document.title = totalUnread > 0 ? `(${totalUnread > 99 ? '99+' : totalUnread}) Admin — JListings` : 'Admin — JListings';
 }
 
@@ -103,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/new-post', renderCreatePostPage);
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);
+  AdminRouter.add('#/editorials', renderEditorialsPage);
   AdminRouter.add('#/contact-messages', renderContactMessagesPage);
   AdminRouter.add('#/crm', renderCrmPage);
   AdminRouter.add('#/categories', renderCategoriesPage);

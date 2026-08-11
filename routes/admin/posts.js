@@ -8,8 +8,7 @@ const { POST_STATUSES, CURRENCY_CODES } = require('../../utils/constants');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 const { upload, processAndSaveImage } = require('../../middleware/upload');
-const { findCategory } = require('../../services/categories');
-const { findListingCategory } = require('../../services/listingCategories');
+const { findCategory, findListingCategory } = require('../../services/taxonomy');
 const { validateCategoryFields, parseAmountOrText } = require('../../services/postValidation');
 const { normalizeUrl } = require('../../utils/validate');
 const { createRefund } = require('../../services/checkout');
@@ -201,6 +200,22 @@ router.get('/:id', (req, res) => {
   const uniqueViewCount = db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_view'").get(post.id).c;
   const uniqueClickCount = db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_click'").get(post.id).c;
   res.json({ ...formatPostAdmin(post, imagesFor(post.id)), payments, reports, uniqueViewCount, uniqueClickCount });
+});
+
+// Date/time-scoped views/clicks for a single post - separate from the
+// lifetime totals above (both the raw viewCount/clickCount columns and their
+// all-time unique counterparts), so an admin can additionally ask "how did
+// this post do between X and Y" without losing the all-time numbers.
+router.get('/:id/stats', (req, res) => {
+  const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Not found' });
+  const from = req.query.from ? Number(req.query.from) : 0;
+  const to = req.query.to ? Number(req.query.to) : Date.now();
+  const views = db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_view' AND created_at BETWEEN ? AND ?").get(post.id, from, to).c;
+  const uniqueViews = db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_view' AND created_at BETWEEN ? AND ?").get(post.id, from, to).c;
+  const clicks = db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_click' AND created_at BETWEEN ? AND ?").get(post.id, from, to).c;
+  const uniqueClicks = db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE post_id = ? AND type = 'post_click' AND created_at BETWEEN ? AND ?").get(post.id, from, to).c;
+  res.json({ from, to, views, uniqueViews, clicks, uniqueClicks });
 });
 
 router.put('/:id', (req, res) => {

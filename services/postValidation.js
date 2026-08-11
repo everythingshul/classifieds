@@ -1,8 +1,7 @@
 const { LOST_FOUND_OPTIONS, CURRENCY_CODES } = require('../utils/constants');
 const { isValidEmail, isValidUrl, normalizeUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
-const { getClassifiedCategoryKeys, findCategory, getOptionNames } = require('./categories');
-const { getListingCategoryKeys, findListingCategory } = require('./listingCategories');
+const { getClassifiedCategoryKeys, findCategory, getOptionNames, getListingCategoryKeys, findListingCategory } = require('./taxonomy');
 
 class ValidationError extends Error {
   constructor(errors) {

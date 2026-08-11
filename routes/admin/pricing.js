@@ -1,8 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
-const { getClassifiedCategoryKeys } = require('../../services/categories');
-const { getListingCategoryKeys } = require('../../services/listingCategories');
+const { getClassifiedCategoryKeys, getListingCategoryKeys } = require('../../services/taxonomy');
 
 const router = express.Router();
 router.use(requireAdmin);

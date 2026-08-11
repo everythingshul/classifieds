@@ -121,7 +121,15 @@ async function openEditor(id) {
   panel.innerHTML = `
     <div class="admin-card">
       <h3 style="margin-top:0">Edit: ${escapeHtml(p.title)} <span class="status-pill status-${p.status}">${p.status}</span></h3>
-      <p class="hint">${p.viewCount} views (${p.uniqueViewCount} unique) · ${p.clickCount} clicks (${p.uniqueClickCount} unique)</p>
+      <p class="hint">${p.viewCount} views (${p.uniqueViewCount} unique) · ${p.clickCount} clicks (${p.uniqueClickCount} unique) <span class="hint">(all-time)</span></p>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+        <label class="hint" style="font-weight:700">Filter by date/time:</label>
+        <input type="datetime-local" id="statsFrom" style="font-size:.78rem">
+        <span class="hint">to</span>
+        <input type="datetime-local" id="statsTo" style="font-size:.78rem">
+        <button type="button" class="btn btn-sm btn-outline" id="statsFilterBtn">Filter</button>
+      </div>
+      <p class="hint" id="rangeStats"></p>
       <form id="editForm">
         <div class="form-cols">
           <div class="form-row"><label>Title</label><input name="title" value="${escapeHtml(p.title)}" ${titleLimit ? `maxlength="${titleLimit}"` : ''}>${titleLimit ? `<div class="char-counter" id="titleCounter"></div>` : ''}</div>
@@ -189,6 +197,22 @@ async function openEditor(id) {
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}
     </div>
   `;
+
+  document.getElementById('statsFilterBtn').addEventListener('click', async () => {
+    const fromVal = document.getElementById('statsFrom').value;
+    const toVal = document.getElementById('statsTo').value;
+    const params = {};
+    if (fromVal) params.from = new Date(fromVal).getTime();
+    if (toVal) params.to = new Date(toVal).getTime();
+    const box = document.getElementById('rangeStats');
+    box.textContent = 'Loading…';
+    try {
+      const stats = await AdminApi.postStats(id, params);
+      box.textContent = `In range: ${stats.views} views (${stats.uniqueViews} unique) · ${stats.clicks} clicks (${stats.uniqueClicks} unique)`;
+    } catch (e) {
+      box.textContent = e.message;
+    }
+  });
 
   const titleInput = panel.querySelector('input[name="title"]');
   const descInput = panel.querySelector('textarea[name="description"]');

@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
-const { orderTaxonomyTree } = require('../../services/taxonomySort');
+const { orderTaxonomyTree } = require('../../services/taxonomy');
 
 const router = express.Router();
 router.use(requireAdmin);

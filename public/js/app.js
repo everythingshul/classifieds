@@ -17,6 +17,9 @@
   Router.add('/simchas', renderSimchasListPage);
   Router.add('/simchas/:id', ({ id }) => renderDetailPage(id, 'simcha'));
   Router.add('/search', renderSearchPage);
+  Router.add('/editorials', renderEditorialsListPage);
+  Router.add('/editorials/submit', renderEditorialSubmitPage);
+  Router.add('/editorials/:id', ({ id }) => renderEditorialDetailPage(id));
   Router.add('/post', renderPostWizard);
   Router.add('/bookmarks', renderBookmarksPage);
   Router.add('/terms', renderTermsPage);

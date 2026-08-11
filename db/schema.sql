@@ -221,3 +221,67 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(crea
 CREATE INDEX IF NOT EXISTS idx_analytics_events_visitor ON analytics_events(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(type);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_post ON analytics_events(post_id);
+
+-- Editorials: a separate, free-to-post content type (opinion pieces/community
+-- writing) - always requires admin approval, unlike classifieds/listings
+-- which only need it when photos are attached. poster_first_name/last_name/
+-- email/phone are never shown publicly (same "private poster record" pattern
+-- as simchas) - pen_name is the public byline.
+CREATE TABLE IF NOT EXISTS editorials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  public_id TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  pen_name TEXT NOT NULL,
+  poster_first_name TEXT NOT NULL,
+  poster_last_name TEXT NOT NULL,
+  poster_email TEXT NOT NULL,
+  poster_phone TEXT,
+  notes_to_admin TEXT,
+  status TEXT NOT NULL DEFAULT 'pending_approval',
+  -- pending_approval | live | rejected | removed
+  rejection_reason TEXT,
+  is_featured INTEGER NOT NULL DEFAULT 0,
+  view_count INTEGER NOT NULL DEFAULT 0,
+  click_count INTEGER NOT NULL DEFAULT 0,
+  admin_notes TEXT,
+  published_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_editorials_status ON editorials(status);
+CREATE INDEX IF NOT EXISTS idx_editorials_published_at ON editorials(published_at);
+
+CREATE TABLE IF NOT EXISTS editorial_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  editorial_id INTEGER NOT NULL REFERENCES editorials(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+-- Videos are stored as external links (YouTube/Vimeo etc.), embedded on the
+-- detail page - hosting/transcoding video files ourselves is a different
+-- order of infrastructure than this site otherwise needs.
+CREATE TABLE IF NOT EXISTS editorial_videos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  editorial_id INTEGER NOT NULL REFERENCES editorials(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+-- Comments always require approval before showing publicly - pen_name +
+-- email only (no full name), matching the lighter-weight identity bar for
+-- commenting vs. submitting a full editorial.
+CREATE TABLE IF NOT EXISTS editorial_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  editorial_id INTEGER NOT NULL REFERENCES editorials(id) ON DELETE CASCADE,
+  pen_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_approval', -- pending_approval | live | rejected
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_editorial_comments_editorial ON editorial_comments(editorial_id);
+CREATE INDEX IF NOT EXISTS idx_editorial_comments_status ON editorial_comments(status);

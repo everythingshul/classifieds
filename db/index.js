@@ -155,6 +155,8 @@ function seed() {
   seed('simcha_retention_max_days', 365);
   seed('admin_notify_email', process.env.ADMIN_NOTIFY_EMAIL || '');
   seed('char_limits', { title: 80, description: 200 });
+  seed('editorial_instructions_html', '<p>Share your perspective with the community. Please keep submissions <b>respectful</b> and <i>on-topic</i> - all editorials are reviewed before publishing.</p>');
+  seed('editorial_char_limits', { title: 150, body: 20000 });
   seed('default_location', { label: 'Brooklyn, NY', lat: 40.6782, lng: -73.9442, tzid: 'America/New_York' });
 
   // Integration settings - editable from the admin portal's Settings page so

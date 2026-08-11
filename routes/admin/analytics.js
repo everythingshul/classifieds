@@ -7,9 +7,11 @@ router.use(requireAdmin);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// SQLite day bucket from a millisecond epoch column - used for both the
-// timeseries and the "recurring visitor" (active on >1 distinct day) check.
-const DAY_EXPR = "date(created_at / 1000, 'unixepoch')";
+// SQLite day bucket from a millisecond epoch column, shifted by the viewer's
+// timezone offset (passed from the client via getTimezoneOffset(), in
+// minutes) before bucketing - otherwise SQLite's date() operates in UTC and
+// a day's activity gets split across two bars for anyone not on UTC.
+const DAY_EXPR = "date((created_at / 1000) - ?, 'unixepoch')";
 
 function computeTotals(from, to) {
   return {
@@ -44,6 +46,7 @@ function computeTotals(from, to) {
 router.get('/', (req, res) => {
   const to = req.query.to ? Number(req.query.to) : Date.now();
   const from = req.query.from ? Number(req.query.from) : to - 30 * DAY_MS;
+  const tzOffsetSec = (Number(req.query.tzOffsetMinutes) || 0) * 60;
 
   const totals = computeTotals(from, to);
 
@@ -77,7 +80,7 @@ router.get('/', (req, res) => {
     WHERE created_at BETWEEN ? AND ?
     GROUP BY date
     ORDER BY date
-  `).all(from, to);
+  `).all(tzOffsetSec, from, to);
 
   const byPostType = db.prepare(`
     SELECT post_type AS type, COUNT(*) AS c FROM analytics_events
