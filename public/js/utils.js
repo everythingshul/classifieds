@@ -111,6 +111,25 @@ function populateCountrySelect(selectEl, selected) {
   selectEl.innerHTML = countries.map((c) => `<option value="${c.code}" ${c.code === value ? 'selected' : ''}>${c.code} +${c.dial}</option>`).join('');
 }
 
+// Stripe.js is loaded on demand (not as a static <script> tag in index.html)
+// so it never runs - and never injects its own fraud-detection iframe -
+// on pages that never show a payment form. Only the post-a-listing checkout
+// step actually calls mountEmbeddedCheckout, so that's the only place it loads.
+let _stripeJsPromise = null;
+function loadStripeJs() {
+  if (window.Stripe) return Promise.resolve();
+  if (!_stripeJsPromise) {
+    _stripeJsPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://js.stripe.com/v3/';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Stripe.js'));
+      document.head.appendChild(script);
+    });
+  }
+  return _stripeJsPromise;
+}
+
 // Mounts Stripe's Embedded Checkout (the payment form itself renders inline
 // in `containerEl`, no redirect to a Stripe-hosted page) using the
 // publishable key exposed via /api/config.
@@ -121,7 +140,10 @@ async function mountEmbeddedCheckout(containerEl, clientSecret) {
     containerEl.innerHTML = `<p class="error-list">Payments are not configured on this site yet. Please contact the site owner.</p>`;
     return null;
   }
-  if (!_stripeInstance) _stripeInstance = Stripe(pk);
+  if (!_stripeInstance) {
+    await loadStripeJs();
+    _stripeInstance = Stripe(pk);
+  }
   const checkout = await _stripeInstance.initEmbeddedCheckout({ clientSecret });
   checkout.mount(containerEl);
   return checkout;
