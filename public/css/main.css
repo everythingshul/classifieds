@@ -34,7 +34,13 @@ body {
 body[dir='rtl'] { direction: rtl; }
 
 #layout { display: flex; flex-direction: column; min-height: 100vh; }
-#layout main#app { flex: 1 0 auto; }
+/* min-width: 0 - #layout is a column-direction flex container, so #app's
+   cross-axis (horizontal) automatic minimum size defaults to its content's
+   min-content width unless overridden. Without this, #app (and everything
+   inside it, including .home-main's own min-width:0 fix) is capped to
+   whatever oversized width #app's unbreakable content demands, regardless
+   of what's fixed further down the tree. */
+#layout main#app { flex: 1 0 auto; min-width: 0; }
 #layout .site-footer { flex-shrink: 0; }
 
 h1, h2, h3, h4 { font-family: var(--font-head); color: var(--navy); margin: 0 0 .4em; font-weight: 800; letter-spacing: -.01em; }
