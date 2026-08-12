@@ -143,21 +143,20 @@ p { margin: 0 0 .7em; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---------- Home page layout: main column + sidebar (zmanim/daf yomi/weather) ---------- */
+/* Desktop only: two columns via grid. On mobile this wrapper is demoted to
+   plain block flow (see the media query below) rather than a single-column
+   grid - the browse/search pages' card grids render correctly on every
+   device precisely because they sit in ordinary block containers, and the
+   home page was the only page wrapping its content in a grid ancestor, so
+   on mobile it now uses the exact same structure as the pages that work. */
 .home-grid { display: grid; grid-template-columns: 1fr 300px; gap: 24px; align-items: start; }
-/* On mobile the sidebar (zmanim/daf yomi/weather) drops to the bottom, under
-   the listings - it's already the second child in markup, so a single-column
-   grid puts it there on its own; no order override needed (or wanted). */
-@media (max-width: 860px) { .home-grid { grid-template-columns: 1fr; } .home-sidebar { padding-top: 0; } }
-/* min-width:0 alone is the textbook fix here, and it's confirmed applied,
-   but live diagnostics on a real device still showed this box refusing to
-   shrink below its content's width regardless - an actual cross-browser
-   inconsistency in how the "automatic minimum size" spec rule interacts
-   with grid stretch, not something worth chasing further. Forcing an
-   explicit 100% width (not just removing the lower bound) and clipping any
-   residual content overflow is a blunter, more browser-proof fix for the
-   same problem. */
-.home-main { min-width: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
+.home-main { min-width: 0; }
 .home-sidebar { display: flex; flex-direction: column; gap: 14px; padding-top: 30px; }
+@media (max-width: 860px) {
+  .home-grid { display: block; }
+  .home-main { width: auto; }
+  .home-sidebar { padding-top: 0; margin-top: 22px; }
+}
 
 /* ---------- Combo widget (sidebar: date + daf yomi + zmanim, one compact card) ---------- */
 .combo-widget { background: #fff; border: 1px solid var(--border); padding: 10px 14px; box-shadow: var(--shadow); font-size: .8rem; }
