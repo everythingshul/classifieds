@@ -184,12 +184,20 @@ p { margin: 0 0 .7em; }
    items, a fixed-width scroll row left a large empty gap next to the home
    sidebar instead of using the space. */
 .carousel { display: flex; flex-wrap: wrap; gap: 10px; }
-.carousel .card { flex: 1 1 210px; }
-/* Same 2-up minimum as .results-grid below - the 210px flex-basis above only
-   ever fits 1 per row at mobile widths, which is what the .results-grid fix
-   didn't cover since the homepage's "Recent X" sections use .carousel, not
-   .results-grid. */
-@media (max-width: 600px) { .carousel { gap: 7px; } .carousel .card { flex: 1 1 calc(50% - 4px); } }
+.carousel .card { flex: 1 1 210px; min-width: 0; }
+/* At mobile widths this switches to CSS Grid with minmax(0, 1fr) columns
+   instead of flex's percentage flex-basis (calc(50% - 4px)) - percentage
+   flex-basis has real, confirmed-on-device ambiguity resolving against a
+   flex container whose own available width comes from a still-being-
+   resolved ancestor chain (grid > flex column > clipped box), where it can
+   end up sized against the content's own max-content width instead of the
+   actual available space. minmax(0, 1fr) has no such ambiguity - it's an
+   explicit, unconditional "never exceed your fair share" instruction. This
+   matches the technique .results-grid below already uses successfully. */
+@media (max-width: 600px) {
+  .carousel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .carousel .card { min-width: 0; }
+}
 
 /* ---------- Cards ---------- */
 /* Square corners by design - no image, the card is a compact text summary;
