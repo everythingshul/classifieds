@@ -36,16 +36,19 @@ router.get('/', async (req, res, next) => {
     });
 
     const now = Date.now();
+    // Featured/Striking posts jump to the top on the classifieds/listings
+    // browse pages and within their category, but the home page shows recent
+    // activity without that priority - so no is_featured_strike ordering here.
     const recentClassifieds = db
       .prepare(
         `SELECT * FROM posts WHERE type = 'classified' AND status = 'live' AND (expires_at IS NULL OR expires_at > ?)
-         ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT 10`
+         ORDER BY boosted_at DESC LIMIT 10`
       )
       .all(now);
     const recentListings = db
       .prepare(
         `SELECT * FROM posts WHERE type = 'listing' AND status = 'live' AND (expires_at IS NULL OR expires_at > ?)
-         ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT 10`
+         ORDER BY boosted_at DESC LIMIT 10`
       )
       .all(now);
     const recentSimchas = db

@@ -80,7 +80,7 @@ async function renderCreatePostPage() {
             <label>Category</label>
             ${categoriesForType().length ? `<select id="categorySelect">${categoriesForType().map((c) => `<option value="${c.key}" ${category === c.key ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select>` : `<p class="hint">No ${type} categories exist yet - add one under Categories first.</p>`}
           </div>
-          <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${limits.title}"><div class="char-counter" id="titleCounter"></div></div>
+          <div class="form-row"><label>${type === 'listing' ? 'Business/Organization Name' : 'Title'}</label><input type="text" id="f_title" maxlength="${limits.title}"><div class="char-counter" id="titleCounter"></div></div>
           <div class="form-row"><label>Description</label><textarea id="f_description" rows="3" maxlength="${limits.description}"></textarea><div class="char-counter" id="descCounter"></div></div>
           <div id="catFields">${categoryFieldsHtml()}</div>
           <div class="form-row"><label>Location</label><input type="text" id="f_location"></div>

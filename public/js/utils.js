@@ -134,6 +134,16 @@ function loadStripeJs() {
 // in `containerEl`, no redirect to a Stripe-hosted page) using the
 // publishable key exposed via /api/config.
 let _stripeInstance = null;
+// Stripe.js tracks embedded checkout instances page-wide, not per-container -
+// creating a second one via initEmbeddedCheckout() while an earlier one is
+// still active anywhere on the page (even in a different container) throws
+// "You cannot have two Embedded Checkout objects in the DOM at the same
+// time," regardless of how the second mount was triggered (a second listing
+// paid for in the same session, a boost/strike purchase on a post detail
+// page after an earlier checkout wasn't cleaned up, etc). Destroying any
+// previous instance before creating a new one is the fix Stripe's own docs
+// call for.
+let _activeCheckout = null;
 async function mountEmbeddedCheckout(containerEl, clientSecret) {
   const pk = window.SITE_CONFIG?.stripePublishableKey;
   if (!pk) {
@@ -144,8 +154,13 @@ async function mountEmbeddedCheckout(containerEl, clientSecret) {
     await loadStripeJs();
     _stripeInstance = Stripe(pk);
   }
+  if (_activeCheckout) {
+    try { _activeCheckout.destroy(); } catch (e) { /* already destroyed/unmounted - fine */ }
+    _activeCheckout = null;
+  }
   const checkout = await _stripeInstance.initEmbeddedCheckout({ clientSecret });
   checkout.mount(containerEl);
+  _activeCheckout = checkout;
   return checkout;
 }
 

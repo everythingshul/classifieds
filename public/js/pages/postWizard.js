@@ -194,7 +194,7 @@ function renderPostWizard() {
     const initialDescription = (state.data.description || '').slice(0, descLimit);
     shell(`
       <h3 style="margin-top:0">${escapeHtml(catDef.label)}</h3>
-      <div class="form-row"><label>Title</label><input type="text" id="f_title" maxlength="${titleLimit}" value="${escapeHtml(initialTitle)}" required><div class="char-counter" id="titleCounter"></div></div>
+      <div class="form-row"><label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}</label><input type="text" id="f_title" maxlength="${titleLimit}" value="${escapeHtml(initialTitle)}" required><div class="char-counter" id="titleCounter"></div></div>
       <div class="form-row"><label>Description</label><textarea id="f_description" rows="5" maxlength="${descLimit}">${escapeHtml(initialDescription)}</textarea><div class="char-counter" id="descCounter"></div></div>
       <label class="addon-row" style="margin:-4px 0 14px">
         <input type="checkbox" id="f_wantsOversized" ${wantsOversized ? 'checked' : ''}>
@@ -530,7 +530,7 @@ function renderPostWizard() {
           <li><span><b>Total</b></span><span><b>${formatCents(pricing.total)}</b></span></li>
         </ul>
         ${pricing.total > 0 || state.data.promo ? `
-          <div class="form-row" style="max-width:320px">
+          <div class="form-row" id="promoRow" style="max-width:320px">
             <label>Promo code</label>
             <div style="display:flex;gap:6px">
               <input type="text" id="promoInput" style="flex:1;text-transform:uppercase" placeholder="e.g. SAVE10" value="${escapeHtml(state.data.promo?.code || '')}" ${state.data.promo ? 'disabled' : ''}>
@@ -635,6 +635,13 @@ function renderPostWizard() {
           return;
         }
         document.getElementById('reviewActions').style.display = 'none';
+        // The promo code controls sit outside #reviewActions, so without this
+        // they'd stay live after checkout mounts - applying/removing a promo
+        // re-renders the review step, wiping #checkoutContainer without ever
+        // destroying the mounted Stripe checkout first (mountEmbeddedCheckout
+        // now guards against that too, but this avoids triggering it at all).
+        const promoRow = document.getElementById('promoRow');
+        if (promoRow) promoRow.style.display = 'none';
         await mountEmbeddedCheckout(document.getElementById('checkoutContainer'), result.clientSecret);
       } else {
         document.getElementById('app').innerHTML = postSubmittedHtml(result.post);

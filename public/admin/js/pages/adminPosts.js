@@ -132,7 +132,7 @@ async function openEditor(id) {
       <p class="hint" id="rangeStats"></p>
       <form id="editForm">
         <div class="form-cols">
-          <div class="form-row"><label>Title</label><input name="title" value="${escapeHtml(p.title)}" ${titleLimit ? `maxlength="${titleLimit}"` : ''}>${titleLimit ? `<div class="char-counter" id="titleCounter"></div>` : ''}</div>
+          <div class="form-row"><label>${p.type === 'listing' ? 'Business/Organization Name' : 'Title'}</label><input name="title" value="${escapeHtml(p.title)}" ${titleLimit ? `maxlength="${titleLimit}"` : ''}>${titleLimit ? `<div class="char-counter" id="titleCounter"></div>` : ''}</div>
           <div class="form-row"><label>Status</label>
             <select name="status">${['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
           </div>
