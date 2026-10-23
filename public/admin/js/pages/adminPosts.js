@@ -122,6 +122,7 @@ async function openEditor(id) {
     <div class="admin-card">
       <h3 style="margin-top:0">Edit: ${escapeHtml(p.title)} <span class="status-pill status-${p.status}">${p.status}</span></h3>
       <p class="hint">${p.viewCount} views (${p.uniqueViewCount} unique) · ${p.clickCount} clicks (${p.uniqueClickCount} unique) <span class="hint">(all-time)</span></p>
+      <p class="hint">Posted ${formatDate(p.publishedAt || p.createdAt)} <span class="hint">(stays fixed - extending only moves the expiration date)</span> · Expires ${p.savedForever ? 'Never (saved forever)' : p.expiresAt ? formatDate(p.expiresAt) : 'Never'}</p>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
         <label class="hint" style="font-weight:700">Filter by date/time:</label>
         <input type="datetime-local" id="statsFrom" style="font-size:.78rem">
@@ -164,7 +165,7 @@ async function openEditor(id) {
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${p.status === 'pending_approval' ? `<button class="btn btn-gold" id="approveBtn">Approve &amp; Publish</button><button class="btn btn-danger" id="rejectBtn">Reject</button>` : ''}
         ${p.type !== 'simcha' ? `<button class="btn btn-outline" id="boostBtn">Boost to Top</button>` : ''}
-        <button class="btn btn-outline" id="extendBtn">Extend 30 Days</button>
+        <button class="btn btn-outline" id="extendBtn">Extend</button>
         <button class="btn btn-outline" id="saveForeverBtn">${p.savedForever ? 'Saved Forever' : 'Save Forever'}</button>
         <button class="btn btn-danger" id="deleteBtn">Remove Listing</button>
       </div>
@@ -274,7 +275,15 @@ async function openEditor(id) {
   });
   const boostBtn = document.getElementById('boostBtn');
   if (boostBtn) boostBtn.addEventListener('click', async () => { await AdminApi.boostPost(id); toast('Boosted'); });
-  document.getElementById('extendBtn').addEventListener('click', async () => { await AdminApi.extendPost(id, 30); toast('Extended 30 days'); openEditor(id); });
+  document.getElementById('extendBtn').addEventListener('click', async () => {
+    const raw = prompt('Extend this post by how many days?', '14');
+    if (raw === null) return;
+    const days = Number(raw);
+    if (!Number.isFinite(days) || days <= 0) return toast('Enter a valid number of days');
+    await AdminApi.extendPost(id, days);
+    toast(`Extended ${days} day${days === 1 ? '' : 's'}`);
+    openEditor(id);
+  });
   document.getElementById('saveForeverBtn').addEventListener('click', async () => { await AdminApi.saveForever(id); toast('Saved forever'); openEditor(id); });
   document.getElementById('deleteBtn').addEventListener('click', async () => {
     if (!confirm('Remove this listing?')) return;

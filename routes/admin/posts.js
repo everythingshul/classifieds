@@ -313,13 +313,24 @@ router.post('/:id/boost', (req, res) => {
   res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
 });
 
+// Only moves expires_at forward - published_at/created_at are never touched,
+// so the "Posted X ago" date shown publicly (and the Posted date shown to
+// admins) always stays the post's real original post date, however many
+// times it's been extended.
 router.post('/:id/extend', (req, res) => {
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   const days = Number(req.body.days) || 0;
+  if (days <= 0) return res.status(400).json({ error: 'days must be a positive number' });
   const base = post.expires_at && post.expires_at > Date.now() ? post.expires_at : Date.now();
   const newExpiry = base + days * DAY_MS;
-  db.prepare('UPDATE posts SET expires_at = ?, updated_at = ? WHERE id = ?').run(newExpiry, Date.now(), post.id);
+  // Appended to admin_notes (rather than a separate column) so the
+  // extension is documented right alongside the rest of a post's admin
+  // history, with no new UI needed to see it.
+  const stamp = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const note = `[${stamp}] Extended by ${days} day${days === 1 ? '' : 's'} (admin).`;
+  const nextNotes = post.admin_notes ? `${post.admin_notes}\n${note}` : note;
+  db.prepare('UPDATE posts SET expires_at = ?, admin_notes = ?, updated_at = ? WHERE id = ?').run(newExpiry, nextNotes, Date.now(), post.id);
   res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
 });
 
