@@ -330,7 +330,14 @@ router.post('/:id/extend', (req, res) => {
   const stamp = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   const note = `[${stamp}] Extended by ${days} day${days === 1 ? '' : 's'} (admin).`;
   const nextNotes = post.admin_notes ? `${post.admin_notes}\n${note}` : note;
-  db.prepare('UPDATE posts SET expires_at = ?, admin_notes = ?, updated_at = ? WHERE id = ?').run(newExpiry, nextNotes, Date.now(), post.id);
+  // A post the cron job already flipped to 'expired' needs its status
+  // revived back to 'live' too, or it stays invisible on every public page
+  // despite now having a future expiration - extending is meaningless
+  // otherwise. Other non-live statuses (removed, rejected, pending_*,
+  // scheduled) are left alone since those are separate, deliberate admin
+  // decisions that extending shouldn't silently undo.
+  const nextStatus = post.status === 'expired' ? 'live' : post.status;
+  db.prepare('UPDATE posts SET expires_at = ?, status = ?, admin_notes = ?, updated_at = ? WHERE id = ?').run(newExpiry, nextStatus, nextNotes, Date.now(), post.id);
   res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
 });
 
