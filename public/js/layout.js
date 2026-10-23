@@ -48,6 +48,7 @@ function renderLayout(siteName) {
 
   document.getElementById('hamburgerBtn').addEventListener('click', () => {
     document.getElementById('mainNav').classList.toggle('open');
+    document.getElementById('hamburgerBtn').classList.toggle('open');
   });
   document.getElementById('langToggle').addEventListener('click', () => {
     I18N.set(I18N.get() === 'he' ? 'en' : 'he');

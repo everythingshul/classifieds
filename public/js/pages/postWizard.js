@@ -10,15 +10,23 @@ function renderPostWizard() {
 
   function shell(inner) {
     const steps = stepsList();
+    const progressPct = steps.length > 1 ? Math.round((state.step / (steps.length - 1)) * 100) : 0;
     document.getElementById('app').innerHTML = `
       <div class="container" style="padding:30px 0 60px">
         <h1 data-i18n="nav_post">Post an Ad</h1>
-        <div class="wizard-steps">${steps.map((s, i) => `<span class="${i === state.step ? 'active' : ''}">${i + 1}. ${s}</span>`).join('')}</div>
+        <div class="wizard-steps">
+          <div class="wizard-progress-track"><div class="wizard-progress-fill" id="wizardProgressFill"></div></div>
+          <div class="wizard-steps-row">${steps.map((s, i) => `<span class="${i === state.step ? 'active' : i < state.step ? 'done' : ''}">${i + 1}. ${s}</span>`).join('')}</div>
+        </div>
         <div class="form-card">${inner}</div>
       </div>
     `;
     I18N.apply();
     setPageTitle('Post an Ad');
+    // Set after insertion (rather than inline in the markup above) so the
+    // width change is picked up as a transition by .wizard-progress-fill's
+    // CSS instead of just appearing at its final value immediately.
+    requestAnimationFrame(() => { document.getElementById('wizardProgressFill').style.width = `${progressPct}%`; });
   }
 
   function go(step) { state.step = step; render(); }
@@ -526,7 +534,7 @@ function renderPostWizard() {
       ${pricing ? `
         <h3>Pricing</h3>
         <ul class="detail-meta-list">
-          ${pricing.lines.map((l) => `<li><span>${escapeHtml(l.label)}</span><span>${formatCents(l.amount)}</span></li>`).join('')}
+          ${pricing.lines.map((l) => `<li ${l.label.startsWith('Promo') ? 'class="promo-line-new"' : ''}><span>${escapeHtml(l.label)}</span><span>${formatCents(l.amount)}</span></li>`).join('')}
           <li><span><b>Total</b></span><span><b>${formatCents(pricing.total)}</b></span></li>
         </ul>
         ${pricing.total > 0 || state.data.promo ? `
@@ -642,7 +650,9 @@ function renderPostWizard() {
         // now guards against that too, but this avoids triggering it at all).
         const promoRow = document.getElementById('promoRow');
         if (promoRow) promoRow.style.display = 'none';
-        await mountEmbeddedCheckout(document.getElementById('checkoutContainer'), result.clientSecret);
+        const checkoutEl = document.getElementById('checkoutContainer');
+        await mountEmbeddedCheckout(checkoutEl, result.clientSecret);
+        checkoutEl.classList.add('show');
       } else {
         document.getElementById('app').innerHTML = postSubmittedHtml(result.post);
       }
@@ -667,14 +677,20 @@ function postSubmittedHtml(post) {
   if (post.status === 'pending_approval') {
     return `
       <div class="container" style="padding:60px 0;text-align:center;max-width:520px">
-        <h1>Your post has been submitted!</h1>
-        <p>Since it includes photos, it needs a quick admin review before it goes live - usually within a day. You'll see it on the site as soon as it's approved.</p>
-        <p><a href="/" class="btn btn-outline">Back to Home</a></p>
+        <div class="success-pop">
+          ${successCheckHtml()}
+          <h1>Your post has been submitted!</h1>
+          <p>Since it includes photos, it needs a quick admin review before it goes live - usually within a day. You'll see it on the site as soon as it's approved.</p>
+          <p><a href="/" class="btn btn-outline">Back to Home</a></p>
+        </div>
       </div>`;
   }
   return `
     <div class="container" style="padding:60px 0;text-align:center">
-      <h1>Your post is live!</h1>
-      <p><a href="${path}" class="btn">View your post</a></p>
+      <div class="success-pop">
+        ${successCheckHtml()}
+        <h1>Your post is live!</h1>
+        <p><a href="${path}" class="btn">View your post</a></p>
+      </div>
     </div>`;
 }

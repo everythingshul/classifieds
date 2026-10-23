@@ -218,7 +218,22 @@ function toast(msg) {
   el.className = 'toast';
   el.textContent = msg;
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+  setTimeout(() => {
+    el.classList.add('toast-out');
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+  }, 3200);
+}
+
+// A drawn checkmark for payment/posting success moments - shared by the
+// post wizard's success screen and the boost/strike confirmation.
+function successCheckHtml() {
+  return `
+    <div class="success-check" aria-hidden="true">
+      <svg viewBox="0 0 52 52">
+        <circle class="success-check-circle" cx="26" cy="26" r="24"/>
+        <path class="success-check-mark" d="M14 27l7 7 16-16"/>
+      </svg>
+    </div>`;
 }
 
 // Wires up a bold/italic/underline/list toolbar sitting directly before a

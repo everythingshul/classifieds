@@ -81,8 +81,12 @@ async function renderDetailPage(id, type) {
 
   document.getElementById('bookmarkBtn').addEventListener('click', () => {
     const active = Bookmarks.toggle(type, id);
-    document.getElementById('bookmarkBtn').classList.toggle('active', active);
+    const btn = document.getElementById('bookmarkBtn');
+    btn.classList.toggle('active', active);
     document.getElementById('bookmarkLabel').textContent = I18N.t(active ? 'bookmarked' : 'bookmark');
+    btn.classList.remove('pop');
+    void btn.offsetWidth;
+    btn.classList.add('pop');
   });
 
   document.getElementById('reportBtn').addEventListener('click', async () => {
@@ -102,7 +106,12 @@ async function renderDetailPage(id, type) {
   const mainImg = document.getElementById('galleryMain');
   thumbs.forEach((t) => {
     t.addEventListener('click', () => {
-      mainImg.src = t.dataset.src;
+      if (t.dataset.src === mainImg.src) return;
+      mainImg.classList.add('fading');
+      setTimeout(() => {
+        mainImg.src = t.dataset.src;
+        mainImg.classList.remove('fading');
+      }, 150);
       thumbs.forEach((x) => x.classList.remove('active'));
       t.classList.add('active');
     });
@@ -122,7 +131,9 @@ async function renderDetailPage(id, type) {
         }
         if (result.clientSecret) {
           boostForm.style.display = 'none';
-          await mountEmbeddedCheckout(document.getElementById('boostCheckoutContainer'), result.clientSecret);
+          const checkoutEl = document.getElementById('boostCheckoutContainer');
+          await mountEmbeddedCheckout(checkoutEl, result.clientSecret);
+          checkoutEl.classList.add('show');
         } else {
           toast('Done!');
           Router.navigate(window.location.pathname);

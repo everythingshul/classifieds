@@ -19,8 +19,20 @@
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  function render(html) {
-    document.getElementById('content').innerHTML = html;
+  function successCheckHtml() {
+    return `
+      <div class="success-check" aria-hidden="true">
+        <svg viewBox="0 0 52 52">
+          <circle class="success-check-circle" cx="26" cy="26" r="24"/>
+          <path class="success-check-mark" d="M14 27l7 7 16-16"/>
+        </svg>
+      </div>`;
+  }
+
+  // Successful/positive outcomes get the drawn checkmark; the "pending" retry
+  // state further down does not, since nothing has actually succeeded yet.
+  function render(html, { success = false } = {}) {
+    document.getElementById('content').innerHTML = success ? `<div class="success-pop">${successCheckHtml()}${html}</div>` : html;
   }
 
   function postUrl(post) {
@@ -48,44 +60,44 @@
         <h1>Payment Successful</h1>
         <p>Your listing has been boosted to the top.</p>
         <p><a class="btn" href="${data.post ? postUrl(data.post) : '/'}">View your listing</a></p>
-      `);
+      `, { success: true });
     } else if (data.kind === 'strike') {
       render(`
         <h1>Payment Successful</h1>
         <p>Your listing is now featured.</p>
         <p><a class="btn" href="${data.post ? postUrl(data.post) : '/'}">View your listing</a></p>
-      `);
+      `, { success: true });
     } else if (data.post && data.post.status === 'pending_approval') {
       render(`
         <h1>Your post has been submitted!</h1>
         <p>Thank you! Your payment has been received and an invoice was emailed to you. Since it includes photos, it needs a quick admin review before it goes live - usually within a day.</p>
         <p><a class="btn btn-outline" href="/">Back to Home</a></p>
-      `);
+      `, { success: true });
     } else if (data.post) {
       render(`
         <h1>Your post is live!</h1>
         <p>Thank you! Your payment has been received and an invoice was emailed to you.</p>
         <p><a class="btn" href="${postUrl(data.post)}">View your post</a></p>
-      `);
+      `, { success: true });
     } else {
       render(`
         <h1>Payment Successful</h1>
         <p>Thank you! Your payment has been received. If your post included photos, it will go live once approved by our team.</p>
         <p><a class="btn" href="/">Return to Home</a></p>
-      `);
+      `, { success: true });
     }
   }
 
   const sessionId = new URLSearchParams(window.location.search).get('session_id');
   if (!sessionId) {
-    render(`<h1>Payment Successful</h1><p>Thank you!</p><p><a class="btn" href="/">Return to Home</a></p>`);
+    render(`<h1>Payment Successful</h1><p>Thank you!</p><p><a class="btn" href="/">Return to Home</a></p>`, { success: true });
   } else {
     verify(sessionId, 0).catch(() => {
       render(`
         <h1>Payment Successful</h1>
         <p>Thank you! Your payment has been received and your post is being finalized. You'll receive an email confirmation shortly.</p>
         <p><a class="btn" href="/">Return to Home</a></p>
-      `);
+      `, { success: true });
     });
   }
 })();
