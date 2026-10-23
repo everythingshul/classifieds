@@ -18,55 +18,78 @@ const AdminRouter = (() => {
     } catch (e) {
       root.innerHTML = `<div class="error-list">${escapeHtml(e.message)}</div>`;
     }
-    highlightSidebar();
+    highlightNav();
+    closeMobileNav();
     if (typeof refreshNotificationBadges === 'function') refreshNotificationBadges();
   }
   function init() {
     window.addEventListener('hashchange', resolve);
     resolve();
   }
-  function highlightSidebar() {
-    document.querySelectorAll('.admin-sidebar a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === current()));
+  function highlightNav() {
+    document.querySelectorAll('.nav-item').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === current()));
   }
   return { add, resolve, init, current, query };
 })();
+
+const ADMIN_NAV_ITEMS = [
+  { href: '#/dashboard', label: 'Dashboard', badge: 'badge-dashboard' },
+  { href: '#/analytics', label: 'Analytics' },
+  { href: '#/new-post', label: '+ New Post' },
+  { href: '#/moderation', label: 'Moderation', badge: 'badge-moderation' },
+  { href: '#/posts', label: 'All Posts' },
+  { href: '#/editorials', label: 'Editorials', badge: 'badge-editorials' },
+  { href: '#/contact-messages', label: 'Messages', badge: 'badge-contact' },
+  { href: '#/crm', label: 'CRM Search' },
+  { href: '#/categories', label: 'Categories' },
+  { href: '#/pricing', label: 'Pricing' },
+  { href: '#/settings', label: 'Settings' },
+];
 
 function renderShell() {
   if (AdminApi.token()) {
     if (!document.getElementById('adminShell')) {
       document.getElementById('adminRoot').innerHTML = `
-        <div class="admin-shell" id="adminShell">
-          <aside class="admin-sidebar">
-            <div class="brand">Admin Portal</div>
-            <a href="#/dashboard">Dashboard <span class="nav-badge" id="badge-dashboard" style="display:none"></span></a>
-            <a href="#/analytics">Analytics</a>
-            <a href="#/new-post">+ New Post</a>
-            <a href="#/moderation">Moderation Queue <span class="nav-badge" id="badge-moderation" style="display:none"></span></a>
-            <a href="#/posts">All Posts</a>
-            <a href="#/editorials">Editorials <span class="nav-badge" id="badge-editorials" style="display:none"></span></a>
-            <a href="#/contact-messages">Contact Messages <span class="nav-badge" id="badge-contact" style="display:none"></span></a>
-            <a href="#/crm">CRM Search</a>
-            <a href="#/categories">Categories</a>
-            <a href="#/pricing">Pricing</a>
-            <a href="#/settings">Settings</a>
-          </aside>
-          <div class="admin-main">
-            <div class="admin-topbar">
-              <div></div>
-              <button id="logoutBtn">Log Out</button>
+        <div id="adminShell">
+          <header class="app-header">
+            <button class="header-menu-btn" id="hamburgerBtn" aria-label="Menu">&#9776;</button>
+            <div class="brand">
+              <img src="/img/logo.png" onerror="this.style.display='none'" alt="">
+              <span class="brand-name">Admin<span>JListings</span></span>
             </div>
-            <div id="adminContent"></div>
-          </div>
+            <nav id="top-nav">
+              ${ADMIN_NAV_ITEMS.map((item) => `<a class="nav-item" href="${item.href}">${escapeHtml(item.label)}${item.badge ? ` <span class="nav-badge" id="${item.badge}" style="display:none"></span>` : ''}</a>`).join('')}
+            </nav>
+            <div class="header-right">
+              <div class="header-user">
+                <button id="logoutBtn">Log Out</button>
+              </div>
+            </div>
+          </header>
+          <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
+          <main class="admin-page"><div id="adminContent"></div></main>
         </div>`;
       document.getElementById('logoutBtn').addEventListener('click', () => {
         AdminApi.setToken(null);
         window.location.hash = '#/login';
       });
+      document.getElementById('hamburgerBtn').addEventListener('click', toggleMobileNav);
+      document.getElementById('mobileNavOverlay').addEventListener('click', closeMobileNav);
       startNotificationPolling();
     }
   } else {
+    closeMobileNav();
     document.getElementById('adminRoot').innerHTML = `<div id="adminContent"></div>`;
   }
+}
+
+function toggleMobileNav() {
+  document.getElementById('top-nav').classList.toggle('mob-open');
+  document.getElementById('mobileNavOverlay').classList.toggle('show');
+}
+function closeMobileNav() {
+  document.getElementById('top-nav')?.classList.remove('mob-open');
+  document.getElementById('mobileNavOverlay')?.classList.remove('show');
 }
 
 let _notifPollTimer = null;

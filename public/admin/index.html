@@ -6,11 +6,24 @@
 <title>Admin — JListings</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="/favicon-white.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Frank+Ruhl+Libre:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/main.css">
 <link rel="stylesheet" href="/admin/css/admin.css">
 </head>
 <body>
 <div id="adminRoot"></div>
+
+<!-- Shared popup used by every admin page instead of a separate inline panel -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)Modal.close()">
+  <div id="modal-box" class="modal-box">
+    <div class="modal-hdr">
+      <h2 id="modal-title"></h2>
+      <button type="button" onclick="Modal.close()" class="btn-icon" aria-label="Close">&#10005;</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<div id="toast-wrap"></div>
 
 <script src="/admin/js/adminUtils.js"></script>
 <script src="/js/placesAutocomplete.js"></script>

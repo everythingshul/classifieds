@@ -16,7 +16,7 @@ async function renderPostsPage(query) {
       <button class="btn btn-sm" type="submit">Filter</button>
     </form>
 
-    <table class="admin-table">
+    <div class="tw"><table class="admin-table">
       <thead><tr><th>Title</th><th>Type</th><th>Category</th><th>Status</th><th>Views</th><th>Clicks</th><th>Expires</th><th></th></tr></thead>
       <tbody>
         ${data.posts.map((p) => `
@@ -28,15 +28,17 @@ async function renderPostsPage(query) {
             <td>${p.viewCount}</td>
             <td>${p.clickCount}</td>
             <td>${p.expiresAt ? formatDate(p.expiresAt) : (p.savedForever ? 'Never' : '—')}</td>
-            <td><button class="btn btn-sm edit-btn" data-id="${p.id}">Edit</button></td>
+            <td><div class="actions">
+              <button class="btn btn-sm edit-btn" data-id="${p.id}">Edit</button>
+              <button class="btn btn-sm btn-outline extend-list-btn" data-id="${p.id}">Extend</button>
+            </div></td>
           </tr>
         `).join('')}
       </tbody>
-    </table>
+    </table></div>
     <div class="pagination">
       ${Array.from({ length: data.totalPages }, (_, i) => i + 1).map((p) => `<a href="#/posts?${new URLSearchParams({ ...filters, page: p })}" class="${p === data.page ? 'active' : ''}">${p}</a>`).join('')}
     </div>
-    <div id="editorPanel"></div>
   `;
 
   document.getElementById('filterForm').addEventListener('submit', (e) => {
@@ -47,11 +49,26 @@ async function renderPostsPage(query) {
     window.location.hash = `#/posts?${new URLSearchParams(next)}`;
   });
   root.querySelectorAll('.edit-btn').forEach((btn) => btn.addEventListener('click', () => openEditor(btn.dataset.id)));
+  root.querySelectorAll('.extend-list-btn').forEach((btn) => btn.addEventListener('click', () => extendPost(btn.dataset.id, () => renderPostsPage(query))));
 
   if (query.q) {
     const exact = data.posts.find((p) => p.publicId === query.q);
     if (exact) openEditor(exact.id);
   }
+}
+
+// Shared by the list's own Extend button and the one inside the edit
+// popup, so both stay in sync - days defaults to 14, with the option to
+// enter a different amount. onDone re-renders whatever's showing the post
+// (the list row, or the open editor) with the updated expiration.
+async function extendPost(id, onDone) {
+  const raw = prompt('Extend this post by how many days?', '14');
+  if (raw === null) return;
+  const days = Number(raw);
+  if (!Number.isFinite(days) || days <= 0) return toast('Enter a valid number of days', 'err');
+  await AdminApi.extendPost(id, days);
+  toast(`Extended ${days} day${days === 1 ? '' : 's'}`);
+  onDone();
 }
 
 function toDatetimeLocalValue(ms) {
@@ -114,13 +131,12 @@ function fieldsEditorHtml(p, cfg) {
 
 async function openEditor(id) {
   const [p, cfg] = await Promise.all([AdminApi.post(id), fetch('/api/config').then((r) => r.json())]);
-  const panel = document.getElementById('editorPanel');
   const baseLimits = p.type === 'listing' ? cfg.listingCharLimits : p.type === 'simcha' ? cfg.simchaCharLimits : cfg.charLimits;
   const limits = p.isOversized ? cfg.oversizedCharLimits : baseLimits;
   const titleLimit = p.type !== 'simcha' ? limits.title : null;
-  panel.innerHTML = `
-    <div class="admin-card">
-      <h3 style="margin-top:0">Edit: ${escapeHtml(p.title)} <span class="status-pill status-${p.status}">${p.status}</span></h3>
+  const typeLabel = p.type === 'listing' ? 'Listing' : p.type === 'simcha' ? 'Simcha' : 'Classified';
+  Modal.open(`Edit ${typeLabel}: ${p.title}`, `
+      <p class="hint"><span class="status-pill status-${p.status}">${p.status}</span></p>
       <p class="hint">${p.viewCount} views (${p.uniqueViewCount} unique) · ${p.clickCount} clicks (${p.uniqueClickCount} unique) <span class="hint">(all-time)</span></p>
       <p class="hint">Posted ${formatDate(p.publishedAt || p.createdAt)} <span class="hint">(stays fixed - extending only moves the expiration date)</span> · Expires ${p.savedForever ? 'Never (saved forever)' : p.expiresAt ? formatDate(p.expiresAt) : 'Never'}</p>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
@@ -196,8 +212,8 @@ async function openEditor(id) {
         </tr>`;
       }).join('')}</tbody></table>` : ''}
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}
-    </div>
-  `;
+  `, { lg: true });
+  const panel = document.getElementById('modal-body');
 
   document.getElementById('statsFilterBtn').addEventListener('click', async () => {
     const fromVal = document.getElementById('statsFrom').value;
@@ -275,20 +291,13 @@ async function openEditor(id) {
   });
   const boostBtn = document.getElementById('boostBtn');
   if (boostBtn) boostBtn.addEventListener('click', async () => { await AdminApi.boostPost(id); toast('Boosted'); });
-  document.getElementById('extendBtn').addEventListener('click', async () => {
-    const raw = prompt('Extend this post by how many days?', '14');
-    if (raw === null) return;
-    const days = Number(raw);
-    if (!Number.isFinite(days) || days <= 0) return toast('Enter a valid number of days');
-    await AdminApi.extendPost(id, days);
-    toast(`Extended ${days} day${days === 1 ? '' : 's'}`);
-    openEditor(id);
-  });
+  document.getElementById('extendBtn').addEventListener('click', () => extendPost(id, () => openEditor(id)));
   document.getElementById('saveForeverBtn').addEventListener('click', async () => { await AdminApi.saveForever(id); toast('Saved forever'); openEditor(id); });
   document.getElementById('deleteBtn').addEventListener('click', async () => {
     if (!confirm('Remove this listing?')) return;
     await AdminApi.deletePost(id);
     toast('Removed');
+    Modal.close();
     renderPostsPage(AdminRouter.query());
   });
   const approveBtn = document.getElementById('approveBtn');
