@@ -139,7 +139,7 @@ table.admin-table tr:last-child td { border-bottom: none; }
 
 /* ── Buttons (palette only - sizing/layout already comes from main.css's .btn) ── */
 #adminRoot .btn-outline { border-color: var(--navy); color: var(--navy); }
-#adminRoot .btn-outline:hover { background: var(--navy); }
+#adminRoot .btn-outline:hover { background: var(--navy); color: #fff; }
 #adminRoot .btn-gold { background: var(--accent); border-color: var(--accent); }
 #adminRoot .btn-gold:hover { background: #1b8fcc; border-color: #1b8fcc; }
 #adminRoot .btn:not(.btn-outline):not(.btn-gold):not(.btn-danger) { background: var(--navy); border-color: var(--navy); }
