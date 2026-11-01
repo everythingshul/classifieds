@@ -290,3 +290,24 @@ CREATE TABLE IF NOT EXISTS editorial_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_editorial_comments_editorial ON editorial_comments(editorial_id);
 CREATE INDEX IF NOT EXISTS idx_editorial_comments_status ON editorial_comments(status);
+
+-- Daily email digest subscriptions. categories is a JSON array of strings
+-- like "classified:items-for-sale", "listing:restaurants", "simcha",
+-- "editorial" - one row per email (re-subscribing just updates it in place).
+-- Double opt-in (status starts 'pending' until the confirm link is
+-- clicked) and a one-click unsubscribe (public_id doubles as the
+-- confirm/unsubscribe token) are both there specifically to protect sender
+-- reputation/deliverability, not just as a UX nicety.
+CREATE TABLE IF NOT EXISTS email_subscriptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  public_id TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  categories TEXT NOT NULL,
+  send_hour INTEGER NOT NULL DEFAULT 8, -- 0-23, interpreted in the site's configured timezone (Settings -> Default Location)
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | confirmed | unsubscribed
+  confirmed_at INTEGER,
+  last_sent_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_email_subscriptions_status_hour ON email_subscriptions(status, send_hour);

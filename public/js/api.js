@@ -44,5 +44,8 @@ const Api = (() => {
     registerEditorialImpressions: (ids) => req('/editorials/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
     registerEditorialClicks: (ids) => req('/editorials/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
     likeEditorial: (id) => req(`/editorials/${id}/like`, { method: 'POST' }),
+    subscriptionTopics: () => req('/subscriptions/topics'),
+    subscriptionManage: (token) => req(`/subscriptions/manage?token=${encodeURIComponent(token)}`),
+    subscribe: (body) => req('/subscriptions', { method: 'POST', body }),
   };
 })();

@@ -34,6 +34,10 @@ const I18N = (() => {
       editorial_read_more: 'Read More',
       home_editorials_heading: 'From Our Editorials',
       like: 'Like', liked: 'Liked',
+      subscribe_nav: 'Email Updates', subscribe_title: 'Daily Email Updates',
+      subscribe_tagline: "Pick what you want to hear about and when - one short email a day, only when there's something new.",
+      subscribe_time_label: 'What time should it arrive?', subscribe_topics_label: 'What do you want to follow?',
+      subscribe_submit_btn: 'Subscribe', subscribe_save_btn: 'Save Preferences', unsubscribe: 'Unsubscribe',
     },
     he: {
       nav_home: 'בית', nav_classifieds: 'מודעות', nav_listings: 'רשימות', nav_simchas: 'שמחות',
@@ -69,6 +73,10 @@ const I18N = (() => {
       editorial_read_more: 'קרא עוד',
       home_editorials_heading: 'מהמאמרים שלנו',
       like: 'אהבתי', liked: 'אהבתי!',
+      subscribe_nav: 'עדכוני אימייל', subscribe_title: 'עדכוני אימייל יומיים',
+      subscribe_tagline: 'בחרו מה מעניין אתכם ומתי - אימייל קצר אחד ביום, רק כשיש משהו חדש.',
+      subscribe_time_label: 'באיזו שעה לשלוח?', subscribe_topics_label: 'מה תרצו לעקוב אחריו?',
+      subscribe_submit_btn: 'הרשמה', subscribe_save_btn: 'שמור העדפות', unsubscribe: 'בטל הרשמה',
     },
   };
 

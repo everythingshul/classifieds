@@ -25,6 +25,7 @@
   Router.add('/terms', renderTermsPage);
   Router.add('/refund-policy', renderRefundPolicyPage);
   Router.add('/contact', renderContactPage);
+  Router.add('/subscribe', renderSubscribePage);
 
   Router.init();
 })();

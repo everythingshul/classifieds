@@ -85,6 +85,7 @@ async function renderDashboardPage() {
       <div class="stat-card"><div class="num">${formatCents(stats.revenueCents)}</div><div class="label">Total Revenue</div>${stats.refundedCents > 0 ? `<div class="hint" style="margin-top:2px">${formatCents(stats.refundedCents)} refunded</div>` : ''}</div>
       <div class="stat-card"><div class="num">${stats.totalViews}</div><div class="label">Total Views</div></div>
       <div class="stat-card"><div class="num">${stats.totalClicks}</div><div class="label">Total Clicks</div></div>
+      <div class="stat-card"><div class="num">${stats.confirmedSubscribers}</div><div class="label">Email Subscribers</div></div>
     </div>
 
     <div class="admin-card">

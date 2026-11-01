@@ -68,6 +68,7 @@ app.use('/api/posts', require('./routes/public/posts'));
 app.use('/api/contact', require('./routes/public/contact'));
 app.use('/api/analytics', require('./routes/public/analytics'));
 app.use('/api/editorials', require('./routes/public/editorials'));
+app.use('/api/subscriptions', require('./routes/public/subscriptions'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));

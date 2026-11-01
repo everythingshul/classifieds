@@ -17,7 +17,8 @@ router.get('/', (req, res) => {
   const totalViews = db.prepare('SELECT SUM(view_count) AS v FROM posts').get().v || 0;
   const totalClicks = db.prepare('SELECT SUM(click_count) AS c FROM posts').get().c || 0;
   const topViewed = db.prepare('SELECT id, public_id, title, type, category, view_count, click_count FROM posts ORDER BY view_count DESC LIMIT 10').all();
-  res.json({ byStatus, byType, pendingApproval, revenueCents: revenue, grossRevenueCents: grossRevenue, refundedCents: totalRefunded, totalViews, totalClicks, topViewed });
+  const confirmedSubscribers = db.prepare("SELECT COUNT(*) AS c FROM email_subscriptions WHERE status = 'confirmed'").get().c;
+  res.json({ byStatus, byType, pendingApproval, revenueCents: revenue, grossRevenueCents: grossRevenue, refundedCents: totalRefunded, totalViews, totalClicks, topViewed, confirmedSubscribers });
 });
 
 module.exports = router;

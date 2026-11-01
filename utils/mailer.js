@@ -37,7 +37,7 @@ function toRecipientList(to) {
     .map((email) => ({ email }));
 }
 
-async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments, replyTo }) {
+async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments, replyTo, headers }) {
   const body = {
     sender: parseFromAddress(from),
     to: toRecipientList(to),
@@ -45,6 +45,7 @@ async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments
     htmlContent: html || undefined,
     textContent: text || undefined,
     replyTo: replyTo ? parseFromAddress(replyTo) : undefined,
+    headers: headers && Object.keys(headers).length ? headers : undefined,
   };
   if (attachments && attachments.length) {
     body.attachment = attachments.map((a) => ({
@@ -64,7 +65,7 @@ async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments
   return res.json();
 }
 
-async function sendMail({ to, subject, html, text, attachments, replyTo }) {
+async function sendMail({ to, subject, html, text, attachments, replyTo, headers }) {
   const from = runtimeConfig.get('mail_from', 'MAIL_FROM') || 'no-reply@example.com';
   const provider = runtimeConfig.get('mail_provider', 'MAIL_PROVIDER') || 'smtp';
   // Falls back to the configured Reply-To address so every outgoing email
@@ -78,10 +79,10 @@ async function sendMail({ to, subject, html, text, attachments, replyTo }) {
       console.log('[mailer] Brevo selected but no API key set, would have sent:', { to, subject });
       return { messageId: 'dry-run' };
     }
-    return sendViaBrevo({ apiKey, from, to, subject, html, text, attachments, replyTo });
+    return sendViaBrevo({ apiKey, from, to, subject, html, text, attachments, replyTo, headers });
   }
 
-  return getTransporter().sendMail({ from, to, subject, html, text, attachments, replyTo });
+  return getTransporter().sendMail({ from, to, subject, html, text, attachments, replyTo, headers });
 }
 
 async function notifyAdmin(subject, html) {
