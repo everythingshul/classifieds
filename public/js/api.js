@@ -1,4 +1,8 @@
 const Api = (() => {
+  // Shared by every impression/click registration call below - same opt-out
+  // as Analytics.trackPageview (the admin "don't count my visits" toggle).
+  function trackingOk() { return typeof Analytics === 'undefined' || !Analytics.isDisabled(); }
+
   async function req(path, opts = {}) {
     const res = await fetch(`/api${path}`, {
       headers: opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
@@ -33,19 +37,21 @@ const Api = (() => {
     report: (id, body) => req(`/posts/${id}/report`, { method: 'POST', body }),
     boost: (id, body) => req(`/posts/${id}/boost`, { method: 'POST', body }),
     strike: (id, body) => req(`/posts/${id}/strike`, { method: 'POST', body }),
-    registerImpressions: (ids) => req('/posts/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
-    registerClicks: (ids) => req('/posts/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
+    registerImpressions: (ids) => trackingOk() ? req('/posts/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
+    registerClicks: (ids) => trackingOk() ? req('/posts/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
     contact: (body) => req('/contact', { method: 'POST', body }),
     editorials: (params) => req(`/editorials?${new URLSearchParams(params)}`),
     editorialDetail: (id) => req(`/editorials/${id}`),
     editorialInstructions: () => req('/editorials/instructions'),
     submitEditorial: (formData) => req('/editorials', { method: 'POST', body: formData }),
     submitEditorialComment: (id, body) => req(`/editorials/${id}/comments`, { method: 'POST', body }),
-    registerEditorialImpressions: (ids) => req('/editorials/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
-    registerEditorialClicks: (ids) => req('/editorials/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}),
+    registerEditorialImpressions: (ids) => trackingOk() ? req('/editorials/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
+    registerEditorialClicks: (ids) => trackingOk() ? req('/editorials/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
     likeEditorial: (id) => req(`/editorials/${id}/like`, { method: 'POST' }),
-    subscriptionTopics: () => req('/subscriptions/topics'),
     subscriptionManage: (token) => req(`/subscriptions/manage?token=${encodeURIComponent(token)}`),
     subscribe: (body) => req('/subscriptions', { method: 'POST', body }),
+    banners: (zone) => req(`/banners?zone=${encodeURIComponent(zone)}`),
+    registerBannerImpressions: (ids) => trackingOk() ? req('/banners/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
+    registerBannerClicks: (ids) => trackingOk() ? req('/banners/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
   };
 })();

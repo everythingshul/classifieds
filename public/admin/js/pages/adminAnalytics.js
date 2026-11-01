@@ -1,5 +1,13 @@
 const ANALYTICS_PALETTE = ['#1f3b57', '#b08d3f', '#2f6b63', '#a13d3d', '#62666b', '#8a6fae', '#3f7fa1', '#c98a3f'];
 
+// Reads the same localStorage flag the public site's tracking script
+// (public/js/analytics.js) checks before firing - set from here, read there,
+// both same-origin so it carries over to this browser's own visits to the
+// public pages.
+function noTrackEnabled() {
+  try { return !!localStorage.getItem('esc_no_track'); } catch (e) { return false; }
+}
+
 // CSS conic-gradient donut - no charting library needed, and it's legible
 // in both a screenshot and a live page. A plain <ul> legend does the actual
 // labeling since color alone isn't accessible.
@@ -194,7 +202,24 @@ async function renderAnalyticsPage(query) {
       <h3 style="margin-top:0">Top Editorials</h3>
       ${data.topEditorials.length ? `<table class="admin-table"><thead><tr><th>Title</th><th>Views</th><th>Unique Views</th><th>Clicks</th><th>Likes</th></tr></thead><tbody>${data.topEditorials.map((e) => `<tr><td><a href="#/editorials?q=${escapeHtml(e.publicId)}">${escapeHtml(e.title)}</a></td><td>${e.views}</td><td>${e.uniqueViews}</td><td>${e.clicks}</td><td>${e.likeCount}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
     </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top:0">Your Own Visits</h3>
+      <label class="addon-row" style="margin:0">
+        <input type="checkbox" id="noTrackToggle" ${noTrackEnabled() ? 'checked' : ''}>
+        Don't count my visits in this browser
+      </label>
+      <p class="hint" style="margin-top:6px">Tick this on every device/browser you use to browse the public site, so your own clicks don't skew the numbers above. It's per-browser (stored only here), not account-wide - the admin pages themselves are never counted either way.</p>
+    </div>
   `;
+
+  document.getElementById('noTrackToggle').addEventListener('change', (e) => {
+    try {
+      if (e.target.checked) localStorage.setItem('esc_no_track', '1');
+      else localStorage.removeItem('esc_no_track');
+    } catch (err) { /* ignore - private browsing etc. */ }
+    toast(e.target.checked ? "Your visits on this browser won't be counted" : 'Your visits will be counted again');
+  });
 
   document.getElementById('customRangeForm').addEventListener('submit', (e) => {
     e.preventDefault();
