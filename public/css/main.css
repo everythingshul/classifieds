@@ -57,7 +57,6 @@ body[dir='rtl'] { direction: rtl; }
 .site-banner { display: block; margin-bottom: 10px; }
 .site-banner:last-child { margin-bottom: 0; }
 .site-banner img { display: block; width: 100%; height: auto; border: 1px solid var(--border); }
-#sidebarBannerSlot .site-banner img { max-height: 250px; object-fit: cover; }
 
 h1, h2, h3, h4 { font-family: var(--font-head); color: var(--navy); margin: 0 0 .4em; font-weight: 800; letter-spacing: -.01em; }
 h1 { font-size: 1.5rem; }
@@ -103,16 +102,27 @@ p { margin: 0 0 .7em; }
 .main-nav a:hover, .main-nav a.active { background: rgba(31,59,87,.08); color: var(--navy); }
 .nav-subscribe {
   display: inline-flex; align-items: center; gap: 5px;
-  background: var(--gold); border: 1px solid var(--gold); color: #fff !important; font-weight: 700;
+  /* Same color as the +Post button (var(--cta)) for a consistent pair of
+     CTAs in the header. !important on background/color: .main-nav a.active
+     (toggled by the router whenever the current path matches a nav link -
+     true for this link while actually on /subscribe) is more specific than
+     the plain .nav-subscribe class and would otherwise repaint it back to
+     the generic muted nav-link look instead of staying this button's own
+     color before, during hover, and after being clicked. */
+  background: var(--cta) !important; border: 1px solid var(--cta); color: #fff !important; font-weight: 700;
   border-radius: 999px; margin-inline-start: 6px; flex-shrink: 0;
-  box-shadow: 0 0 0 0 rgba(176,141,63,.45);
+  box-shadow: 0 0 0 0 rgba(47,107,99,.45);
   animation: nav-subscribe-pulse 2.6s ease-in-out infinite;
 }
 .nav-subscribe-icon { font-size: .92em; transform: translateY(-1px); }
-.nav-subscribe:hover { background: var(--gold-dark, #8f7132); border-color: var(--gold-dark, #8f7132); color: #fff !important; animation-play-state: paused; box-shadow: none; transform: translateY(-1px); }
+.nav-subscribe:hover, .nav-subscribe.active {
+  background: var(--cta-dark) !important; border-color: var(--cta-dark); color: #fff !important;
+  animation-play-state: paused; box-shadow: none;
+}
+.nav-subscribe:hover { transform: translateY(-1px); }
 @keyframes nav-subscribe-pulse {
-  0%, 60%, 100% { box-shadow: 0 0 0 0 rgba(176,141,63,.45); }
-  30% { box-shadow: 0 0 0 5px rgba(176,141,63,0); }
+  0%, 60%, 100% { box-shadow: 0 0 0 0 rgba(47,107,99,.45); }
+  30% { box-shadow: 0 0 0 5px rgba(47,107,99,0); }
 }
 @media (prefers-reduced-motion: reduce) { .nav-subscribe { animation: none; } }
 .site-search { flex-shrink: 2; min-width: 0; }
