@@ -75,6 +75,7 @@ async function renderHomePage() {
           </div>
           <div id="weatherWidget"></div>
           ${renderHomeEditorialsTeaser(data.recentEditorials)}
+          <div id="sidebarBannerSlot" style="display:none"></div>
         </aside>
       </div>
     </div>
@@ -82,4 +83,5 @@ async function renderHomePage() {
   I18N.apply();
   setPageTitle(null, 'Community classifieds, business listings, and simcha announcements. Post a job, sell an item, find a service, or share a simcha.');
   if (typeof renderWeatherWidget === 'function') renderWeatherWidget(loc, c.location);
+  if (typeof Banners !== 'undefined') Banners.renderSidebar('home', 'sidebarBannerSlot');
 }

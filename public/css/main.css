@@ -48,6 +48,17 @@ body[dir='rtl'] { direction: rtl; }
 #layout main#app { flex: 1 0 auto; min-width: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
 #layout .site-footer { flex-shrink: 0; }
 
+/* ---------- Banners (admin-managed ad/promo slots) ---------- */
+/* #topBannerSlot/#sidebarBannerSlot start hidden (inline style) and only
+   ever get display:'' (shown) from JS once there's at least one banner to
+   put in them - see public/js/banners.js - so an empty slot never reserves
+   visible space or shows a placeholder. */
+#topBannerSlot { margin: 14px 0 0; }
+.site-banner { display: block; margin-bottom: 10px; }
+.site-banner:last-child { margin-bottom: 0; }
+.site-banner img { display: block; width: 100%; height: auto; border: 1px solid var(--border); }
+#sidebarBannerSlot .site-banner img { max-height: 250px; object-fit: cover; }
+
 h1, h2, h3, h4 { font-family: var(--font-head); color: var(--navy); margin: 0 0 .4em; font-weight: 800; letter-spacing: -.01em; }
 h1 { font-size: 1.5rem; }
 h2 { font-size: 1.2rem; }

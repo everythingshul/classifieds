@@ -83,6 +83,7 @@ const Router = (() => {
         playEnter();
         highlightNav();
         if (typeof Analytics !== 'undefined') Analytics.trackPageview(path);
+        if (typeof Banners !== 'undefined') Banners.refreshTop(Banners.zoneForPath(path));
         return;
       }
     }

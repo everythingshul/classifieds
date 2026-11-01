@@ -69,6 +69,7 @@ app.use('/api/contact', require('./routes/public/contact'));
 app.use('/api/analytics', require('./routes/public/analytics'));
 app.use('/api/editorials', require('./routes/public/editorials'));
 app.use('/api/subscriptions', require('./routes/public/subscriptions'));
+app.use('/api/banners', require('./routes/public/banners'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
@@ -86,6 +87,7 @@ app.use('/api/admin/stats', require('./routes/admin/stats'));
 app.use('/api/admin/analytics', require('./routes/admin/analytics'));
 app.use('/api/admin/editorials', require('./routes/admin/editorials'));
 app.use('/api/admin/subscriptions', require('./routes/admin/subscriptions'));
+app.use('/api/admin/banners', require('./routes/admin/banners'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));

@@ -72,12 +72,14 @@ async function renderDetailPage(id, type) {
             </form>
             <div id="boostCheckoutContainer" style="margin-top:12px"></div>
           </details>`}
+          <div id="sidebarBannerSlot" style="display:none;margin-top:14px"></div>
         </div>
       </div>
     </div>
   `;
   I18N.apply();
   setPageTitle(`${post.title} - ${post.categoryLabel}`, post.description ? post.description.slice(0, 160) : `${post.categoryLabel} on JListings.`);
+  if (typeof Banners !== 'undefined') Banners.renderSidebar(type === 'simcha' ? 'simchas' : type === 'listing' ? 'listings' : 'classifieds', 'sidebarBannerSlot');
 
   document.getElementById('bookmarkBtn').addEventListener('click', () => {
     const active = Bookmarks.toggle(type, id);

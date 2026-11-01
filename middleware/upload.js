@@ -33,4 +33,27 @@ async function processAndSaveImage(fileBuffer) {
   return filename;
 }
 
-module.exports = { upload, processAndSaveImage, UPLOAD_DIR };
+// Banners (admin-uploaded ad/promo images) skip the post-image pipeline
+// entirely - they're admin-authored (no moderation queue needed) and must
+// support animated GIFs, which re-encoding through sharp above would
+// flatten to a single static frame. This just validates the type and
+// writes the raw bytes straight to disk, same UPLOAD_DIR as everything else.
+const BANNER_MIME_EXT = { 'image/gif': 'gif', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+const bannerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (!BANNER_MIME_EXT[file.mimetype]) return cb(new Error('Only GIF, JPG, PNG or WEBP images are allowed'));
+    cb(null, true);
+  },
+});
+
+function saveBannerImage(file) {
+  const ext = BANNER_MIME_EXT[file.mimetype];
+  const filename = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(UPLOAD_DIR, filename), file.buffer);
+  return filename;
+}
+
+module.exports = { upload, processAndSaveImage, UPLOAD_DIR, bannerUpload, saveBannerImage };

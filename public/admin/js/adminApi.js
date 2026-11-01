@@ -93,5 +93,12 @@ const AdminApi = (() => {
     unsubscribeSubscriber: (id) => req(`/subscriptions/${id}/unsubscribe`, { method: 'POST' }),
     resendSubscriptionConfirmation: (id) => req(`/subscriptions/${id}/resend-confirmation`, { method: 'POST' }),
     deleteSubscription: (id) => req(`/subscriptions/${id}`, { method: 'DELETE' }),
+    banners: () => req('/banners'),
+    bannerZones: () => req('/banners/zones'),
+    createBanner: (formData) => req('/banners', { method: 'POST', body: formData }),
+    updateBanner: (id, formData) => req(`/banners/${id}`, { method: 'PUT', body: formData }),
+    setBannerActive: (id, active) => req(`/banners/${id}/active`, { method: 'PUT', body: { active } }),
+    deleteBanner: (id) => req(`/banners/${id}`, { method: 'DELETE' }),
+    emailStats: () => req('/subscriptions/email-stats'),
   };
 })();

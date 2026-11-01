@@ -30,6 +30,7 @@ function renderLayout(siteName) {
         </div>
       </div>
     </header>
+    <div class="container"><div id="topBannerSlot" style="display:none"></div></div>
     <main id="app"></main>
     <footer class="site-footer">
       <div class="container footer-row">

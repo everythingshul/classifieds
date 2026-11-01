@@ -137,6 +137,22 @@ table.admin-table tr:last-child td { border-bottom: none; }
 .status-rejected, .status-removed { background: var(--danger-pale); color: var(--danger); }
 .status-expired { background: #eef2f7; color: var(--ink-soft); }
 
+/* ── Pills (generic - distinct from the fixed-vocabulary status-pill above) ── */
+.pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: .7rem; font-weight: 600; }
+.pill-blue { background: var(--accent-pale); color: var(--navy); }
+
+/* ── Toggle switch ── */
+.tgl { position: relative; display: inline-block; width: 38px; height: 21px; cursor: pointer; flex-shrink: 0; }
+.tgl input { opacity: 0; width: 0; height: 0; }
+.tgl-s { position: absolute; inset: 0; background: var(--border); border-radius: 21px; transition: .2s; }
+.tgl-s::before { content: ''; position: absolute; width: 15px; height: 15px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+.tgl input:checked + .tgl-s { background: var(--accent); }
+.tgl input:checked + .tgl-s::before { transform: translateX(17px); }
+
+/* ── Small layout utilities (match the other Everything Shul dashboards) ── */
+.bg { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.mt { margin-top: 16px; }
+
 /* ── Buttons (palette only - sizing/layout already comes from main.css's .btn) ── */
 #adminRoot .btn-outline { border-color: var(--navy); color: var(--navy); }
 #adminRoot .btn-outline:hover { background: var(--navy); color: #fff; }
