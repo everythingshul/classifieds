@@ -40,6 +40,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '#/posts', label: 'All Posts' },
   { href: '#/editorials', label: 'Editorials', badge: 'badge-editorials' },
   { href: '#/contact-messages', label: 'Messages', badge: 'badge-contact' },
+  { href: '#/subscriptions', label: 'Email Subscribers' },
   { href: '#/crm', label: 'CRM Search' },
   { href: '#/categories', label: 'Categories' },
   { href: '#/pricing', label: 'Pricing' },
@@ -132,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/editorials', renderEditorialsPage);
   AdminRouter.add('#/editorials/new', renderCreateEditorialPage);
   AdminRouter.add('#/contact-messages', renderContactMessagesPage);
+  AdminRouter.add('#/subscriptions', renderSubscriptionsPage);
   AdminRouter.add('#/crm', renderCrmPage);
   AdminRouter.add('#/categories', renderCategoriesPage);
   AdminRouter.add('#/pricing', renderPricingPage);

@@ -85,6 +85,7 @@ app.use('/api/admin/crm', require('./routes/admin/crm'));
 app.use('/api/admin/stats', require('./routes/admin/stats'));
 app.use('/api/admin/analytics', require('./routes/admin/analytics'));
 app.use('/api/admin/editorials', require('./routes/admin/editorials'));
+app.use('/api/admin/subscriptions', require('./routes/admin/subscriptions'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));

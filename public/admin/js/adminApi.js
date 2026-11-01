@@ -89,5 +89,9 @@ const AdminApi = (() => {
     approveEditorialComment: (commentId) => req(`/editorials/comments/${commentId}/approve`, { method: 'POST' }),
     rejectEditorialComment: (commentId) => req(`/editorials/comments/${commentId}/reject`, { method: 'POST' }),
     deleteEditorialComment: (commentId) => req(`/editorials/comments/${commentId}`, { method: 'DELETE' }),
+    subscriptions: (params) => req(`/subscriptions?${new URLSearchParams(params)}`),
+    unsubscribeSubscriber: (id) => req(`/subscriptions/${id}/unsubscribe`, { method: 'POST' }),
+    resendSubscriptionConfirmation: (id) => req(`/subscriptions/${id}/resend-confirmation`, { method: 'POST' }),
+    deleteSubscription: (id) => req(`/subscriptions/${id}`, { method: 'DELETE' }),
   };
 })();
