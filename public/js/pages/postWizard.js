@@ -189,25 +189,26 @@ function renderPostWizard() {
 
   function renderClassifiedDetailsStep() {
     const catDef = currentCatDef();
-    const base = baseCharLimits();
-    const over = cfg.oversizedCharLimits;
-    const wantsOversized = !!state.data.wantsOversized;
-    const titleLimit = wantsOversized ? over.title : base.title;
-    const descLimit = wantsOversized ? over.description : base.description;
-    // maxlength only stops fresh typing/pasting - it doesn't retroactively
-    // trim content already sitting in state.data (e.g. carried over from an
-    // earlier step where a higher oversized limit applied). Clamped here so
-    // the field never starts out already over whatever limit is active now.
-    const initialTitle = (state.data.title || '').slice(0, titleLimit);
-    const initialDescription = (state.data.description || '').slice(0, descLimit);
+    // Typing/pasting is never blocked by a maxlength attribute - going over
+    // the current limit shows a red warning with a button to pay for more
+    // room (see renderLimitWarning/updateCounters below) instead of the
+    // browser silently refusing to accept any more characters.
+    const initialTitle = state.data.title || '';
+    const initialDescription = state.data.description || '';
     shell(`
       <h3 style="margin-top:0">${escapeHtml(catDef.label)}</h3>
-      <div class="form-row"><label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}</label><input type="text" id="f_title" maxlength="${titleLimit}" value="${escapeHtml(initialTitle)}" required><div class="char-counter" id="titleCounter"></div></div>
-      <div class="form-row"><label>Description</label><textarea id="f_description" rows="5" maxlength="${descLimit}">${escapeHtml(initialDescription)}</textarea><div class="char-counter" id="descCounter"></div></div>
-      <label class="addon-row" style="margin:-4px 0 14px">
-        <input type="checkbox" id="f_wantsOversized" ${wantsOversized ? 'checked' : ''}>
-        Need more space? Oversized post (up to ${over.title} title / ${over.description} description characters)${currentAddons()?.oversized ? ` — ${formatCents(currentAddons().oversized.price_cents)}` : ''}
-      </label>
+      <div class="form-row">
+        <label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}</label>
+        <input type="text" id="f_title" value="${escapeHtml(initialTitle)}" required>
+        <div class="char-counter" id="titleCounter"></div>
+        <div class="field-limit-warning error-list" id="titleLimitWarning" style="display:none"></div>
+      </div>
+      <div class="form-row">
+        <label>Description</label>
+        <textarea id="f_description" rows="5">${escapeHtml(initialDescription)}</textarea>
+        <div class="char-counter" id="descCounter"></div>
+        <div class="field-limit-warning error-list" id="descriptionLimitWarning" style="display:none"></div>
+      </div>
       ${categorySpecificFieldsHtml()}
       <div class="form-row"><label>Location</label><input type="text" id="f_location" placeholder="City, State" value="${escapeHtml(state.data.locationText || '')}" required></div>
       ${imageUploadHtml()}
@@ -243,22 +244,40 @@ function renderPostWizard() {
 
     const titleInput = document.getElementById('f_title');
     const descInput = document.getElementById('f_description');
-    const oversizedCheckbox = document.getElementById('f_wantsOversized');
-    function updateCounters() {
-      document.getElementById('titleCounter').textContent = `${titleInput.value.length} / ${titleInput.maxLength}`;
-      document.getElementById('descCounter').textContent = `${descInput.value.length} / ${descInput.maxLength}`;
+    // Shared by both fields - the oversized add-on is one purchase that
+    // raises both caps at once, so extending from either field's warning
+    // button applies to both.
+    let oversized = !!state.data.wantsOversized;
+    function activeLimits() {
+      return oversized ? cfg.oversizedCharLimits : baseCharLimits();
     }
-    oversizedCheckbox.addEventListener('change', () => {
-      const over = cfg.oversizedCharLimits;
-      const base = baseCharLimits();
-      const nextTitleMax = oversizedCheckbox.checked ? over.title : base.title;
-      const nextDescMax = oversizedCheckbox.checked ? over.description : base.description;
-      titleInput.maxLength = nextTitleMax;
-      descInput.maxLength = nextDescMax;
-      if (titleInput.value.length > nextTitleMax) titleInput.value = titleInput.value.slice(0, nextTitleMax);
-      if (descInput.value.length > nextDescMax) descInput.value = descInput.value.slice(0, nextDescMax);
-      updateCounters();
-    });
+    function renderLimitWarning(field, label, input, counterEl, warningEl) {
+      const limits = activeLimits();
+      const len = input.value.length;
+      const over = len > limits[field];
+      counterEl.textContent = `${len} / ${limits[field]}`;
+      counterEl.style.color = over ? 'var(--danger)' : '';
+      if (!over) { warningEl.style.display = 'none'; warningEl.innerHTML = ''; return; }
+      warningEl.style.display = 'flex';
+      const addon = currentAddons()?.oversized;
+      const overLimits = cfg.oversizedCharLimits;
+      warningEl.innerHTML = oversized
+        ? `<span>${label} is over the ${limits[field]}-character limit.</span>`
+        : `<span>${label} is over the ${limits[field]}-character limit.</span>
+           <button type="button" class="btn btn-sm btn-gold extend-limit-btn">Extend to ${overLimits[field]} characters${addon ? ` — ${formatCents(addon.price_cents)}` : ''}</button>`;
+      const btn = warningEl.querySelector('.extend-limit-btn');
+      if (btn) {
+        btn.addEventListener('click', () => {
+          oversized = true;
+          state.data.wantsOversized = true;
+          updateCounters();
+        });
+      }
+    }
+    function updateCounters() {
+      renderLimitWarning('title', 'Title', titleInput, document.getElementById('titleCounter'), document.getElementById('titleLimitWarning'));
+      renderLimitWarning('description', 'Description', descInput, document.getElementById('descCounter'), document.getElementById('descriptionLimitWarning'));
+    }
     titleInput.addEventListener('input', updateCounters);
     descInput.addEventListener('input', updateCounters);
     updateCounters();
@@ -281,16 +300,14 @@ function renderPostWizard() {
       const errs = [];
       const title = document.getElementById('f_title').value.trim();
       if (!title) errs.push('Title is required');
-      // The maxlength attribute only stops fresh typing/pasting - it doesn't
-      // retroactively trim content the browser restores on its own (e.g.
-      // after using the browser's own Back button, not this page's Back),
-      // which can leave text longer than the current limit sitting in the
-      // field with no visible warning until a late, confusing submit
-      // failure. Checked here against the live (checkbox-updated) maxLength
-      // so the count and the limit can never disagree.
-      if (title.length > titleInput.maxLength) errs.push(`Title must be ${titleInput.maxLength} characters or fewer (currently ${title.length}).`);
+      // Typing was never blocked, so this is the actual gate - checked
+      // against whichever limit is currently active (base, or the extended
+      // one once the add-on button was clicked) so the field's own red
+      // warning and this error can never disagree.
+      const limits = activeLimits();
+      if (title.length > limits.title) errs.push(`Title must be ${limits.title} characters or fewer (currently ${title.length}).`);
       const description = descInput.value.trim();
-      if (description.length > descInput.maxLength) errs.push(`Description must be ${descInput.maxLength} characters or fewer (currently ${description.length}).`);
+      if (description.length > limits.description) errs.push(`Description must be ${limits.description} characters or fewer (currently ${description.length}).`);
       const location = document.getElementById('f_location').value.trim();
       if (!location) errs.push('Location is required');
       const posterEmail = document.getElementById('p_email').value.trim();
@@ -354,7 +371,7 @@ function renderPostWizard() {
         posterPhone: document.getElementById('p_phone').value.trim(),
         posterPhoneCountry: document.getElementById('p_phoneCountry').value,
         posterEmail,
-        wantsOversized: oversizedCheckbox.checked,
+        wantsOversized: oversized,
         fields: { ...(state.data.fields || {}), ...fields, taxonomyId: fields.taxonomyId },
       });
       if (fields.taxonomyId !== undefined) state.data.taxonomyId = fields.taxonomyId;

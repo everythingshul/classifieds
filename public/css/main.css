@@ -401,6 +401,8 @@ p { margin: 0 0 .7em; }
 .addon-row { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 0; margin-bottom: 6px; font-size: .86rem; }
 .error-list { background: #fdecec; border: 1px solid var(--danger); color: var(--danger); padding: 8px 12px; border-radius: 0; margin-bottom: 12px; font-size: .84rem; }
 .error-list ul { margin: 4px 0 0; padding-inline-start: 18px; }
+.field-limit-warning { align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 0; }
+.field-limit-warning .extend-limit-btn { flex-shrink: 0; white-space: nowrap; }
 
 /* ---------- Footer ---------- */
 .site-footer { background: #fff; border-top: 1px solid var(--border); color: var(--ink-soft); margin-top: 44px; padding: 24px 0; font-size: .8rem; }
