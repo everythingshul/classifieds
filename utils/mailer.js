@@ -65,8 +65,21 @@ async function sendViaBrevo({ apiKey, from, to, subject, html, text, attachments
   return res.json();
 }
 
+// Builds the "From" header's display name independently of the From email
+// address, so the sender name doesn't have to be hand-typed into a
+// "Name <email>" string - set via mail_from_name/MAIL_FROM_NAME (e.g. in
+// render.yaml), falling back to a name already embedded in mail_from, then
+// to the configured site name, so existing setups keep working unchanged.
+function buildFrom() {
+  const raw = runtimeConfig.get('mail_from', 'MAIL_FROM') || 'no-reply@example.com';
+  const { name: embeddedName, email } = parseFromAddress(raw);
+  const { siteName } = require('../services/emailLayout');
+  const name = runtimeConfig.get('mail_from_name', 'MAIL_FROM_NAME') || embeddedName || siteName();
+  return name ? `"${String(name).replace(/"/g, '')}" <${email}>` : email;
+}
+
 async function sendMail({ to, subject, html, text, attachments, replyTo, headers }) {
-  const from = runtimeConfig.get('mail_from', 'MAIL_FROM') || 'no-reply@example.com';
+  const from = buildFrom();
   const provider = runtimeConfig.get('mail_provider', 'MAIL_PROVIDER') || 'smtp';
   // Falls back to the configured Reply-To address so every outgoing email
   // (invoices, notifications, etc.) uses it automatically without every
