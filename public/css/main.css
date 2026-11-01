@@ -102,9 +102,19 @@ p { margin: 0 0 .7em; }
 .main-nav a { color: var(--ink-soft); padding: 6px 9px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
 .main-nav a:hover, .main-nav a.active { background: rgba(31,59,87,.08); color: var(--navy); }
 .nav-subscribe {
-  border: 1px solid var(--gold); color: var(--gold) !important; border-radius: 999px; margin-inline-start: 4px; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--gold); border: 1px solid var(--gold); color: #fff !important; font-weight: 700;
+  border-radius: 999px; margin-inline-start: 6px; flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(176,141,63,.45);
+  animation: nav-subscribe-pulse 2.6s ease-in-out infinite;
 }
-.nav-subscribe:hover { background: var(--gold) !important; color: #fff !important; }
+.nav-subscribe-icon { font-size: .92em; transform: translateY(-1px); }
+.nav-subscribe:hover { background: var(--gold-dark, #8f7132); border-color: var(--gold-dark, #8f7132); color: #fff !important; animation-play-state: paused; box-shadow: none; transform: translateY(-1px); }
+@keyframes nav-subscribe-pulse {
+  0%, 60%, 100% { box-shadow: 0 0 0 0 rgba(176,141,63,.45); }
+  30% { box-shadow: 0 0 0 5px rgba(176,141,63,0); }
+}
+@media (prefers-reduced-motion: reduce) { .nav-subscribe { animation: none; } }
 .site-search { flex-shrink: 2; min-width: 0; }
 .site-search input {
   width: 100%; min-width: 90px; max-width: 220px; border: 1px solid var(--border); background: #fff;
@@ -133,7 +143,7 @@ p { margin: 0 0 .7em; }
     transition: max-height .25s ease, opacity .2s ease, padding .25s ease;
   }
   .main-nav.open { max-height: 360px; opacity: 1; pointer-events: auto; padding: 6px; }
-  .nav-subscribe { margin-inline-start: 0; border-radius: var(--radius); }
+  .nav-subscribe { margin-inline-start: 0; align-self: center; }
   .hamburger { display: flex; }
   .hamburger span { transition: transform .2s ease, opacity .15s ease; }
   .hamburger.open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }
