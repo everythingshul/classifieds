@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { sendMail } = require('../../utils/mailer');
+const { emailShell, escapeHtml } = require('../../services/emailLayout');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -34,7 +35,17 @@ router.post('/:id/reply', async (req, res) => {
     await sendMail({
       to: row.email,
       subject: `Re: ${row.subject || 'Your message'}`,
-      html: `<p>${replyText.replace(/\n/g, '<br>')}</p><hr><p style="color:#888;font-size:12px">Your original message:</p><p style="color:#888;font-size:12px">${(row.message || '').replace(/\n/g, '<br>')}</p>`,
+      html: emailShell({
+        eyebrow: 'Reply',
+        heading: 'A reply to your message',
+        bodyHtml: `
+          <p>${escapeHtml(replyText).replace(/\n/g, '<br>')}</p>
+          <div style="margin-top:22px;padding-top:14px;border-top:1px solid #e4e1d8;font-size:12px;color:#62666b">
+            <p style="margin:0 0 4px"><b>Your original message:</b></p>
+            <p style="margin:0">${escapeHtml(row.message || '').replace(/\n/g, '<br>')}</p>
+          </div>
+        `,
+      }),
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });

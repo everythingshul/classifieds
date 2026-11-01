@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { sendMail } = require('../../utils/mailer');
+const { emailShell, siteName } = require('../../services/emailLayout');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -33,8 +34,12 @@ router.post('/test-email', async (req, res) => {
   try {
     const result = await sendMail({
       to,
-      subject: 'Test email from JListings',
-      html: '<p>This is a test email sent from Admin → Settings → Outbound Email. If you received this, your email configuration works.</p>',
+      subject: `Test email from ${siteName()}`,
+      html: emailShell({
+        eyebrow: 'Test Email',
+        heading: 'Your email setup works!',
+        bodyHtml: '<p>This is a test email sent from Admin &rarr; Settings &rarr; Outbound Email. If you received this, your email configuration is working correctly - and this is what your other emails will look like, too.</p>',
+      }),
     });
     if (result?.messageId === 'dry-run') {
       return res.json({ ok: true, dryRun: true, message: 'No provider is configured (or no API key set) - this was logged to the server console instead of actually sent.' });

@@ -16,6 +16,7 @@ const { ValidationError } = require('../../services/postValidation');
 const { sanitizeRichText } = require('../../utils/htmlSanitize');
 const { getSetting } = require('../../services/pricing');
 const { sendMail } = require('../../utils/mailer');
+const { emailShell, escapeHtml } = require('../../services/emailLayout');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 
@@ -213,7 +214,13 @@ router.post('/comments/:commentId/approve', async (req, res, next) => {
       sendMail({
         to: comment.email,
         subject: `Your comment on "${editorial.title}" is live`,
-        html: `<p>Your comment has been approved and is now visible.</p><p><a href="${appUrl()}/editorials/${editorial.public_id}">View it here</a></p>`,
+        html: emailShell({
+          eyebrow: 'Comment Approved',
+          heading: 'Your comment is live',
+          bodyHtml: `<p>Your comment on "${escapeHtml(editorial.title)}" has been approved and is now visible.</p>`,
+          ctaText: 'View It Here',
+          ctaUrl: `${appUrl()}/editorials/${editorial.public_id}`,
+        }),
       }).catch(() => {});
     }
     res.json(formatCommentAdmin(db.prepare('SELECT * FROM editorial_comments WHERE id = ?').get(comment.id)));

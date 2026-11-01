@@ -266,11 +266,21 @@ async function sendInvoiceEmail(invoice) {
   return pdf;
 }
 
+// Called for every post that comes in through the public posting flow
+// (services/postLifecycle.js's finalizePostLive) - reason is only set when
+// it's specifically waiting on approval (has photos), otherwise this is
+// just an FYI that something new went live. Never called for posts created
+// directly from the admin backend - those skip finalizePostLive entirely.
 async function notifyAdminNewPost(post, reason) {
-  const url = `${runtimeConfig.get('app_url', 'APP_URL') || ''}/admin/#/posts/${post.public_id}`;
+  const url = `${runtimeConfig.get('app_url', 'APP_URL') || ''}/admin/#/posts?q=${encodeURIComponent(post.public_id)}`;
   await notifyAdmin(
-    `Post needs attention: ${post.title}`,
-    `<p><b>Reason:</b> ${reason}</p><p><b>Post:</b> ${post.title} (${post.category})</p><p><b>Poster:</b> ${post.poster_email}</p><p><a href="${url}">Review in admin portal</a></p>`
+    reason ? `Post needs attention: ${post.title}` : `New ${typeLabel(post.type).toLowerCase()} posted: ${post.title}`,
+    `
+      ${reason ? `<p><b>Reason:</b> ${reason}</p>` : ''}
+      <p><b>Type:</b> ${typeLabel(post.type)} &middot; <b>Category:</b> ${post.category}</p>
+      <p><b>Poster:</b> ${post.poster_email}</p>
+    `,
+    { ctaText: 'Review in Admin Portal', ctaUrl: url }
   );
 }
 

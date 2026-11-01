@@ -9,6 +9,7 @@ const { isValidEmail, isValidUrl } = require('../utils/validate');
 const { validatePhone } = require('../utils/phone');
 const { sanitizeRichText, stripHtml } = require('../utils/htmlSanitize');
 const runtimeConfig = require('./runtimeConfig');
+const { emailShell, escapeHtml } = require('./emailLayout');
 
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 
@@ -234,8 +235,8 @@ async function notifyAdminNewEditorial(editorial) {
   try {
     await notifyAdmin(
       'New editorial awaiting approval',
-      `<p><b>${editorial.title}</b> was submitted by ${editorial.poster_first_name} ${editorial.poster_last_name} (pen name: ${editorial.pen_name}).</p>
-       <p><a href="${url}">Review it in the admin portal</a></p>`
+      `<p><b>${escapeHtml(editorial.title)}</b> was submitted by ${escapeHtml(editorial.poster_first_name)} ${escapeHtml(editorial.poster_last_name)} (pen name: ${escapeHtml(editorial.pen_name)}).</p>`,
+      { ctaText: 'Review in Admin Portal', ctaUrl: url }
     );
   } catch (e) {
     console.error('[editorial] Failed to notify admin of new editorial', editorial.public_id, '-', e.message);
@@ -248,7 +249,13 @@ async function notifyPosterApproved(editorial) {
     await sendMail({
       to: editorial.poster_email,
       subject: `Your editorial "${editorial.title}" is live!`,
-      html: `<p>Great news - your editorial has been approved and is now live.</p><p><a href="${url}">${url}</a></p>`,
+      html: emailShell({
+        eyebrow: 'Published',
+        heading: 'Your editorial is live!',
+        bodyHtml: `<p>Great news - "${escapeHtml(editorial.title)}" has been approved and is now live on the site.</p>`,
+        ctaText: 'Read It Live',
+        ctaUrl: url,
+      }),
     });
   } catch (e) {
     console.error('[editorial] Failed to send approval email for editorial', editorial.public_id, '-', e.message);
@@ -260,7 +267,11 @@ async function notifyPosterRejected(editorial) {
     await sendMail({
       to: editorial.poster_email,
       subject: `About your editorial submission: "${editorial.title}"`,
-      html: `<p>Thanks for submitting your editorial. Unfortunately it wasn't approved for publishing${editorial.rejection_reason ? `: ${editorial.rejection_reason}` : '.'}</p>`,
+      html: emailShell({
+        eyebrow: 'Submission Update',
+        heading: 'About your editorial submission',
+        bodyHtml: `<p>Thanks for submitting "${escapeHtml(editorial.title)}". Unfortunately it wasn't approved for publishing${editorial.rejection_reason ? `: ${escapeHtml(editorial.rejection_reason)}` : '.'}</p>`,
+      }),
     });
   } catch (e) {
     console.error('[editorial] Failed to send rejection email for editorial', editorial.public_id, '-', e.message);
@@ -272,9 +283,9 @@ async function notifyAdminNewComment(editorial, comment) {
   try {
     await notifyAdmin(
       'New comment awaiting approval',
-      `<p><b>${comment.pen_name}</b> commented on "${editorial.title}":</p>
-       <p>${comment.body}</p>
-       <p><a href="${url}">Review it in the admin portal</a></p>`
+      `<p><b>${escapeHtml(comment.pen_name)}</b> commented on "${escapeHtml(editorial.title)}":</p>
+       <p>${escapeHtml(comment.body)}</p>`,
+      { ctaText: 'Review in Admin Portal', ctaUrl: url }
     );
   } catch (e) {
     console.error('[editorial] Failed to notify admin of new comment on editorial', editorial.public_id, '-', e.message);

@@ -85,7 +85,7 @@ async function sendMail({ to, subject, html, text, attachments, replyTo, headers
   return getTransporter().sendMail({ from, to, subject, html, text, attachments, replyTo, headers });
 }
 
-async function notifyAdmin(subject, html) {
+async function notifyAdmin(subject, bodyHtml, opts = {}) {
   // Falls back to the first admin account's login email if no separate
   // notification address is configured, so report/moderation alerts still
   // reach someone by default instead of silently going nowhere.
@@ -99,7 +99,12 @@ async function notifyAdmin(subject, html) {
     console.warn('[mailer] notifyAdmin: no admin_notify_email set and no admin account found - alert not sent:', subject);
     return null;
   }
-  return sendMail({ to, subject: `[JListings] ${subject}`, html });
+  const { emailShell, siteName } = require('../services/emailLayout');
+  return sendMail({
+    to,
+    subject: `[${siteName()}] ${subject}`,
+    html: emailShell({ eyebrow: 'Admin Alert', heading: subject, bodyHtml, ctaText: opts.ctaText, ctaUrl: opts.ctaUrl }),
+  });
 }
 
 module.exports = { sendMail, notifyAdmin };

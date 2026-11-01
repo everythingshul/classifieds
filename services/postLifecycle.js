@@ -5,6 +5,7 @@ const { sendInvoiceEmail, notifyAdminNewPost } = require('../utils/invoice');
 const { sendMail } = require('../utils/mailer');
 const { formatCents } = require('../utils/money');
 const runtimeConfig = require('./runtimeConfig');
+const { emailShell, escapeHtml: escapeHtmlShell } = require('./emailLayout');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
@@ -99,11 +100,13 @@ async function sendSurpriseEmails(post) {
       await sendMail({
         to: s.recipient_email,
         subject: `A surprise Mazel Tov for you!`,
-        html: `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto">
-          <h2 style="color:#1f3b57">Mazel Tov!</h2>
-          <p><b>${from}</b> wanted to surprise you with a Mazel Tov!</p>
-          <p><a href="${url}" style="display:inline-block;padding:10px 18px;background:#1f3b57;color:#fff;text-decoration:none;border-radius:4px">View the Simcha</a></p>
-        </div>`,
+        html: emailShell({
+          eyebrow: 'Mazel Tov',
+          heading: 'A surprise Mazel Tov for you!',
+          bodyHtml: `<p><b>${escapeHtmlShell(from)}</b> wanted to surprise you with a Mazel Tov!</p>`,
+          ctaText: 'View the Simcha',
+          ctaUrl: url,
+        }),
       });
       db.prepare('UPDATE simcha_surprises SET sent = 1 WHERE id = ?').run(s.id);
     } catch (e) {
@@ -146,12 +149,14 @@ async function finalizePostLive(postId) {
     console.error('[postLifecycle] Failed to send invoice email for post', updated.public_id, '-', e.message);
   }
 
-  if (nextStatus === 'pending_approval') {
-    try {
-      await notifyAdminNewPost(updated, 'New post with images awaiting approval');
-    } catch (e) {
-      console.error('[postLifecycle] Failed to notify admin of new post', updated.public_id, '-', e.message);
-    }
+  // Every post that comes through the public posting flow gets an admin
+  // notification (live ones as an FYI, pending-approval ones framed as
+  // needing attention) - posts created directly from the admin backend
+  // never reach finalizePostLive at all, so they're naturally excluded.
+  try {
+    await notifyAdminNewPost(updated, nextStatus === 'pending_approval' ? 'New post with images awaiting approval' : null);
+  } catch (e) {
+    console.error('[postLifecycle] Failed to notify admin of new post', updated.public_id, '-', e.message);
   }
   if (updated.type === 'simcha') {
     await sendSurpriseEmails(updated);
@@ -222,7 +227,13 @@ async function fulfillCheckoutSession(session) {
         await sendMail({
           to: post.poster_email,
           subject: `Your listing was boosted: ${post.title}`,
-          html: `<p>Your listing "${post.title}" has been moved back to the top.</p>`,
+          html: emailShell({
+            eyebrow: 'Boosted',
+            heading: 'Your listing is back on top',
+            bodyHtml: `<p>"${escapeHtmlShell(post.title)}" has been moved back to the top of its category.</p>`,
+            ctaText: 'View Your Listing',
+            ctaUrl: `${appUrl()}/${post.type === 'simcha' ? 'simchas' : post.type === 'listing' ? 'listings' : 'classifieds'}/${post.public_id}`,
+          }),
         }).catch((e) => console.error('[postLifecycle] Failed to send boost confirmation email for post', post.public_id, '-', e.message));
       }
     }
@@ -236,7 +247,13 @@ async function fulfillCheckoutSession(session) {
         await sendMail({
           to: post.poster_email,
           subject: `Your listing is now featured: ${post.title}`,
-          html: `<p>Your listing "${post.title}" is now featured/striking.</p>`,
+          html: emailShell({
+            eyebrow: 'Featured',
+            heading: 'Your listing is now featured',
+            bodyHtml: `<p>"${escapeHtmlShell(post.title)}" is now featured/striking, so it'll stand out and show above the regular listings in its category.</p>`,
+            ctaText: 'View Your Listing',
+            ctaUrl: `${appUrl()}/${post.type === 'simcha' ? 'simchas' : post.type === 'listing' ? 'listings' : 'classifieds'}/${post.public_id}`,
+          }),
         }).catch((e) => console.error('[postLifecycle] Failed to send strike confirmation email for post', post.public_id, '-', e.message));
       }
     }

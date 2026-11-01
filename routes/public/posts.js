@@ -11,6 +11,7 @@ const { createCheckoutSession } = require('../../services/checkout');
 const { getStripe } = require('../../utils/stripeClient');
 const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
+const { escapeHtml } = require('../../services/emailLayout');
 
 const router = express.Router();
 
@@ -323,7 +324,8 @@ router.post('/:publicId/report', async (req, res, next) => {
     try {
       await notifyAdmin(
         `Post reported: ${post.title}`,
-        `<p><b>Post:</b> ${post.title}</p><p><b>Reason:</b> ${reason || '(none given)'}</p><p><b>Reported by:</b> ${reporterEmail || 'anonymous'}</p><p><a href="${url}">View post</a></p>`
+        `<p><b>Post:</b> ${escapeHtml(post.title)}</p><p><b>Reason:</b> ${escapeHtml(reason || '(none given)')}</p><p><b>Reported by:</b> ${escapeHtml(reporterEmail || 'anonymous')}</p>`,
+        { ctaText: 'View Post', ctaUrl: url }
       );
     } catch (e) {
       console.error('[posts] Failed to send report notification email for post', post.public_id, '-', e.message);

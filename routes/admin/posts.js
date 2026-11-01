@@ -4,6 +4,7 @@ const { requireAdmin } = require('../../middleware/adminAuth');
 const { formatPostAdmin } = require('../../services/postFormat');
 const { computeExpiry, DAY_MS, sendInvoiceForPost, insertPost, attachImages, attachSimchaSurprises, recordPayment } = require('../../services/postLifecycle');
 const { sendMail } = require('../../utils/mailer');
+const { emailShell, escapeHtml } = require('../../services/emailLayout');
 const { POST_STATUSES, CURRENCY_CODES } = require('../../utils/constants');
 const runtimeConfig = require('../../services/runtimeConfig');
 const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
@@ -281,7 +282,13 @@ router.post('/:id/approve', async (req, res, next) => {
     await sendMail({
       to: updated.poster_email,
       subject: `Your listing is now live: ${updated.title}`,
-      html: `<p>Great news - your listing "${updated.title}" has been approved and is now live.</p><p><a href="${appUrl()}${updated.type === 'simcha' ? '/simchas/' : updated.type === 'listing' ? '/listings/' : '/classifieds/'}${updated.public_id}">View it here</a></p>`,
+      html: emailShell({
+        eyebrow: 'Approved',
+        heading: 'Your listing is now live',
+        bodyHtml: `<p>Great news - "${escapeHtml(updated.title)}" has been approved and is now live.</p>`,
+        ctaText: 'View Your Listing',
+        ctaUrl: `${appUrl()}${updated.type === 'simcha' ? '/simchas/' : updated.type === 'listing' ? '/listings/' : '/classifieds/'}${updated.public_id}`,
+      }),
     }).catch((e) => console.error('[posts] Failed to send approval email for post', updated.public_id, '-', e.message));
     res.json(formatPostAdmin(updated, imagesFor(post.id)));
   } catch (e) {
@@ -298,7 +305,17 @@ router.post('/:id/reject', async (req, res, next) => {
     await sendMail({
       to: post.poster_email,
       subject: `Your listing was not approved: ${post.title}`,
-      html: `<p>Unfortunately your listing "${post.title}" was not approved.</p>${reason ? `<p><b>Reason:</b> ${reason}</p>` : ''}<p>Please contact us with any questions.</p>`,
+      html: emailShell({
+        eyebrow: 'Submission Update',
+        heading: 'About your listing submission',
+        bodyHtml: `
+          <p>Unfortunately "${escapeHtml(post.title)}" was not approved.</p>
+          ${reason ? `<p><b>Reason:</b> ${escapeHtml(reason)}</p>` : ''}
+          <p>Please contact us with any questions.</p>
+        `,
+        ctaText: 'Contact Us',
+        ctaUrl: `${appUrl()}/contact`,
+      }),
     }).catch((e) => console.error('[posts] Failed to send rejection email for post', post.public_id, '-', e.message));
     res.json(formatPostAdmin(db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id), imagesFor(post.id)));
   } catch (e) {

@@ -14,6 +14,7 @@ const { formatPostPublic } = require('./postFormat');
 const { stripHtml } = require('../utils/htmlSanitize');
 const { DEFAULT_BROOKLYN_LOCATION } = require('../utils/constants');
 const { sendMail } = require('../utils/mailer');
+const { emailShell } = require('./emailLayout');
 
 const appUrl = () => (runtimeConfig.get('app_url', 'APP_URL') || 'https://jlistings.com').replace(/\/$/, '');
 const siteName = () => runtimeConfig.get('site_name', 'SITE_NAME') || 'JListings';
@@ -160,8 +161,20 @@ function manageUrl(sub) {
 function unsubscribeUrl(sub) {
   return `${appUrl()}/api/subscriptions/unsubscribe?token=${sub.public_id}`;
 }
+// sendToken identifies one particular digest send (email_sends.public_id) -
+// routed through the server so a click is logged before redirecting on to
+// the real post/editorial, same idea as the open-tracking pixel below.
+function trackClickUrl(sendToken, realUrl) {
+  return `${appUrl()}/api/subscriptions/track-click?send=${sendToken}&url=${encodeURIComponent(realUrl)}`;
+}
+function trackOpenUrl(sendToken) {
+  return `${appUrl()}/api/subscriptions/track-open?send=${sendToken}`;
+}
 
-function digestEmailHtml(sub, sections) {
+// sendToken is optional - when a caller doesn't have one yet (e.g. a
+// preview), links just go straight to the real URLs with no tracking.
+function digestEmailHtml(sub, sections, sendToken) {
+  const linkFor = (url) => (sendToken ? trackClickUrl(sendToken, url) : url);
   const sectionsHtml = sections
     .map(
       (sec) => `
@@ -170,7 +183,7 @@ function digestEmailHtml(sub, sections) {
         .map(
           (it) => `
         <div style="padding:10px 0;border-bottom:1px solid #e4e1d8">
-          <a href="${it.url}" style="font-size:14px;font-weight:700;color:#1f3b57;text-decoration:none">${escapeHtml(it.title)}</a><br>
+          <a href="${linkFor(it.url)}" style="font-size:14px;font-weight:700;color:#1f3b57;text-decoration:none">${escapeHtml(it.title)}</a><br>
           ${it.categoryLabel || it.location ? `<span style="font-size:12px;color:#62666b">${[it.categoryLabel, it.location].filter(Boolean).map(escapeHtml).join(' • ')}</span>` : ''}
           ${it.price ? ` <span style="font-size:12px;font-weight:700;color:#2f6f4f">${escapeHtml(it.price)}</span>` : ''}
           ${it.excerpt ? `<div style="font-size:13px;color:#232323;margin-top:3px">${escapeHtml(it.excerpt)}${it.excerpt.length >= 140 ? '…' : ''}</div>` : ''}
@@ -180,17 +193,18 @@ function digestEmailHtml(sub, sections) {
     )
     .join('');
 
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto">
-      <h1 style="font-size:19px;color:#1f3b57;margin-bottom:4px">${escapeHtml(siteName())} - Your Daily Update</h1>
-      <p style="font-size:13px;color:#62666b;margin-top:0">Here's what's new today in the topics you follow.</p>
-      ${sectionsHtml}
-      <p style="margin-top:28px;font-size:11px;color:#9a9a9a;border-top:1px solid #e4e1d8;padding-top:12px">
-        You're receiving this because you subscribed to daily email updates from ${escapeHtml(siteName())}.
-        <a href="${manageUrl(sub)}" style="color:#9a9a9a">Manage preferences</a> &middot;
-        <a href="${unsubscribeUrl(sub)}" style="color:#9a9a9a">Unsubscribe</a>
-      </p>
-    </div>`;
+  return emailShell({
+    eyebrow: 'Daily Update',
+    heading: "Here's what's new today",
+    bodyHtml: `
+      <p style="margin-top:0">In the topics you follow:</p>${sectionsHtml}
+      ${sendToken ? `<img src="${trackOpenUrl(sendToken)}" width="1" height="1" alt="" style="display:block;border:0">` : ''}
+    `,
+    footerNote: `
+      You're receiving this because you subscribed to daily email updates from ${escapeHtml(siteName())}.
+      <a href="${manageUrl(sub)}" style="color:#62666b">Manage preferences</a> &middot;
+      <a href="${unsubscribeUrl(sub)}" style="color:#62666b">Unsubscribe</a>`,
+  });
 }
 
 function digestEmailText(sub, sections) {
@@ -215,10 +229,16 @@ async function sendConfirmationEmail(sub) {
   await sendMail({
     to: sub.email,
     subject: `Confirm your ${siteName()} email updates`,
-    html: `
-      <p>Please confirm you'd like to receive daily email updates from ${escapeHtml(siteName())}.</p>
-      <p><a href="${confirmUrl}" style="background:#1f3b57;color:#fff;padding:10px 18px;text-decoration:none;display:inline-block">Confirm Subscription</a></p>
-      <p style="font-size:12px;color:#9a9a9a">If you didn't request this, you can safely ignore this email - you won't be subscribed unless you click the button above.</p>`,
+    html: emailShell({
+      eyebrow: 'Confirm Your Subscription',
+      heading: 'One click to confirm',
+      bodyHtml: `
+        <p>Please confirm you'd like to receive daily email updates from ${escapeHtml(siteName())}.</p>
+        <p style="font-size:12px;color:#9a9a9a;margin-top:18px">If you didn't request this, you can safely ignore this email - you won't be subscribed unless you click the button below.</p>
+      `,
+      ctaText: 'Confirm Subscription',
+      ctaUrl: confirmUrl,
+    }),
     text: `Please confirm you'd like to receive daily email updates from ${siteName()}: ${confirmUrl}\n\nIf you didn't request this, you can safely ignore this email.`,
   });
 }

@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
+const { escapeHtml } = require('../../services/emailLayout');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.post('/', async (req, res, next) => {
     try {
       await notifyAdmin(
         `Contact form: ${subject || '(no subject)'}`,
-        `<p><b>From:</b> ${name || '(no name)'} &lt;${email}&gt;</p><p><b>Message:</b></p><p>${message.replace(/\n/g, '<br>')}</p>`
+        `<p><b>From:</b> ${escapeHtml(name || '(no name)')} &lt;${escapeHtml(email)}&gt;</p><p><b>Message:</b></p><p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>`
       );
     } catch (e) {
       console.error('[contact] Failed to send contact notification email -', e.message);
