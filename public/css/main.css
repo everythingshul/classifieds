@@ -83,7 +83,13 @@ p { margin: 0 0 .7em; }
   z-index: 40;
   border-bottom: 1px solid var(--border);
 }
-.site-header .container { display: flex; align-items: center; gap: 16px; height: 68px; }
+/* Wider than the site's normal content container (--max-width: 980px) -
+   the header row has more to fit (logo, 7 nav links, search, 2 buttons)
+   than a content column ever needs, and capping it at the content width is
+   exactly what was squeezing the last nav link (Bookmarks) permanently out
+   of view, with no visible scrollbar to show it was clipped rather than
+   just missing. */
+.site-header .container { display: flex; align-items: center; gap: 14px; height: 68px; max-width: 1320px; }
 /* Scoped to .site-header specifically - .brand alone would also match the
    unrelated "Admin Portal" sidebar brand div in the admin portal, which
    doesn't use this file's grid/height rules and broke badly when it did. */
@@ -92,10 +98,14 @@ p { margin: 0 0 .7em; }
    ratio intact - it only distorts if something else clamps the width down
    independently of height, which is what the mobile fix below guards against. */
 .site-header .brand img { height: 48px; width: auto; }
-.main-nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
-.main-nav a { color: var(--ink-soft); padding: 6px 10px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
+.main-nav { display: flex; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.main-nav a { color: var(--ink-soft); padding: 6px 9px; border-radius: var(--radius); font-size: .86rem; font-weight: 500; white-space: nowrap; }
 .main-nav a:hover, .main-nav a.active { background: rgba(31,59,87,.08); color: var(--navy); }
-.site-search { flex-shrink: 1; min-width: 0; }
+.nav-subscribe {
+  border: 1px solid var(--gold); color: var(--gold) !important; border-radius: 999px; margin-inline-start: 4px; flex-shrink: 0;
+}
+.nav-subscribe:hover { background: var(--gold) !important; color: #fff !important; }
+.site-search { flex-shrink: 2; min-width: 0; }
 .site-search input {
   width: 100%; min-width: 90px; max-width: 220px; border: 1px solid var(--border); background: #fff;
   color: var(--ink); border-radius: 0; padding: 6px 10px; font-size: .82rem;
@@ -116,13 +126,14 @@ p { margin: 0 0 .7em; }
 .hamburger { display: none; background: none; border: none; width: 26px; height: 20px; padding: 0; flex-direction: column; justify-content: space-between; }
 .hamburger span { display: block; height: 2px; width: 100%; background: var(--navy); }
 
-@media (max-width: 860px) {
+@media (max-width: 1160px) {
   .main-nav {
     display: flex; position: absolute; top: 68px; inset-inline: 0; background: #fff; border-bottom: 1px solid var(--border); box-shadow: var(--shadow); flex-direction: column; padding: 0 6px;
     max-height: 0; overflow: hidden; opacity: 0; pointer-events: none;
     transition: max-height .25s ease, opacity .2s ease, padding .25s ease;
   }
-  .main-nav.open { max-height: 320px; opacity: 1; pointer-events: auto; padding: 6px; }
+  .main-nav.open { max-height: 360px; opacity: 1; pointer-events: auto; padding: 6px; }
+  .nav-subscribe { margin-inline-start: 0; border-radius: var(--radius); }
   .hamburger { display: flex; }
   .hamburger span { transition: transform .2s ease, opacity .15s ease; }
   .hamburger.open span:nth-child(1) { transform: translateY(9px) rotate(45deg); }

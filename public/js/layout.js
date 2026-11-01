@@ -20,6 +20,7 @@ function renderLayout(siteName) {
           <a href="/simchas" data-i18n="nav_simchas">Simchas</a>
           <a href="/editorials" class="nav-editorials"><span data-i18n="nav_editorials">Editorials</span> <span class="badge-new-pill" data-i18n="badge_new">${I18N.t('badge_new')}</span></a>
           <a href="/bookmarks" data-i18n="nav_bookmarks">Bookmarks</a>
+          <a href="/subscribe" class="nav-subscribe" data-i18n="subscribe_nav">Email Updates</a>
         </nav>
         <form class="site-search" id="siteSearchForm">
           <input type="search" id="siteSearchInput" name="q" data-i18n-placeholder="search_everything" placeholder="${I18N.t('search_everything')}" autocomplete="off">
