@@ -7,7 +7,10 @@ async function renderSubscriptionsPage(query) {
   const page = parseInt(query.page, 10) || 1;
   const filters = { status: query.status || '', q: query.q || '' };
 
-  const data = await AdminApi.subscriptions({ ...filters, page, pageSize: 25 });
+  const [data, emailStats] = await Promise.all([
+    AdminApi.subscriptions({ ...filters, page, pageSize: 25 }),
+    AdminApi.emailStats(),
+  ]);
   const counts = data.counts || {};
 
   root.innerHTML = `
@@ -15,6 +18,13 @@ async function renderSubscriptionsPage(query) {
     <p class="hint">
       ${counts.confirmed || 0} confirmed &middot; ${counts.pending || 0} pending confirmation &middot; ${counts.unsubscribed || 0} unsubscribed
     </p>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="num">${emailStats.totalSends}</div><div class="label">Digests Sent</div></div>
+      <div class="stat-card"><div class="num">${emailStats.openRate}%</div><div class="label">Open Rate</div><div class="hint" style="margin-top:2px">${emailStats.uniqueOpens} unique (${emailStats.totalOpens} total)</div></div>
+      <div class="stat-card"><div class="num">${emailStats.clickRate}%</div><div class="label">Click Rate</div><div class="hint" style="margin-top:2px">${emailStats.uniqueClicks} unique (${emailStats.totalClicks} total)</div></div>
+    </div>
+
     <form class="filters-bar" id="filterForm">
       <div class="field"><label>Search</label><input type="text" name="q" value="${escapeHtml(filters.q)}" placeholder="email…"></div>
       <div class="field"><label>Status</label>

@@ -209,7 +209,7 @@ CREATE INDEX IF NOT EXISTS idx_post_payments_email ON post_payments(payer_email)
 -- lifetime totals (posts.view_count/click_count already cover that).
 CREATE TABLE IF NOT EXISTS analytics_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL, -- 'pageview' | 'post_view' | 'post_click' | 'editorial_view' | 'editorial_click'
+  type TEXT NOT NULL, -- 'pageview' | 'post_view' | 'post_click' | 'editorial_view' | 'editorial_click' | 'banner_view' | 'banner_click'
   path TEXT,
   post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
   post_type TEXT, -- denormalized from posts.type at event time, for fast breakdowns without a join
@@ -224,6 +224,49 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_type ON analytics_events(type);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_post ON analytics_events(post_id);
 -- idx_analytics_events_editorial is created in db/index.js, after the
 -- editorial_id column migration runs - see the comment there for why.
+-- Same story for the banner_id column/index (added after this table already
+-- existed in deployed databases).
+
+-- Admin-managed clickable ad/promo banners - top-of-page or sidebar, each
+-- one targeted to specific page zones or every page, with an image (GIFs
+-- supported - see middleware/upload.js's separate banner upload path that
+-- skips the post-image re-encoding pipeline so animation survives) and a
+-- link. Views/clicks are logged as analytics_events rows (banner_id set,
+-- type 'banner_view'/'banner_click'), same system as post/editorial
+-- impressions, so they show up in the same admin Analytics dashboard.
+CREATE TABLE IF NOT EXISTS banners (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  public_id TEXT UNIQUE NOT NULL,
+  image_filename TEXT NOT NULL,
+  link_url TEXT NOT NULL,
+  position TEXT NOT NULL DEFAULT 'top', -- 'top' | 'sidebar'
+  pages TEXT NOT NULL DEFAULT '[]', -- JSON array of page-zone keys ('home','classifieds','listings','simchas','editorials','post','search','bookmarks') - ignored when all_pages = 1
+  all_pages INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_banners_active ON banners(active);
+
+-- One row per digest actually sent (not per subscriber overall) - gives
+-- both per-send and aggregate open/click numbers. opened_at/clicked_at are
+-- the first time each happened; open_count/click_count keep incrementing
+-- past that (a subscriber opening the same email on their phone and laptop
+-- both count).
+CREATE TABLE IF NOT EXISTS email_sends (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  public_id TEXT UNIQUE NOT NULL,
+  subscription_id INTEGER NOT NULL REFERENCES email_subscriptions(id) ON DELETE CASCADE,
+  item_count INTEGER NOT NULL DEFAULT 0,
+  sent_at INTEGER NOT NULL,
+  opened_at INTEGER,
+  open_count INTEGER NOT NULL DEFAULT 0,
+  clicked_at INTEGER,
+  click_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_email_sends_subscription ON email_sends(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_email_sends_sent_at ON email_sends(sent_at);
 
 -- Editorials: a separate, free-to-post content type (opinion pieces/community
 -- writing) - always requires admin approval, unlike classifieds/listings

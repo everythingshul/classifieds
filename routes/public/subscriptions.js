@@ -123,4 +123,41 @@ function doUnsubscribe(req, res) {
 router.get('/unsubscribe', doUnsubscribe);
 router.post('/unsubscribe', doUnsubscribe); // body already parsed by server.js's global express.urlencoded()
 
+// 1x1 transparent GIF, served for every digest's embedded tracking pixel -
+// the request itself (regardless of response content) is the "open" event.
+// Most mail clients only load images once per message, but open_count still
+// increments past the first so re-opens on another device are visible too.
+const TRACKING_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+
+function findSend(token) {
+  return db.prepare('SELECT * FROM email_sends WHERE public_id = ?').get(token);
+}
+
+router.get('/track-open', (req, res) => {
+  const send = findSend(String(req.query.send || ''));
+  if (send) {
+    const now = Date.now();
+    db.prepare('UPDATE email_sends SET opened_at = COALESCE(opened_at, ?), open_count = open_count + 1 WHERE id = ?').run(now, send.id);
+  }
+  res.set('Content-Type', 'image/gif');
+  res.set('Cache-Control', 'no-store');
+  res.send(TRACKING_PIXEL);
+});
+
+// Logs the click, then redirects on to the real URL - restricted to this
+// site's own origin (every link the digest ever builds is one of our own
+// post/editorial/manage/unsubscribe pages) so this can't be turned into an
+// open redirector to an arbitrary external site.
+router.get('/track-click', (req, res) => {
+  const send = findSend(String(req.query.send || ''));
+  const url = String(req.query.url || '');
+  const { appUrl } = require('../../services/emailDigest');
+  const safeUrl = url.startsWith(appUrl()) ? url : appUrl();
+  if (send) {
+    const now = Date.now();
+    db.prepare('UPDATE email_sends SET clicked_at = COALESCE(clicked_at, ?), click_count = click_count + 1 WHERE id = ?').run(now, send.id);
+  }
+  res.redirect(302, safeUrl);
+});
+
 module.exports = router;

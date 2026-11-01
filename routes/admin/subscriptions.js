@@ -66,6 +66,31 @@ router.get('/', (req, res) => {
   });
 });
 
+// Aggregate open/click performance across every digest ever sent - unique
+// (first-time) opens/clicks drive the rate %s since that's what "did this
+// land" actually means; total opens/clicks (which keep counting re-opens on
+// another device) are shown alongside for the raw activity picture.
+router.get('/email-stats', (req, res) => {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS sends, COALESCE(SUM(open_count), 0) AS totalOpens, COALESCE(SUM(click_count), 0) AS totalClicks,
+              SUM(CASE WHEN opened_at IS NOT NULL THEN 1 ELSE 0 END) AS uniqueOpens,
+              SUM(CASE WHEN clicked_at IS NOT NULL THEN 1 ELSE 0 END) AS uniqueClicks
+       FROM email_sends`
+    )
+    .get();
+  const sends = row.sends || 0;
+  res.json({
+    totalSends: sends,
+    uniqueOpens: row.uniqueOpens || 0,
+    uniqueClicks: row.uniqueClicks || 0,
+    totalOpens: row.totalOpens,
+    totalClicks: row.totalClicks,
+    openRate: sends ? Math.round(((row.uniqueOpens || 0) / sends) * 1000) / 10 : 0,
+    clickRate: sends ? Math.round(((row.uniqueClicks || 0) / sends) * 1000) / 10 : 0,
+  });
+});
+
 router.post('/:id/unsubscribe', (req, res) => {
   const row = db.prepare('SELECT * FROM email_subscriptions WHERE id = ?').get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Not found' });

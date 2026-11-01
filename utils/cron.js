@@ -58,6 +58,7 @@ function publishScheduledEditorials() {
 function sendDueDigests() {
   const { currentHourInSiteTz, collectDigestSections, digestEmailHtml, digestEmailText, unsubscribeUrl, siteName } = require('../services/emailDigest');
   const { sendMail } = require('./mailer');
+  const { newPublicId } = require('./ids');
   const hour = currentHourInSiteTz();
   const cutoff = Date.now() - 20 * HOUR_MS;
   const subs = db
@@ -82,17 +83,27 @@ function sendDueDigests() {
       return;
     }
     const itemCount = sections.reduce((n, s) => n + s.items.length, 0);
+    // Generated before sending (not after) because the open-tracking pixel
+    // and click-tracking links need to be embedded in the email content
+    // itself - the email_sends row is only written once the send actually
+    // succeeds, so a failed send never leaves a row claiming to be sent.
+    const sendToken = newPublicId(20);
     sendMail({
       to: sub.email,
       subject: `${siteName()}: ${itemCount} new post${itemCount === 1 ? '' : 's'} today`,
-      html: digestEmailHtml(sub, sections),
+      html: digestEmailHtml(sub, sections, sendToken),
       text: digestEmailText(sub, sections),
       headers: {
         'List-Unsubscribe': `<${unsubscribeUrl(sub)}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       },
     })
-      .then(() => db.prepare('UPDATE email_subscriptions SET last_sent_at = ? WHERE id = ?').run(Date.now(), sub.id))
+      .then(() => {
+        const now = Date.now();
+        db.prepare('UPDATE email_subscriptions SET last_sent_at = ? WHERE id = ?').run(now, sub.id);
+        db.prepare('INSERT INTO email_sends (public_id, subscription_id, item_count, sent_at) VALUES (?, ?, ?, ?)')
+          .run(sendToken, sub.id, itemCount, now);
+      })
       .catch((e) => console.error('[cron] Failed to send digest to', sub.email, '-', e.message));
   });
 }
