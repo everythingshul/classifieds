@@ -52,10 +52,14 @@ body[dir='rtl'] { direction: rtl; }
 /* #topBannerSlot/#sidebarBannerSlot start hidden (inline style) and only
    ever get display:'' (shown) from JS once there's at least one banner to
    put in them - see public/js/banners.js - so an empty slot never reserves
-   visible space or shows a placeholder. */
+   visible space or shows a placeholder. Once shown, each slot is a flex
+   column: height isn't fixed anywhere, it's just the sum of however many
+   banners actually render at their own natural (content-driven) height, so
+   one short wide banner, one tall poster-style one, or several stacked
+   banners all lay out cleanly with no extra/clipped space either way. */
+#topBannerSlot, #sidebarBannerSlot { display: flex; flex-direction: column; gap: 10px; }
 #topBannerSlot { margin: 14px 0 0; }
-.site-banner { display: block; margin-bottom: 10px; }
-.site-banner:last-child { margin-bottom: 0; }
+.site-banner { display: block; }
 .site-banner img { display: block; width: 100%; height: auto; border: 1px solid var(--border); }
 
 h1, h2, h3, h4 { font-family: var(--font-head); color: var(--navy); margin: 0 0 .4em; font-weight: 800; letter-spacing: -.01em; }
