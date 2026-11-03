@@ -176,6 +176,7 @@
           <div class="form-row"><label>Photos <span class="hint">(up to 6, optional)</span></label><input type="file" data-field="images" accept="image/png,image/jpeg,image/webp" multiple></div>
           <div class="form-row"><label>Duration (days)</label><input type="number" data-field="durationDays" value="30" min="1"></div>
         </div>
+        <div class="form-row"><label>Schedule for <span class="hint">(optional - leave blank to go live immediately)</span></label><input type="datetime-local" data-field="scheduledAt"></div>
         <label class="addon-row"><input type="checkbox" data-field="wantsStrike"> Feature this listing (no charge from this tool)</label>
         <div class="error-list" data-role="blockError" style="display:none"></div>
       </div>`;
@@ -250,19 +251,22 @@
   }
 
   function updateSummary() {
-    const created = blocks.filter((b) => b.status === 'created').length;
+    const done = blocks.filter((b) => b.status === 'created' || b.status === 'scheduled').length;
     document.getElementById('bulkSummary').textContent = blocks.length
-      ? `${blocks.length} listing${blocks.length === 1 ? '' : 's'}${created ? ` · ${created} created` : ''}`
+      ? `${blocks.length} listing${blocks.length === 1 ? '' : 's'}${done ? ` · ${done} done` : ''}`
       : '';
   }
 
   function setBlockStatus(blockEl, block, status, message) {
+    // 'scheduled' counts as done the same as 'created' for styling/skip-on-
+    // retry purposes - block.status just needs to not be 'pending'/'error'.
     block.status = status;
-    blockEl.classList.toggle('created', status === 'created');
+    const done = status === 'created' || status === 'scheduled';
+    blockEl.classList.toggle('created', done);
     blockEl.classList.toggle('errored', status === 'error');
     const statusEl = blockEl.querySelector('[data-role="status"]');
-    statusEl.className = `bulk-status ${status === 'created' ? 'ok' : status === 'error' ? 'err' : ''}`;
-    statusEl.textContent = status === 'created' ? 'Created ✓' : status === 'error' ? 'Failed' : status === 'creating' ? 'Creating…' : '';
+    statusEl.className = `bulk-status ${done ? 'ok' : status === 'error' ? 'err' : ''}`;
+    statusEl.textContent = status === 'created' ? 'Created ✓' : status === 'scheduled' ? 'Scheduled ✓' : status === 'error' ? 'Failed' : status === 'creating' ? 'Creating…' : '';
     const errEl = blockEl.querySelector('[data-role="blockError"]');
     if (message) {
       errEl.style.display = '';
@@ -304,6 +308,8 @@
     fd.set('posterPhone', val('posterPhone'));
     fd.set('posterEmail', val('posterEmail'));
     fd.set('durationDays', val('durationDays') || '30');
+    const scheduledAt = val('scheduledAt');
+    if (scheduledAt) fd.set('scheduledAt', String(new Date(scheduledAt).getTime()));
     if (checked('wantsStrike')) fd.set('wantsStrike', '1');
     const fileInput = blockEl.querySelector('[data-field="images"]');
     Array.from(fileInput?.files || []).slice(0, 6).forEach((f) => fd.append('images', f));
@@ -332,7 +338,7 @@
         setBlockStatus(blockEl, block, 'error', msg);
         return false;
       }
-      setBlockStatus(blockEl, block, 'created');
+      setBlockStatus(blockEl, block, data.status === 'scheduled' ? 'scheduled' : 'created');
       return true;
     } catch (e) {
       if (e.message !== '__auth__') setBlockStatus(blockEl, block, 'error', e.message || 'Network error');
@@ -341,8 +347,8 @@
   }
 
   async function createAll() {
-    const pending = blocks.filter((b) => b.status !== 'created');
-    if (!pending.length) { toast('Nothing to create - every listing is already marked Created.'); return; }
+    const pending = blocks.filter((b) => b.status !== 'created' && b.status !== 'scheduled');
+    if (!pending.length) { toast('Nothing to create - every listing is already done.'); return; }
     const btn = document.getElementById('createAllBtn');
     btn.disabled = true;
     btn.textContent = 'Creating…';
