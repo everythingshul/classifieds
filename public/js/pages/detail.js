@@ -35,10 +35,12 @@ async function renderDetailPage(id, type) {
   const shareUrl = window.location.href;
   const shareText = `${post.title} - ${post.categoryLabel}`;
   const shareRow = renderShareRow(shareUrl, shareText);
+  const isExpired = post.status === 'expired';
 
   document.getElementById('app').innerHTML = `
     <div class="container">
-      <div class="detail-grid detail-anim">
+      <div class="detail-grid detail-anim ${isExpired ? 'is-expired' : ''}">
+        ${isExpired ? '<div class="detail-expired-stamp">Expired</div>' : ''}
         <div class="detail-main">
           <div class="detail-topline">
             <span class="tag tag-lg">${escapeHtml(post.categoryLabel)}</span>
@@ -63,6 +65,7 @@ async function renderDetailPage(id, type) {
             <button class="bookmark-btn ${isBookmarked ? 'active' : ''}" id="bookmarkBtn"><span id="bookmarkLabel">${I18N.t(isBookmarked ? 'bookmarked' : 'bookmark')}</span></button>
             <button class="report-link" id="reportBtn" data-i18n="report">Report</button>
           </div>
+          ${isExpired ? '' : `
           <details style="margin-top:16px">
             <summary style="cursor:pointer;font-weight:600;font-size:.88rem">Boost or Feature this listing</summary>
             <form id="boostForm" style="margin-top:10px">
@@ -71,7 +74,7 @@ async function renderDetailPage(id, type) {
               <button class="btn btn-sm btn-gold" type="submit" name="action" value="strike">Make Featured</button>
             </form>
             <div id="boostCheckoutContainer" style="margin-top:12px"></div>
-          </details>`}
+          </details>`}`}
           <div id="sidebarBannerSlot" style="display:none;margin-top:14px"></div>
         </div>
       </div>

@@ -144,7 +144,10 @@ router.get('/', (req, res, next) => {
 router.get('/:publicId', (req, res, next) => {
   try {
     const post = db.prepare("SELECT * FROM posts WHERE public_id = ? AND type = 'classified'").get(req.params.publicId);
-    if (!post || post.status !== 'live') return res.status(404).json({ error: 'Post not found' });
+    // Expired posts stay reachable at their own URL (with an "expired"
+    // stamp and no contact info, see formatPostPublic) instead of 404ing -
+    // only ones that were never actually live (pending/rejected/removed) 404.
+    if (!post || !['live', 'expired'].includes(post.status)) return res.status(404).json({ error: 'Post not found' });
     // View counting happens via POST /api/posts/impressions (fired for any
     // rendered card/detail page), not gated behind this fetch.
     const images = db.prepare('SELECT * FROM post_images WHERE post_id = ? ORDER BY sort_order').all(post.id);

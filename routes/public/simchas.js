@@ -73,7 +73,9 @@ router.get('/', (req, res, next) => {
 router.get('/:publicId', (req, res, next) => {
   try {
     const post = db.prepare("SELECT * FROM posts WHERE public_id = ? AND type = 'simcha'").get(req.params.publicId);
-    if (!post || post.status !== 'live') return res.status(404).json({ error: 'Post not found' });
+    // Expired posts stay reachable (see routes/public/classifieds.js's
+    // detail route for the full rationale).
+    if (!post || !['live', 'expired'].includes(post.status)) return res.status(404).json({ error: 'Post not found' });
     res.json(formatPostPublic(post));
   } catch (e) {
     next(e);

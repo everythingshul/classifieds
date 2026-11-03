@@ -27,12 +27,13 @@ function cardMetaLine(post) {
 function postCardHtml(post) {
   const priceDisplay = formatPriceField(post.fields?.price, post.fields?.priceText, post.fields?.currency);
   const meta = cardMetaLine(post);
+  const isExpired = post.status === 'expired';
   return `
-    <a class="card ${post.isFeatured ? 'featured' : ''}" href="${postUrl(post)}">
+    <a class="card ${post.isFeatured ? 'featured' : ''} ${isExpired ? 'is-expired' : ''}" href="${postUrl(post)}">
       <div class="body">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
           <span class="cat">${escapeHtml(categoryLabelFor(post))}</span>
-          ${post.isFeatured ? `<span class="badge-featured" style="position:static;margin:0">Featured</span>` : ''}
+          ${isExpired ? '<span class="badge-expired">Expired</span>' : post.isFeatured ? `<span class="badge-featured" style="position:static;margin:0">Featured</span>` : ''}
         </div>
         <span class="title">${escapeHtml(post.title)}</span>
         ${post.description ? `<p class="card-desc">${escapeHtml(post.description)}</p>` : ''}

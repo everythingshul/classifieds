@@ -15,10 +15,7 @@ const { escapeHtml } = require('../../services/emailLayout');
 
 const router = express.Router();
 
-const runtimeConfig = require('../../services/runtimeConfig');
-function appUrl() {
-  return runtimeConfig.get('app_url', 'APP_URL') || '';
-}
+const { appUrl } = require('../../services/appUrl');
 function postUrlPath(post) {
   if (post.type === 'simcha') return `/simchas/${post.public_id}`;
   if (post.type === 'listing') return `/listings/${post.public_id}`;
@@ -386,7 +383,10 @@ router.get('/by-ids', (req, res, next) => {
     const ids = String(req.query.ids || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 100);
     if (!ids.length) return res.json({ posts: [] });
     const placeholders = ids.map(() => '?').join(',');
-    const posts = db.prepare(`SELECT * FROM posts WHERE public_id IN (${placeholders}) AND status = 'live'`).all(...ids);
+    // Bookmarks should keep showing a post the viewer saved even after it
+    // expires (with an "expired" stamp - see formatPostPublic) instead of
+    // just silently vanishing from their list.
+    const posts = db.prepare(`SELECT * FROM posts WHERE public_id IN (${placeholders}) AND status IN ('live', 'expired')`).all(...ids);
     const postIds = posts.map((p) => p.id);
     let imgMap = new Map();
     if (postIds.length) {

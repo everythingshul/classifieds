@@ -60,7 +60,12 @@ function formatPostPublic(post, images = []) {
     },
     // Simchas never show contact info publicly - it's collected only so
     // admins/CRM can reach the poster, and for the report-post workflow.
-    contact: post.type === 'simcha' ? {} : buildContactLinks(post),
+    // Expired posts stay visible (see routes/public/{classifieds,listings,
+    // simchas}.js's detail routes) but lose their contact info the same
+    // way - the poster may no longer be reachable at it, and it's no
+    // longer meant to generate new contact, just stay findable with an
+    // "expired" stamp.
+    contact: post.type === 'simcha' || post.status === 'expired' ? {} : buildContactLinks(post),
     isFeatured: !!post.is_featured_strike,
     // View count is tracked (see /api/posts/impressions) but not shown
     // publicly for now - it's still visible to admins via formatPostAdmin.
