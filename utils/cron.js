@@ -109,16 +109,22 @@ function sendDueDigests() {
 }
 
 function start() {
+  const { sendDueAdminDigest } = require('../services/adminDigest');
   expireStalePosts();
   deleteAbandonedCheckouts();
   publishScheduledPosts();
   publishScheduledEditorials();
   sendDueDigests();
+  sendDueAdminDigest();
   cron.schedule('*/15 * * * *', expireStalePosts);
   cron.schedule('0 * * * *', deleteAbandonedCheckouts);
   cron.schedule('*/5 * * * *', publishScheduledPosts);
   cron.schedule('*/5 * * * *', publishScheduledEditorials);
   cron.schedule('5 * * * *', sendDueDigests);
+  // Same hourly cadence as the subscriber digest check above - the admin
+  // digest's own date guard (see services/adminDigest.js) is what actually
+  // makes it only fire once, the first tick after its morning hour arrives.
+  cron.schedule('10 * * * *', sendDueAdminDigest);
 }
 
 module.exports = { start, expireStalePosts, deleteAbandonedCheckouts, publishScheduledPosts, publishScheduledEditorials, sendDueDigests };
