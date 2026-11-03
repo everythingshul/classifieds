@@ -1,3 +1,11 @@
+// Same segment the public site's own post cards link to (see postUrl in
+// public/js/cards.js) - a relative path works fine since the admin portal
+// and the public site are the same origin.
+function postPublicPath(p) {
+  const segment = p.type === 'simcha' ? 'simchas' : p.type === 'listing' ? 'listings' : 'classifieds';
+  return `/${segment}/${p.publicId}`;
+}
+
 async function renderPostsPage(query) {
   const root = document.getElementById('adminContent');
   const page = parseInt(query.page, 10) || 1;
@@ -29,6 +37,7 @@ async function renderPostsPage(query) {
             <td>${p.clickCount}</td>
             <td>${p.expiresAt ? formatDate(p.expiresAt) : (p.savedForever ? 'Never' : '—')}</td>
             <td><div class="actions">
+              ${['live', 'expired'].includes(p.status) ? `<a class="btn btn-sm btn-outline" href="${postPublicPath(p)}" target="_blank" rel="noopener">View</a>` : ''}
               <button class="btn btn-sm edit-btn" data-id="${p.id}">Edit</button>
               <button class="btn btn-sm btn-outline extend-list-btn" data-id="${p.id}">Extend</button>
             </div></td>
@@ -136,7 +145,7 @@ async function openEditor(id) {
   const titleLimit = p.type !== 'simcha' ? limits.title : null;
   const typeLabel = p.type === 'listing' ? 'Listing' : p.type === 'simcha' ? 'Simcha' : 'Classified';
   Modal.open(`Edit ${typeLabel}: ${p.title}`, `
-      <p class="hint"><span class="status-pill status-${p.status}">${p.status}</span></p>
+      <p class="hint"><span class="status-pill status-${p.status}">${p.status}</span>${['live', 'expired'].includes(p.status) ? ` &middot; <a href="${postPublicPath(p)}" target="_blank" rel="noopener">View on site</a>` : ''}</p>
       <p class="hint">${p.viewCount} views (${p.uniqueViewCount} unique) · ${p.clickCount} clicks (${p.uniqueClickCount} unique) <span class="hint">(all-time)</span></p>
       <p class="hint">Posted ${formatDate(p.publishedAt || p.createdAt)} <span class="hint">(stays fixed - extending only moves the expiration date)</span> · Expires ${p.savedForever ? 'Never (saved forever)' : p.expiresAt ? formatDate(p.expiresAt) : 'Never'}</p>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
