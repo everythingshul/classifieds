@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
+/* Heebo is loaded via a <link> in the page <head> (both public/index.html
+   and public/admin/index.html), not an @import here - an @import inside a
+   stylesheet blocks rendering until it's fetched, while a <link> the
+   browser discovers immediately can load in parallel with this file. */
 
 :root {
   --navy: #1f3b57;

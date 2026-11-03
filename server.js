@@ -6,6 +6,7 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
@@ -51,6 +52,10 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
+// gzip/brotli every response this process sends (JSON API responses as well
+// as the plain-script JS/CSS bundle, which isn't pre-minified or bundled) -
+// the single highest-leverage, lowest-risk thing to do for page-load speed.
+app.use(compression());
 app.use(cors());
 app.use(cookieParser());
 
@@ -66,7 +71,18 @@ app.use('/api', apiLimiter);
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }));
 app.use(require('./routes/public/sitemap'));
 app.use(require('./routes/public/favicon'));
-app.use(express.static(path.join(__dirname, 'public')));
+// JS/CSS/images get a real cache lifetime (no content-hashed filenames here,
+// so an hour balances fewer repeat requests against how soon a deploy's
+// changes show up) - index.html always revalidates instead, so a deploy's
+// actual page shell is never stuck stale in a visitor's cache.
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    maxAge: '1h',
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) res.set('Cache-Control', 'no-cache');
+    },
+  })
+);
 
 app.use('/api/config', require('./routes/public/config'));
 app.use('/api/home', require('./routes/public/home'));

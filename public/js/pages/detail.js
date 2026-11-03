@@ -28,7 +28,7 @@ async function renderDetailPage(id, type) {
   const gallery = images.length
     ? `<div class="detail-gallery">
         <div class="detail-gallery-main"><img src="${images[0]}" alt="" id="galleryMain"></div>
-        ${images.length > 1 ? `<div class="detail-gallery-thumbs">${images.map((src, i) => `<img src="${src}" alt="" class="${i === 0 ? 'active' : ''}" data-src="${src}">`).join('')}</div>` : ''}
+        ${images.length > 1 ? `<div class="detail-gallery-thumbs">${images.map((src, i) => `<img src="${src}" alt="" loading="lazy" class="${i === 0 ? 'active' : ''}" data-src="${src}">`).join('')}</div>` : ''}
       </div>`
     : '';
 
