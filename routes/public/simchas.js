@@ -11,7 +11,9 @@ router.get('/', (req, res, next) => {
     const pageSize = Math.min(60, Math.max(1, parseInt(req.query.pageSize, 10) || 20));
     const now = Date.now();
 
-    const where = ["type = 'simcha'", "status = 'live'", '(expires_at IS NULL OR expires_at > ?)'];
+    // Expired posts stay in the browse grid too (stamped, contact stripped -
+    // see formatPostPublic/cards.js), sorted after live ones.
+    const where = ["type = 'simcha'", "(status = 'live' OR status = 'expired')", "(status != 'live' OR expires_at IS NULL OR expires_at > ?)"];
     const params = [now];
 
     if (req.query.taxonomyId) {
@@ -44,7 +46,7 @@ router.get('/', (req, res, next) => {
 
     let posts, total;
     if (useGeo) {
-      const all = db.prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY boosted_at DESC LIMIT 5000`).all(...params);
+      const all = db.prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY (status = 'expired') ASC, boosted_at DESC LIMIT 5000`).all(...params);
       const withDist = all
         .map((p) => ({ post: p, dist: distanceMiles(lat, lng, p.location_lat, p.location_lng) }))
         .filter((x) => x.dist !== null && x.dist <= radius)
@@ -54,7 +56,7 @@ router.get('/', (req, res, next) => {
     } else {
       total = db.prepare(`SELECT COUNT(*) AS c FROM posts WHERE ${whereSql}`).get(...params).c;
       posts = db
-        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY boosted_at DESC LIMIT ? OFFSET ?`)
+        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY (status = 'expired') ASC, boosted_at DESC LIMIT ? OFFSET ?`)
         .all(...params, pageSize, (page - 1) * pageSize);
     }
 

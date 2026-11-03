@@ -60,7 +60,7 @@ async function renderDetailPage(id, type) {
             <button class="report-link" id="reportBtn" data-i18n="report">Report</button>
           </div>` : `
           <h3 data-i18n="contact">Contact</h3>
-          ${hasContact ? contactButtons.join('') : '<p class="sub">No contact info provided.</p>'}
+          ${hasContact ? contactButtons.join('') : `<p class="sub">${isExpired ? 'No contact available on expired posts.' : 'No contact info provided.'}</p>`}
           <div style="display:flex;gap:8px;margin-top:14px">
             <button class="bookmark-btn ${isBookmarked ? 'active' : ''}" id="bookmarkBtn"><span id="bookmarkLabel">${I18N.t(isBookmarked ? 'bookmarked' : 'bookmark')}</span></button>
             <button class="report-link" id="reportBtn" data-i18n="report">Report</button>

@@ -23,7 +23,7 @@ function categoryCounts() {
   const rows = db
     .prepare(
       `SELECT category, COUNT(*) AS c FROM posts
-       WHERE type = 'classified' AND status = 'live' AND (expires_at IS NULL OR expires_at > ?)
+       WHERE type = 'classified' AND (status = 'live' OR status = 'expired') AND (status != 'live' OR expires_at IS NULL OR expires_at > ?)
        GROUP BY category`
     )
     .all(now);
@@ -43,7 +43,11 @@ router.get('/', (req, res, next) => {
     const pageSize = Math.min(60, Math.max(1, parseInt(req.query.pageSize, 10) || 20));
     const now = Date.now();
 
-    const where = ["type = 'classified'", "status = 'live'", '(expires_at IS NULL OR expires_at > ?)'];
+    // Expired posts stay in the browse grid too (stamped, contact stripped -
+    // see formatPostPublic/cards.js), sorted after live ones - the
+    // expires_at safety check only matters for a 'live' row, since an
+    // 'expired' one is by definition past its own expires_at already.
+    const where = ["type = 'classified'", "(status = 'live' OR status = 'expired')", "(status != 'live' OR expires_at IS NULL OR expires_at > ?)"];
     const params = [now];
 
     if (req.query.category) {
@@ -108,7 +112,7 @@ router.get('/', (req, res, next) => {
     let posts, total;
     if (useGeo) {
       const all = db
-        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT 5000`)
+        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY (status = 'expired') ASC, is_featured_strike DESC, boosted_at DESC LIMIT 5000`)
         .all(...params);
       const withDist = all
         .map((p) => ({ post: p, dist: distanceMiles(lat, lng, p.location_lat, p.location_lng) }))
@@ -122,7 +126,7 @@ router.get('/', (req, res, next) => {
       if (req.query.sort === 'price_asc') orderBy = "json_extract(fields, '$.price') ASC";
       if (req.query.sort === 'price_desc') orderBy = "json_extract(fields, '$.price') DESC";
       posts = db
-        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY (status = 'expired') ASC, ${orderBy} LIMIT ? OFFSET ?`)
         .all(...params, pageSize, (page - 1) * pageSize);
     }
 
