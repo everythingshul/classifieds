@@ -27,6 +27,15 @@ async function renderSettingsPage() {
     </div>
 
     <div class="admin-card">
+      <h3 style="margin-top:0">Bulk Posting Tool</h3>
+      <p class="hint">A hidden page at <code>/tabadd137</code> for adding many listings at once with no payment and no character limits. Not linked anywhere on the site. Set a password here for it (no username) - visiting it from the "Bulk Add" link in this portal's nav skips the password, since you're already signed in.</p>
+      <form id="bulkForm">
+        ${secretField('bulk_post_password_hash', 'Password', s.bulk_post_password_hash_isSet, 'Choose a password')}
+        <button class="btn btn-sm" type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
       <h3 style="margin-top:0">Payments — Stripe</h3>
       <p class="hint">From your Stripe dashboard: Developers → API keys for the secret key, and Developers → Webhooks (endpoint <code>/api/webhook</code>) for the signing secret.</p>
       <form id="stripeForm">
@@ -166,6 +175,11 @@ async function renderSettingsPage() {
     const out = [['stripe_publishable_key', fd.stripe_publishable_key]];
     if (fd.stripe_secret_key) out.push(['stripe_secret_key', fd.stripe_secret_key]);
     if (fd.stripe_webhook_secret) out.push(['stripe_webhook_secret', fd.stripe_webhook_secret]);
+    return out;
+  }, true);
+  bindForm('bulkForm', (fd) => {
+    const out = [];
+    if (fd.bulk_post_password_hash) out.push(['bulk_post_password_hash', fd.bulk_post_password_hash]);
     return out;
   }, true);
   document.getElementById('mailProviderSelect').addEventListener('change', (e) => {
