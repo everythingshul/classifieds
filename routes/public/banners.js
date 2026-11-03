@@ -14,25 +14,25 @@ router.get('/', (req, res) => {
 // fire-and-forget pattern, logged into the same analytics_events table
 // (banner_id set, type 'banner_view'/'banner_click') so banner performance
 // shows up in the same admin Analytics dashboard as everything else.
-function logBannerEvents(type, ids, visitorId) {
+function logBannerEvents(type, ids, visitorId, domain) {
   if (!visitorId || !ids?.length) return;
   const placeholders = ids.map(() => '?').join(',');
   const banners = db.prepare(`SELECT id FROM banners WHERE public_id IN (${placeholders})`).all(...ids);
   if (!banners.length) return;
   const now = Date.now();
-  const stmt = db.prepare('INSERT INTO analytics_events (type, banner_id, visitor_id, created_at) VALUES (?, ?, ?, ?)');
-  banners.forEach((b) => stmt.run(type, b.id, visitorId, now));
+  const stmt = db.prepare('INSERT INTO analytics_events (type, banner_id, visitor_id, domain, created_at) VALUES (?, ?, ?, ?, ?)');
+  banners.forEach((b) => stmt.run(type, b.id, visitorId, domain, now));
 }
 
 router.post('/impressions', (req, res) => {
   const { ids, visitorId } = req.body;
-  logBannerEvents('banner_view', Array.isArray(ids) ? ids : [], visitorId);
+  logBannerEvents('banner_view', Array.isArray(ids) ? ids : [], visitorId, String(req.get('host') || '').toLowerCase());
   res.json({ ok: true });
 });
 
 router.post('/clicks', (req, res) => {
   const { ids, visitorId } = req.body;
-  logBannerEvents('banner_click', Array.isArray(ids) ? ids : [], visitorId);
+  logBannerEvents('banner_click', Array.isArray(ids) ? ids : [], visitorId, String(req.get('host') || '').toLowerCase());
   res.json({ ok: true });
 });
 

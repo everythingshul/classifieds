@@ -116,14 +116,14 @@ router.post('/:id/comments', async (req, res, next) => {
 // simple running counters on editorials.view_count/click_count below) so the
 // admin analytics dashboard can report editorial traffic over any date
 // range, not just lifetime totals - mirrors logPostEvents in routes/public/posts.js.
-function logEditorialEvents(type, ids, visitorId) {
+function logEditorialEvents(type, ids, visitorId, domain) {
   if (!visitorId || !ids.length) return;
   const placeholders = ids.map(() => '?').join(',');
   const rows = db.prepare(`SELECT id FROM editorials WHERE public_id IN (${placeholders})`).all(...ids);
   if (!rows.length) return;
   const now = Date.now();
-  const stmt = db.prepare('INSERT INTO analytics_events (type, editorial_id, visitor_id, created_at) VALUES (?, ?, ?, ?)');
-  const txn = db.transaction((r) => r.forEach((row) => stmt.run(type, row.id, visitorId, now)));
+  const stmt = db.prepare('INSERT INTO analytics_events (type, editorial_id, visitor_id, domain, created_at) VALUES (?, ?, ?, ?, ?)');
+  const txn = db.transaction((r) => r.forEach((row) => stmt.run(type, row.id, visitorId, domain, now)));
   txn(rows);
 }
 
@@ -134,7 +134,7 @@ router.post('/impressions', (req, res) => {
   if (!ids.length) return res.json({ ok: true });
   const placeholders = ids.map(() => '?').join(',');
   db.prepare(`UPDATE editorials SET view_count = view_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
-  logEditorialEvents('editorial_view', ids, req.body.visitorId);
+  logEditorialEvents('editorial_view', ids, req.body.visitorId, String(req.get('host') || '').toLowerCase());
   res.json({ ok: true });
 });
 
@@ -143,7 +143,7 @@ router.post('/clicks', (req, res) => {
   if (!ids.length) return res.json({ ok: true });
   const placeholders = ids.map(() => '?').join(',');
   db.prepare(`UPDATE editorials SET click_count = click_count + 1 WHERE public_id IN (${placeholders}) AND status = 'live'`).run(...ids);
-  logEditorialEvents('editorial_click', ids, req.body.visitorId);
+  logEditorialEvents('editorial_click', ids, req.body.visitorId, String(req.get('host') || '').toLowerCase());
   res.json({ ok: true });
 });
 

@@ -34,6 +34,10 @@ addColumnIfMissing('editorials', 'scheduled_at', 'scheduled_at INTEGER');
 addColumnIfMissing('editorials', 'like_count', 'like_count INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('analytics_events', 'editorial_id', 'editorial_id INTEGER REFERENCES editorials(id) ON DELETE SET NULL');
 addColumnIfMissing('analytics_events', 'banner_id', 'banner_id INTEGER REFERENCES banners(id) ON DELETE SET NULL');
+// Host header the event came in on (e.g. "jlistings.com" vs
+// "jlistings.co.uk") - lets the admin analytics dashboard break traffic
+// down per domain. Null on rows logged before this column existed.
+addColumnIfMissing('analytics_events', 'domain', 'domain TEXT');
 // Must run after the migrations above, not in schema.sql - CREATE INDEX IF NOT
 // EXISTS still fails with "no such column" on a pre-existing analytics_events
 // table where the column was just added by ALTER TABLE, not by the original
@@ -41,6 +45,7 @@ addColumnIfMissing('analytics_events', 'banner_id', 'banner_id INTEGER REFERENCE
 // when the table already exists).
 db.exec('CREATE INDEX IF NOT EXISTS idx_analytics_events_editorial ON analytics_events(editorial_id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_analytics_events_banner ON analytics_events(banner_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_analytics_events_domain ON analytics_events(domain)');
 
 // Simcha pricing tiers used to be stored with post_type defaulting to
 // 'classified' (only distinguished by category = 'simcha'), which mixed

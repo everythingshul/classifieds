@@ -11,8 +11,8 @@ router.post('/pageview', (req, res) => {
   const path = String(req.body.path || '').slice(0, 500);
   const visitorId = String(req.body.visitorId || '').slice(0, 100);
   if (!path || !visitorId) return res.status(400).json({ error: 'path and visitorId are required' });
-  db.prepare('INSERT INTO analytics_events (type, path, visitor_id, created_at) VALUES (?, ?, ?, ?)').run(
-    'pageview', path, visitorId, Date.now()
+  db.prepare('INSERT INTO analytics_events (type, path, visitor_id, domain, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    'pageview', path, visitorId, String(req.get('host') || '').toLowerCase(), Date.now()
   );
   res.status(204).end();
 });

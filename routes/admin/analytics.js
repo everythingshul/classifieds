@@ -122,6 +122,17 @@ router.get('/', (req, res) => {
     GROUP BY category ORDER BY c DESC LIMIT 8
   `).all(from, to);
 
+  // Only meaningful once more than one domain points at this site (see
+  // services/appUrl.js) - a single-domain site just gets one row here.
+  const byDomain = db.prepare(`
+    SELECT COALESCE(NULLIF(domain, ''), '(unknown)') AS domain,
+      COUNT(*) AS events,
+      COUNT(DISTINCT visitor_id) AS uniqueVisitors
+    FROM analytics_events
+    WHERE created_at BETWEEN ? AND ?
+    GROUP BY domain ORDER BY events DESC
+  `).all(from, to);
+
   const topPages = db.prepare(`
     SELECT path, COUNT(*) AS c FROM analytics_events
     WHERE type = 'pageview' AND created_at BETWEEN ? AND ?
@@ -162,7 +173,7 @@ router.get('/', (req, res) => {
 
   res.json({
     from, to, totals, previousTotals, newVsReturning, timeseries, revenueTimeseries, revenueByKind,
-    byPostType, byCategory, topPages, topPosts, topEditorials, editorialsByStatus, editorialTotals,
+    byPostType, byCategory, byDomain, topPages, topPosts, topEditorials, editorialsByStatus, editorialTotals,
   });
 });
 

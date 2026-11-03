@@ -166,6 +166,11 @@ async function renderAnalyticsPage(query) {
     </div>
 
     <div class="admin-card">
+      <h3 style="margin-top:0">Traffic by Domain</h3>
+      ${data.byDomain.length ? `<table class="admin-table"><thead><tr><th>Domain</th><th>Events</th><th>Unique Visitors</th></tr></thead><tbody>${data.byDomain.map((d) => `<tr><td>${escapeHtml(d.domain)}</td><td>${d.events}</td><td>${d.uniqueVisitors}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
+    </div>
+
+    <div class="admin-card">
       <h3 style="margin-top:0">Top Pages</h3>
       ${data.topPages.length ? `<table class="admin-table"><thead><tr><th>Path</th><th>Views</th></tr></thead><tbody>${data.topPages.map((p) => `<tr><td>${escapeHtml(p.path)}</td><td>${p.c}</td></tr>`).join('')}</tbody></table>` : '<p class="hint">No data for this range yet.</p>'}
     </div>
