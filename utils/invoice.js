@@ -4,6 +4,7 @@ const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const { formatCents } = require('./money');
 const { sendMail, notifyAdmin } = require('./mailer');
 const runtimeConfig = require('../services/runtimeConfig');
+const { appUrl } = require('../services/appUrl');
 
 const NAVY = rgb(0.1216, 0.2314, 0.3412); // #1f3b57
 const NAVY_DARK = rgb(0.0784, 0.1569, 0.2196); // #142838
@@ -17,10 +18,6 @@ function typeLabel(type) {
   if (type === 'simcha') return 'Simcha';
   if (type === 'listing') return 'Listing';
   return 'Classified';
-}
-
-function appUrl() {
-  return runtimeConfig.get('app_url', 'APP_URL') || '';
 }
 
 // Reads the site's own logo straight off disk (whatever the admin has
@@ -172,26 +169,25 @@ function invoiceHtml(invoice) {
       </tr>` : '';
 
   return `
-  <div style="font-family:Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#f2f0eb;padding:24px 12px">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e4e1d8">
-      <tr>
-        <td style="background:#142838;padding:22px 28px">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="vertical-align:middle">
-                <div style="background:#ffffff;display:inline-block;padding:8px 14px">
-                  <img src="${logoUrl}" alt="${siteName}" height="34" style="display:block;height:34px" onerror="this.style.display='none'">
-                </div>
-              </td>
-              <td style="text-align:right;vertical-align:middle">
-                <div style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.04em">INVOICE</div>
-                <div style="color:#c7cedb;font-size:12px;margin-top:2px">${invoice.invoiceNumber}</div>
-                <div style="color:#c7cedb;font-size:12px">${invoice.issuedAt.toDateString()}</div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
+  <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#faf8f4">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f4">
+      <tr><td style="height:4px;line-height:4px;font-size:0;background:#b08d3f">&nbsp;</td></tr>
+      <tr><td style="padding:26px 32px 18px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="vertical-align:middle">
+              <img src="${logoUrl}" alt="${siteName}" height="32" style="display:block;height:32px;width:auto;border:0">
+            </td>
+            <td style="text-align:right;vertical-align:middle">
+              <div style="color:#1f3b57;font-size:17px;font-weight:800;letter-spacing:.03em">INVOICE</div>
+              <div style="color:#62666b;font-size:12px;margin-top:2px">${invoice.invoiceNumber}</div>
+              <div style="color:#62666b;font-size:12px">${invoice.issuedAt.toDateString()}</div>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:0 32px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e4e1d8">
       <tr>
         <td style="padding:26px 28px 6px">
           <p style="margin:0 0 20px;font-size:15px;color:#232323">Thank you for your posting${invoice.poster.firstName ? `, ${invoice.poster.firstName}` : ''}! Here's your receipt.</p>
@@ -222,7 +218,7 @@ function invoiceHtml(invoice) {
               ${detailRow('Expires', invoice.post.expiresAtText || 'n/a', true)}
             </tr>
           </table>
-          <p style="margin:18px 0 0"><a href="${invoice.post.url}" style="color:#2f6b63;font-size:13px;font-weight:700;text-decoration:none">View your post &rarr;</a></p>
+          <p style="margin:18px 0 0"><a href="${invoice.post.url}" style="color:#2f6b63;font-size:13px;font-weight:700;text-decoration:none">View your post</a></p>
         </td>
       </tr>
       <tr>
@@ -246,11 +242,11 @@ function invoiceHtml(invoice) {
           <p style="font-size:11.5px;color:#62666b;line-height:1.6;margin:0">This listing will automatically expire on the date above unless renewed. All sales, listings and payments are subject to our <a href="${site}/terms" style="color:#2f6b63">Terms &amp; Conditions</a> and <a href="${site}/refund-policy" style="color:#2f6b63">Refund Policy</a>.</p>
         </td>
       </tr>
-      <tr>
-        <td style="background:#f2f0eb;padding:14px 28px;text-align:center;border-top:1px solid #e4e1d8">
-          <span style="font-size:11px;color:#62666b">A PDF copy of this invoice is attached. Questions? <a href="${site}/contact" style="color:#2f6b63">Contact us</a>.</span>
-        </td>
-      </tr>
+      </table>
+      </td></tr>
+      <tr><td style="padding:22px 32px 30px;text-align:center">
+        <span style="font-size:11.5px;color:#62666b;line-height:1.6">A PDF copy of this invoice is attached. Questions? <a href="${site}/contact" style="color:#2f6b63">Contact us</a>.</span>
+      </td></tr>
     </table>
   </div>`;
 }
@@ -272,7 +268,7 @@ async function sendInvoiceEmail(invoice) {
 // just an FYI that something new went live. Never called for posts created
 // directly from the admin backend - those skip finalizePostLive entirely.
 async function notifyAdminNewPost(post, reason) {
-  const url = `${runtimeConfig.get('app_url', 'APP_URL') || ''}/admin/#/posts?q=${encodeURIComponent(post.public_id)}`;
+  const url = `${appUrl()}/admin/#/posts?q=${encodeURIComponent(post.public_id)}`;
   await notifyAdmin(
     reason ? `Post needs attention: ${post.title}` : `New ${typeLabel(post.type).toLowerCase()} posted: ${post.title}`,
     `
