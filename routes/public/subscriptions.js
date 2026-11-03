@@ -4,6 +4,7 @@ const db = require('../../db');
 const { isValidEmail } = require('../../utils/validate');
 const { newPublicId } = require('../../utils/ids');
 const { validTopicValues, sendConfirmationEmail, escapeHtml, siteName } = require('../../services/emailDigest');
+const { appUrl } = require('../../services/appUrl');
 
 const router = express.Router();
 
@@ -151,7 +152,6 @@ router.get('/track-open', (req, res) => {
 router.get('/track-click', (req, res) => {
   const send = findSend(String(req.query.send || ''));
   const url = String(req.query.url || '');
-  const { appUrl } = require('../../services/emailDigest');
   const safeUrl = url.startsWith(appUrl()) ? url : appUrl();
   if (send) {
     const now = Date.now();

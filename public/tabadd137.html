@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Bulk Add Listings</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body { background: var(--paper); }
+    .bulk-wrap { max-width: 720px; margin: 0 auto; padding: 40px 18px 100px; }
+    .auth-card { max-width: 380px; margin: 80px auto; background: #fff; border: 1px solid var(--border); padding: 28px; }
+    .auth-card h1 { font-size: 1.2rem; margin: 0 0 6px; }
+    .bulk-block { background: #fff; border: 1px solid var(--border); padding: 18px; margin-bottom: 18px; position: relative; }
+    .bulk-block.created { border-color: var(--success); background: #f3faf5; }
+    .bulk-block.errored { border-color: var(--danger); }
+    .bulk-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .bulk-block-num { font-weight: 800; color: var(--ink-soft); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+    .bulk-status { font-size: .78rem; font-weight: 700; }
+    .bulk-status.ok { color: var(--success); }
+    .bulk-status.err { color: var(--danger); }
+    .bulk-remove-btn { background: none; border: none; color: var(--danger); font-size: .78rem; cursor: pointer; padding: 4px 6px; }
+    .bulk-block textarea { min-height: 90px; }
+    .bulk-top-bar { position: sticky; top: 0; background: var(--paper); z-index: 10; padding: 14px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .bulk-top-bar h1 { font-size: 1.3rem; margin: 0; }
+    .bulk-summary { font-size: .82rem; color: var(--ink-soft); }
+  </style>
+</head>
+<body>
+  <div class="bulk-wrap">
+    <div id="authGate">
+      <div class="auth-card">
+        <h1>Bulk Add Listings</h1>
+        <p class="hint">Enter the password to continue.</p>
+        <form id="authForm">
+          <div class="form-row"><input type="password" id="bulkPassword" autocomplete="current-password" required></div>
+          <div id="authError" class="error-list" style="display:none"></div>
+          <button class="btn" type="submit" style="width:100%">Continue</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="bulkTool" style="display:none">
+      <div class="bulk-top-bar">
+        <h1>Bulk Add Listings</h1>
+        <div class="bulk-summary" id="bulkSummary"></div>
+      </div>
+      <p class="hint">Every listing here goes live immediately with no payment required and no character limits. Fill in as many as you like, then create them all at once.</p>
+      <div id="blocksContainer"></div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-outline" type="button" id="addBlockBtn">+ Add Another Listing</button>
+        <button class="btn btn-gold" type="button" id="createAllBtn" style="margin-inline-start:auto">Create All Listings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/bulkPost.js"></script>
+</body>
+</html>

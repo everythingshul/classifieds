@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { sendMail } = require('../../utils/mailer');
@@ -9,7 +10,7 @@ router.use(requireAdmin);
 
 // Never send these back to the browser in full once set - only whether a
 // value is currently configured, via a companion "<key>_isSet" flag.
-const SECRET_KEYS = new Set(['stripe_secret_key', 'stripe_webhook_secret', 'smtp_pass', 'brevo_api_key']);
+const SECRET_KEYS = new Set(['stripe_secret_key', 'stripe_webhook_secret', 'smtp_pass', 'brevo_api_key', 'bulk_post_password_hash']);
 
 router.get('/', (req, res) => {
   const rows = db.prepare('SELECT * FROM site_settings').all();
@@ -51,12 +52,19 @@ router.post('/test-email', async (req, res) => {
 });
 
 router.put('/:key', (req, res) => {
-  const { value } = req.body;
+  let { value } = req.body;
+  // A password, not an API credential - store a hash, never the plaintext,
+  // same as admin_users.password_hash. Blank means "no bulk-post password
+  // set" (the hidden tool's standalone login is simply unusable until one
+  // is set; admins can always still reach it from inside the admin portal).
+  if (req.params.key === 'bulk_post_password_hash' && value) {
+    value = bcrypt.hashSync(String(value), 10);
+  }
   db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
     req.params.key,
     JSON.stringify(value)
   );
-  res.json({ key: req.params.key, value });
+  res.json({ key: req.params.key, value: SECRET_KEYS.has(req.params.key) ? undefined : value });
 });
 
 module.exports = router;

@@ -15,8 +15,8 @@ const { stripHtml } = require('../utils/htmlSanitize');
 const { DEFAULT_BROOKLYN_LOCATION } = require('../utils/constants');
 const { sendMail } = require('../utils/mailer');
 const { emailShell } = require('./emailLayout');
+const { appUrl } = require('./appUrl');
 
-const appUrl = () => (runtimeConfig.get('app_url', 'APP_URL') || 'https://jlistings.com').replace(/\/$/, '');
 const siteName = () => runtimeConfig.get('site_name', 'SITE_NAME') || 'JListings';
 
 function escapeHtml(str) {
@@ -255,7 +255,6 @@ module.exports = {
   unsubscribeUrl,
   manageUrl,
   sendConfirmationEmail,
-  appUrl,
   siteName,
   escapeHtml,
 };

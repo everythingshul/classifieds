@@ -17,8 +17,7 @@ const { sanitizeRichText } = require('../../utils/htmlSanitize');
 const { getSetting } = require('../../services/pricing');
 const { sendMail } = require('../../utils/mailer');
 const { emailShell, escapeHtml } = require('../../services/emailLayout');
-const runtimeConfig = require('../../services/runtimeConfig');
-const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
+const { appUrl } = require('../../services/appUrl');
 
 const router = express.Router();
 router.use(requireAdmin);

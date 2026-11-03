@@ -1,13 +1,13 @@
 const express = require('express');
 const db = require('../../db');
-const runtimeConfig = require('../../services/runtimeConfig');
+const { appUrl } = require('../../services/appUrl');
 
 const router = express.Router();
 
 const STATIC_PATHS = ['/', '/classifieds', '/listings', '/simchas', '/terms', '/refund-policy'];
 
 router.get('/sitemap.xml', (req, res) => {
-  const base = (runtimeConfig.get('app_url', 'APP_URL') || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const base = appUrl();
   const now = Date.now();
 
   const posts = db

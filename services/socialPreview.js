@@ -10,9 +10,7 @@
 
 const db = require('../db');
 const { stripHtml } = require('../utils/htmlSanitize');
-const runtimeConfig = require('./runtimeConfig');
-
-const appUrl = () => (runtimeConfig.get('app_url', 'APP_URL') || 'https://jlistings.com').replace(/\/$/, '');
+const { appUrl } = require('./appUrl');
 
 function escapeAttr(str) {
   return String(str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -50,7 +48,9 @@ const DEFAULT_IMAGE = () => `${appUrl()}/img/logo.png`;
 // type must be 'classified' | 'listing' | 'simcha', matching posts.type and
 // the URL prefix the caller already resolved from (/classifieds, /listings, /simchas).
 function getPostPreview(publicId, type, urlPath) {
-  const post = db.prepare("SELECT * FROM posts WHERE public_id = ? AND type = ? AND status = 'live'").get(publicId, type);
+  // Expired posts keep their own page (and so their own share preview)
+  // instead of falling back to the generic site-wide meta tags.
+  const post = db.prepare("SELECT * FROM posts WHERE public_id = ? AND type = ? AND status IN ('live', 'expired')").get(publicId, type);
   if (!post) return null;
   const image = post.has_images
     ? db.prepare('SELECT filename FROM post_images WHERE post_id = ? AND approved = 1 ORDER BY sort_order LIMIT 1').get(post.id)

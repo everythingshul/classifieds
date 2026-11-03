@@ -46,6 +46,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '#/categories', label: 'Categories' },
   { href: '#/pricing', label: 'Pricing' },
   { href: '#/settings', label: 'Settings' },
+  { href: '/tabadd137', label: 'Bulk Add', target: '_blank' },
 ];
 
 function renderShell() {
@@ -60,7 +61,7 @@ function renderShell() {
               <span class="brand-name">Admin<span>JListings</span></span>
             </div>
             <nav id="top-nav">
-              ${ADMIN_NAV_ITEMS.map((item) => `<a class="nav-item" href="${item.href}">${escapeHtml(item.label)}${item.badge ? ` <span class="nav-badge" id="${item.badge}" style="display:none"></span>` : ''}</a>`).join('')}
+              ${ADMIN_NAV_ITEMS.map((item) => `<a class="nav-item" href="${item.href}"${item.target ? ` target="${item.target}" rel="noopener"` : ''}>${escapeHtml(item.label)}${item.badge ? ` <span class="nav-badge" id="${item.badge}" style="display:none"></span>` : ''}</a>`).join('')}
             </nav>
             <div class="header-right">
               <div class="header-user">

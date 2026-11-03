@@ -4,11 +4,10 @@ const { categoryLabel } = require('./postFormat');
 const { sendInvoiceEmail, notifyAdminNewPost } = require('../utils/invoice');
 const { sendMail } = require('../utils/mailer');
 const { formatCents } = require('../utils/money');
-const runtimeConfig = require('./runtimeConfig');
 const { emailShell, escapeHtml: escapeHtmlShell } = require('./emailLayout');
+const { appUrl } = require('./appUrl');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
 
 function insertPost({ type, category, payload, hasImages }) {
   const now = Date.now();

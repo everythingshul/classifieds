@@ -2,15 +2,13 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
 const { formatPostAdmin } = require('../../services/postFormat');
-const { computeExpiry, DAY_MS, sendInvoiceForPost, insertPost, attachImages, attachSimchaSurprises, recordPayment } = require('../../services/postLifecycle');
+const { computeExpiry, DAY_MS } = require('../../services/postLifecycle');
+const { createAdminPost, AdminPostCreateError } = require('../../services/adminPostCreate');
 const { sendMail } = require('../../utils/mailer');
 const { emailShell, escapeHtml } = require('../../services/emailLayout');
-const { POST_STATUSES, CURRENCY_CODES } = require('../../utils/constants');
-const runtimeConfig = require('../../services/runtimeConfig');
-const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
+const { POST_STATUSES } = require('../../utils/constants');
+const { appUrl } = require('../../services/appUrl');
 const { upload, processAndSaveImage } = require('../../middleware/upload');
-const { findCategory, findListingCategory } = require('../../services/taxonomy');
-const { validateCategoryFields, parseAmountOrText } = require('../../services/postValidation');
 const { normalizeUrl } = require('../../utils/validate');
 const { createRefund } = require('../../services/checkout');
 const { validatePhone } = require('../../utils/phone');
@@ -35,117 +33,15 @@ function imagesFor(postId) {
 
 // Admin-created posts skip payment entirely and go straight live with any
 // uploaded images pre-approved (admin is trusted, unlike public submissions).
+// Shared with the bulk-posting tool - see services/adminPostCreate.js.
 router.post('/create', upload.array('images', 6), async (req, res, next) => {
   try {
-    const type = req.body.type === 'simcha' ? 'simcha' : req.body.type === 'listing' ? 'listing' : 'classified';
-    let fields = {};
-    try {
-      fields = req.body.fields ? JSON.parse(req.body.fields) : {};
-    } catch (e) {
-      return res.status(400).json({ error: 'fields must be valid JSON' });
-    }
-
-    const title = String(req.body.title || '').trim();
-    if (type !== 'simcha' && !title) return res.status(400).json({ error: 'Title is required' });
-
-    const catDef = type === 'classified' ? findCategory(req.body.category) : type === 'listing' ? findListingCategory(req.body.category) : null;
-    if (type !== 'simcha' && !catDef) return res.status(400).json({ error: 'Invalid category' });
-
-    if (type === 'classified') {
-      const fieldErrors = [];
-      fields = validateCategoryFields(req.body.category, fields, fieldErrors, catDef);
-      if (fieldErrors.length) return res.status(400).json({ error: 'Validation failed', details: fieldErrors });
-    } else if (type === 'listing') {
-      const nextFields = {};
-      if (catDef.hasPrice) {
-        const { amount, text } = parseAmountOrText(fields.price);
-        if (amount !== null && amount < 0) return res.status(400).json({ error: 'Validation failed', details: ['price must be a positive number'] });
-        nextFields.price = amount;
-        nextFields.priceText = text;
-        if (amount !== null) nextFields.currency = CURRENCY_CODES.includes(fields.currency) ? fields.currency : 'USD';
-      }
-      fields = nextFields;
-    }
-
-    const uploaded = [];
-    for (const file of req.files || []) {
-      if (type !== 'simcha' && !catDef.hasImages) return res.status(400).json({ error: `${catDef.label} does not support images` });
-      uploaded.push({ filename: await processAndSaveImage(file.buffer), originalName: file.originalname });
-    }
-
-    const posterEmail = String(req.body.posterEmail || req.admin.email || '').toLowerCase();
-    if (!posterEmail) return res.status(400).json({ error: 'A poster email is required' });
-
-    const contact = {};
-    if (req.body.contactPhone) contact.phone = normalizeAdminPhone(req.body.contactPhone);
-    if (req.body.contactPhoneExt) contact.phoneExt = req.body.contactPhoneExt;
-    if (req.body.contactEmail) contact.email = req.body.contactEmail;
-    if (req.body.contactUrl) contact.url = normalizeUrl(req.body.contactUrl);
-
-    const taxonomyId = req.body.taxonomyId ? Number(req.body.taxonomyId) : null;
-    const payload = {
-      category: type === 'simcha' ? 'simcha' : req.body.category,
-      taxonomyId,
-      title,
-      description: req.body.description || '',
-      fields,
-      locationText: req.body.locationText || null,
-      locationCity: req.body.locationCity || null,
-      locationState: req.body.locationState || null,
-      locationLat: req.body.locationLat ? Number(req.body.locationLat) : null,
-      locationLng: req.body.locationLng ? Number(req.body.locationLng) : null,
-      locationPlaceId: null,
-      posterFirstName: req.body.posterFirstName || null,
-      posterLastName: req.body.posterLastName || null,
-      posterEmail,
-      posterPhone: req.body.posterPhone ? normalizeAdminPhone(req.body.posterPhone) : null,
-      contact,
-      pricingTierId: req.body.pricingTierId ? Number(req.body.pricingTierId) : null,
-      wantsStrike: !!req.body.wantsStrike,
-      wantsOversized: false,
-    };
-
-    if (type === 'simcha') {
-      const taxonomy = taxonomyId ? db.prepare('SELECT name FROM taxonomies WHERE id = ?').get(taxonomyId) : null;
-      payload.title = taxonomy ? taxonomy.name : title || 'Simcha';
-    }
-
-    const post = insertPost({ type, category: payload.category, payload, hasImages: uploaded.length > 0 });
-    attachImages(post.id, uploaded);
-    db.prepare('UPDATE post_images SET approved = 1 WHERE post_id = ?').run(post.id);
-    // Admin-entered links skip the same moderation queue admin-uploaded
-    // images already skip above - admin is trusted, so it shouldn't need a
-    // second self-approval step before it shows up publicly.
-    if (contact.url) db.prepare('UPDATE posts SET contact_url_approved = 1 WHERE id = ?').run(post.id);
-
-    if (type === 'simcha' && req.body.surpriseEmail) {
-      attachSimchaSurprises(post.id, [{ email: req.body.surpriseEmail, senderDisplayName: payload.posterFirstName || '' }], payload.posterFirstName);
-    }
-
-    const durationDays = Number(req.body.durationDays) || 30;
-    const now = Date.now();
-    // Scheduling a future go-live is admin-only (never exposed to the public
-    // wizard), available for any post type created here. expires_at is
-    // computed off scheduledAt (not "now") so it reflects the
-    // actual go-live time regardless of how long the post sits scheduled -
-    // the publish cron just flips status/published_at and leaves it as-is.
-    const scheduledAt = req.body.scheduledAt ? Number(req.body.scheduledAt) : null;
-    if (scheduledAt && scheduledAt > now) {
-      const expiresAt = scheduledAt + durationDays * DAY_MS;
-      db.prepare('UPDATE posts SET status = ?, scheduled_at = ?, expires_at = ?, updated_at = ? WHERE id = ?').run(
-        'scheduled', scheduledAt, expiresAt, now, post.id
-      );
-    } else {
-      const expiresAt = now + durationDays * DAY_MS;
-      db.prepare('UPDATE posts SET status = ?, published_at = ?, expires_at = ?, boosted_at = ?, updated_at = ? WHERE id = ?').run(
-        'live', now, expiresAt, now, now, post.id
-      );
-    }
-    recordPayment({ postId: post.id, kind: 'listing', amountCents: 0, payerEmail: posterEmail, status: 'paid' });
-
-    const finalPost = db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id);
-    res.status(201).json(formatPostAdmin(finalPost, imagesFor(post.id)));
+    const post = await createAdminPost(req.body, req.files, req.admin.email);
+    res.status(201).json(post);
   } catch (e) {
+    if (e instanceof AdminPostCreateError) {
+      return res.status(e.status).json(e.details ? { error: e.message, details: e.details } : { error: e.message });
+    }
     next(e);
   }
 });

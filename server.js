@@ -11,6 +11,7 @@ const rateLimit = require('express-rate-limit');
 
 const { UPLOAD_DIR } = require('./middleware/upload');
 const { getPostPreview, getEditorialPreview } = require('./services/socialPreview');
+const requestContext = require('./services/requestContext');
 
 const indexHtmlTemplate = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 const SOCIAL_META_RE = /<!-- SOCIAL_META_START -->[\s\S]*?<!-- SOCIAL_META_END -->/;
@@ -35,6 +36,14 @@ function sendShellWithPreview(res, lookup) {
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Makes the current request's own Host available (via AsyncLocalStorage, see
+// services/requestContext.js) to every appUrl() call during this request -
+// including deep in services that never receive `req` - so links built for
+// the sitemap, social previews, emails etc. can reflect whichever domain the
+// visitor actually used instead of one hardcoded domain. Mounted before
+// every route, including the sitemap.
+app.use(requestContext.middleware);
 
 app.use(
   helmet({
@@ -70,6 +79,7 @@ app.use('/api/analytics', require('./routes/public/analytics'));
 app.use('/api/editorials', require('./routes/public/editorials'));
 app.use('/api/subscriptions', require('./routes/public/subscriptions'));
 app.use('/api/banners', require('./routes/public/banners'));
+app.use('/api/bulk-post', require('./routes/public/bulkPost'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
@@ -91,6 +101,13 @@ app.use('/api/admin/banners', require('./routes/admin/banners'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
+});
+
+// Hidden bulk-posting tool - deliberately not linked anywhere in the public
+// site's nav (only reachable by knowing this URL, or via the admin portal's
+// own "Bulk Add" link). See routes/public/bulkPost.js for its API.
+app.get('/tabadd137', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'tabadd137.html'));
 });
 
 // Client-side routed pages (classified/listing/simcha detail, view-all, etc.)

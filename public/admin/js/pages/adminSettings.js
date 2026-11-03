@@ -17,6 +17,10 @@ async function renderSettingsPage() {
           <div class="form-row"><label>Site name</label><input name="site_name" value="${escapeHtml(s.site_name || '')}"></div>
           <div class="form-row"><label>Site URL</label><input name="app_url" placeholder="https://your-domain.example.com" value="${escapeHtml(s.app_url || '')}"></div>
         </div>
+        <div class="form-row">
+          <label>Additional domains <span class="hint">(optional - one per line, e.g. jlistings.co.uk. Point its DNS at this same Render service first. Visitors on any of these get links built for that domain instead of the Site URL above - no deploy needed when you add one.)</span></label>
+          <textarea name="app_domains" rows="2" placeholder="jlistings.co.uk">${escapeHtml((s.app_domains || []).join('\n'))}</textarea>
+        </div>
         <div class="form-row"><label>Admin notification email</label><input name="admin_notify_email" type="email" value="${escapeHtml(s.admin_notify_email || '')}"></div>
         <button class="btn btn-sm" type="submit">Save</button>
       </form>
@@ -156,6 +160,7 @@ async function renderSettingsPage() {
 
   bindForm('siteForm', (fd) => [
     ['site_name', fd.site_name], ['app_url', fd.app_url], ['admin_notify_email', fd.admin_notify_email],
+    ['app_domains', String(fd.app_domains || '').split('\n').map((d) => d.trim()).filter(Boolean)],
   ]);
   bindForm('stripeForm', (fd) => {
     const out = [['stripe_publishable_key', fd.stripe_publishable_key]];

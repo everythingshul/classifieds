@@ -8,10 +8,8 @@ const { ValidationError } = require('./postValidation');
 const { isValidEmail, isValidUrl } = require('../utils/validate');
 const { validatePhone } = require('../utils/phone');
 const { sanitizeRichText, stripHtml } = require('../utils/htmlSanitize');
-const runtimeConfig = require('./runtimeConfig');
 const { emailShell, escapeHtml } = require('./emailLayout');
-
-const appUrl = () => runtimeConfig.get('app_url', 'APP_URL') || '';
+const { appUrl } = require('./appUrl');
 
 // -- Validation --
 
