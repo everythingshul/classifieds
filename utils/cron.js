@@ -5,8 +5,10 @@ const HOUR_MS = 60 * 60 * 1000;
 
 function expireStalePosts() {
   const now = Date.now();
+  // Simchas never expire - a birth/bar-mitzvah/wedding announcement doesn't
+  // stop being true, so it stays live (and keeps its contact info) forever.
   const info = db
-    .prepare("UPDATE posts SET status = 'expired', updated_at = ? WHERE status = 'live' AND expires_at IS NOT NULL AND expires_at < ?")
+    .prepare("UPDATE posts SET status = 'expired', updated_at = ? WHERE status = 'live' AND type != 'simcha' AND expires_at IS NOT NULL AND expires_at < ?")
     .run(now, now);
   if (info.changes > 0) console.log(`[cron] expired ${info.changes} post(s)`);
 }

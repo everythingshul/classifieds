@@ -8,7 +8,7 @@ const { zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod');
 const { z } = require('zod');
 const db = require('../db');
 const runtimeConfig = require('../services/runtimeConfig');
-const { siteName } = require('./emailLayout');
+const { siteName, appUrl } = require('./emailLayout');
 const { getAllClassifiedCategories } = require('./taxonomy');
 const { getAllListingCategories } = require('./listingCategories');
 
@@ -80,6 +80,44 @@ function findLearnedMatch(question) {
   return best ? { entry: best, distance: bestDist } : null;
 }
 
+const STOPWORDS = new Set(['the', 'a', 'an', 'is', 'are', 'do', 'does', 'how', 'what', 'whats', 'where', 'when', 'why', 'who', 'i', 'my', 'me', 'to', 'for', 'of', 'on', 'in', 'with', 'and', 'or', 'have', 'has', 'you', 'your', 'it', 'this', 'that', 'there', 'any', 'about', 'can', 'will', 'im', 'ive', 'want', 'need', 'looking', 'post', 'posting']);
+
+function extractKeywords(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
+    .slice(0, 8);
+}
+
+function postPublicPath(p) {
+  const segment = p.type === 'simcha' ? 'simchas' : p.type === 'listing' ? 'listings' : 'classifieds';
+  return `${appUrl()}/${segment}/${p.public_id}`;
+}
+
+// A quick keyword search over live posts, so Chesky can point to real
+// inventory ("yes, here's one") instead of only speaking in generalities.
+// Not exhaustive - just a few keywords from the question, best-effort.
+function searchRelevantPosts(question, limit = 5) {
+  const words = extractKeywords(question);
+  if (!words.length) return [];
+  const now = Date.now();
+  const where = words.map(() => '(title LIKE ? OR description LIKE ? OR category LIKE ?)').join(' OR ');
+  const params = [];
+  words.forEach((w) => { const like = `%${w}%`; params.push(like, like, like); });
+  const rows = db
+    .prepare(`SELECT * FROM posts WHERE status = 'live' AND (expires_at IS NULL OR expires_at > ?) AND (${where}) ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT ?`)
+    .all(now, ...params, limit);
+  return rows.map((p) => {
+    let fields = {};
+    try { fields = JSON.parse(p.fields || '{}'); } catch (e) { /* ignore */ }
+    const price = fields.price !== undefined && fields.price !== null ? `$${fields.price}` : fields.priceText || null;
+    const loc = [p.location_city, p.location_state].filter(Boolean).join(', ');
+    return { title: p.title, category: p.category, location: loc, price, url: postPublicPath(p) };
+  });
+}
+
 let contextCache = null;
 let contextCacheAt = 0;
 
@@ -123,20 +161,27 @@ Policies to know:
   return contextCache;
 }
 
-function buildSystemPrompt() {
+function buildSystemPrompt(question) {
   const name = siteName();
-  return `You are Chesky, the friendly help assistant for ${name}, a Jewish community classifieds, listings, and simchas (celebrations) website.
+  const posts = searchRelevantPosts(question);
+  const postsBlock = posts.length
+    ? `Live posts that might be relevant to this question right now (a quick keyword search, not the full inventory - treat it as "here's one I found," never as "this is everything available"):\n${posts.map((p) => `- ${p.title} (${p.category}${p.location ? `, ${p.location}` : ''}${p.price ? `, ${p.price}` : ''}) - ${p.url}`).join('\n')}`
+    : `No live posts matched a quick keyword search for this question. That does NOT mean nothing exists - just that this search missed it. Never tell someone "there are none" or "nothing is available" - instead say you're not sure / didn't find a match, and point them to browsing or searching the site themselves.`;
 
-You ONLY help with questions about using ${name} itself: how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, and general site navigation.
+  return `You are Chesky, the warm and genuinely helpful assistant for ${name}, a Jewish community classifieds, listings, and simchas (celebrations) website.
 
-If someone asks anything else - general knowledge, other websites/companies, personal advice, or anything not about ${name} - do not answer it. Say warmly that it's outside what you can help with here, and set offTopic to true.
+PERSONALITY - this matters a lot: talk like a kind, down-to-earth staff member texting a customer, not like a corporate bot. Use contractions (I'm, you'll, that's), vary your sentence openers, and let a little warmth and personality show. Never sound stiff, robotic, or like you're reading from a script. If someone seems confused, frustrated, or new to the site, be extra patient and reassuring - never curt, never cold. Treat every visitor like a valued member of the community, not a support ticket.
 
-Ground every factual claim (prices, categories, policies) ONLY in the site facts given below. Never invent a price, category, or policy. If a question is about ${name} but you don't actually know the answer from the facts given, say so honestly, offer to connect them with a person on the team, and set offTopic to true.
+SCOPE: you only help with ${name} itself - how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, general site navigation, and (per the live posts below) what's currently posted on the site. If someone asks about something unrelated to ${name} - general knowledge, other websites/companies, personal advice - don't answer it; warmly say that's outside what you can help with here, and set offTopic to true.
 
-Keep replies short (1-4 sentences), warm, and plain text - no markdown, no tables. Never say you are Claude, an AI, or name any AI company - you are just Chesky.
+Ground every factual claim (prices, categories, policies, what's posted) ONLY in the facts given below - never invent a price, category, policy, or listing. If a question is about ${name} but you genuinely don't know the answer from what's given, say so honestly and warmly, offer to connect them with a person on the team, and set offTopic to true. Don't mention that you searched or that something is "a quick keyword search" - just answer naturally.
+
+Keep replies short (1-4 sentences), conversational, and plain text - no markdown, no bullet lists, no tables. Never say you're Claude, an AI, a language model, or name any AI company - you're just Chesky.
 
 Site facts:
-${buildSiteContext()}`;
+${buildSiteContext()}
+
+${postsBlock}`;
 }
 
 const MODEL_FALLBACK = 'claude-opus-5-5';
@@ -156,7 +201,7 @@ async function ask(question, transcript = []) {
     const response = await c.messages.parse({
       model,
       max_tokens: 1024,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt(question),
       output_config: { effort: 'low', format: zodOutputFormat(ReplySchema) },
       messages,
     });
@@ -168,4 +213,4 @@ async function ask(question, transcript = []) {
   }
 }
 
-module.exports = { ask, findLearnedMatch, normQ, buildSiteContext };
+module.exports = { ask, findLearnedMatch, normQ, buildSiteContext, buildSystemPrompt, searchRelevantPosts };

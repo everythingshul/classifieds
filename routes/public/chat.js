@@ -6,6 +6,7 @@ const { saveVoiceNote, VOICE_MIME_EXT } = require('../../middleware/upload');
 const { sendMail, notifyAdmin } = require('../../utils/mailer');
 const { emailShell, escapeHtml, appUrl, siteName } = require('../../services/emailLayout');
 const chesky = require('../../services/chesky');
+const { transcribeAudio } = require('../../services/transcribe');
 
 const router = express.Router();
 
@@ -76,28 +77,59 @@ async function mailAdminNewChat(conv, text, isNew) {
 }
 
 // -- AI ask (stateless - no handoff conversation created) --
+// Shared by /ask and /ask-voice: checks taught answers first, otherwise asks
+// the AI, logging a miss when it couldn't help so the team can teach it.
+async function answerQuestion(question, transcript) {
+  const learned = chesky.findLearnedMatch(question);
+  if (learned) return { reply: learned.entry.answer, offTopic: false, entryId: learned.entry.id };
+
+  const result = await chesky.ask(question, transcript);
+  if (result.offTopic) {
+    const key = chesky.normQ(question);
+    if (key) {
+      const now = Date.now();
+      const existing = db.prepare('SELECT * FROM chat_unanswered WHERE normalized_key = ?').get(key);
+      if (existing) db.prepare('UPDATE chat_unanswered SET miss_count = miss_count + 1, last_at = ? WHERE normalized_key = ?').run(now, key);
+      else db.prepare('INSERT INTO chat_unanswered (normalized_key, question, miss_count, down_count, first_at, last_at) VALUES (?, ?, 1, 0, ?, ?)').run(key, question, now, now);
+    }
+  }
+  return { reply: result.reply, offTopic: !!result.offTopic, entryId: 'ai' };
+}
+
 router.post('/ask', askLimiter, async (req, res, next) => {
   try {
     const question = clean(req.body.question, MAX_TEXT);
     const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
     if (!question) return res.status(400).json({ error: 'A question is required' });
+    res.json(await answerQuestion(question, transcript));
+  } catch (e) {
+    next(e);
+  }
+});
 
-    const learned = chesky.findLearnedMatch(question);
-    if (learned) {
-      return res.json({ reply: learned.entry.answer, offTopic: false, entryId: learned.entry.id });
-    }
+// Transcribes a voice note (OpenAI Whisper - Claude has no audio input), then
+// answers the transcribed text the same way /ask does.
+router.post('/ask-voice', askLimiter, async (req, res, next) => {
+  try {
+    const v = req.body.voice;
+    if (!v || typeof v.data !== 'string' || !v.data || v.data.length > MAX_VOICE_B64) return res.status(400).json({ error: 'No voice note provided' });
+    const mime = String(v.mime || '').split(';')[0].toLowerCase();
+    if (!VOICE_MIME_EXT[mime] || !/^[A-Za-z0-9+/]+=*$/.test(v.data)) return res.status(400).json({ error: 'Unsupported audio format' });
+    let bytes;
+    try { bytes = Buffer.from(v.data, 'base64'); } catch { return res.status(400).json({ error: 'Invalid audio data' }); }
+    if (bytes.length < 200) return res.status(400).json({ error: 'That voice note was too short.' });
 
-    const result = await chesky.ask(question, transcript);
-    if (result.offTopic) {
-      const key = chesky.normQ(question);
-      if (key) {
-        const now = Date.now();
-        const existing = db.prepare('SELECT * FROM chat_unanswered WHERE normalized_key = ?').get(key);
-        if (existing) db.prepare('UPDATE chat_unanswered SET miss_count = miss_count + 1, last_at = ? WHERE normalized_key = ?').run(now, key);
-        else db.prepare('INSERT INTO chat_unanswered (normalized_key, question, miss_count, down_count, first_at, last_at) VALUES (?, ?, 1, 0, ?, ?)').run(key, question, now, now);
-      }
+    let question;
+    try {
+      question = await transcribeAudio(bytes, mime);
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.message });
     }
-    res.json({ reply: result.reply, offTopic: !!result.offTopic, entryId: 'ai' });
+    if (!question) return res.json({ transcript: '', reply: "Sorry, I couldn't make out what you said - could you try again, or type it instead?", offTopic: true, entryId: 'ai' });
+
+    const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
+    const result = await answerQuestion(question, transcript);
+    res.json({ transcript: question, ...result });
   } catch (e) {
     next(e);
   }

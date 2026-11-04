@@ -78,6 +78,18 @@ const Chesky = (() => {
     return `<div class="chesky-chips">${STARTERS.map((s) => `<button type="button" class="chesky-chip">${escapeHtml(s)}</button>`).join('')}</div>`;
   }
 
+  function displayBotReply(question, result) {
+    bubble('bot', escapeHtml(result.reply).replace(/\n/g, '<br>'), feedbackRow(question, result.entryId));
+    transcript.push({ role: 'assistant', text: result.reply });
+    saveTranscript();
+    if (result.offTopic) {
+      const log = document.getElementById('cheskyLog');
+      log.appendChild(el(`<div style="text-align:center"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanInline">Talk to a real person &rarr;</button></div>`));
+      document.getElementById('cheskyTalkHumanInline').addEventListener('click', showHandoffForm);
+      scrollLog();
+    }
+  }
+
   async function ask(question) {
     if (busy || !question.trim()) return;
     busy = true;
@@ -89,18 +101,30 @@ const Chesky = (() => {
     try {
       const result = await Api.cheskyAsk(question, transcript);
       typingNode?.remove();
-      bubble('bot', escapeHtml(result.reply).replace(/\n/g, '<br>'), feedbackRow(question, result.entryId));
-      transcript.push({ role: 'assistant', text: result.reply });
-      saveTranscript();
-      if (result.offTopic) {
-        const log = document.getElementById('cheskyLog');
-        log.appendChild(el(`<div style="text-align:center"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanInline">Talk to a real person &rarr;</button></div>`));
-        document.getElementById('cheskyTalkHumanInline').addEventListener('click', showHandoffForm);
-        scrollLog();
-      }
+      displayBotReply(question, result);
     } catch (e) {
       typingNode?.remove();
       bubble('bot', "Sorry, something went wrong. Please try again, or talk to our team below.");
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function askVoice(voice) {
+    if (busy) return;
+    busy = true;
+    document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
+    const typingNode = showTyping();
+    try {
+      const result = await Api.cheskyAskVoice(voice, transcript);
+      typingNode?.remove();
+      bubble('visitor', escapeHtml(result.transcript || '🎤 Voice note'));
+      transcript.push({ role: 'user', text: result.transcript || '(voice note)' });
+      saveTranscript();
+      displayBotReply(result.transcript || '', result);
+    } catch (e) {
+      typingNode?.remove();
+      bubble('bot', "Sorry, something went wrong with that voice note. Please try again, or type it instead.");
     } finally {
       busy = false;
     }
@@ -111,12 +135,14 @@ const Chesky = (() => {
     foot.innerHTML = `
       <form class="chesky-form" id="cheskyAskForm">
         <div class="chesky-row">
+          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Ask with your voice">&#127908;</button>
           <textarea name="q" rows="1" placeholder="Ask Chesky a question..." required></textarea>
           <button type="submit">Send</button>
         </div>
       </form>
       <div style="text-align:center;padding:6px 0 10px"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanBtn">Talk to a real person &rarr;</button></div>
     `;
+    if (!(navigator.mediaDevices && window.MediaRecorder)) document.getElementById('cheskyMicBtn').style.display = 'none';
     document.getElementById('cheskyAskForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const ta = e.target.q;
@@ -124,6 +150,7 @@ const Chesky = (() => {
       ta.value = '';
       ask(q);
     });
+    document.getElementById('cheskyMicBtn').addEventListener('click', toggleRecording);
     document.getElementById('cheskyTalkHumanBtn').addEventListener('click', showHandoffForm);
   }
 
@@ -287,13 +314,16 @@ const Chesky = (() => {
       reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
       reader.readAsDataURL(blob);
     });
-    if (!convId) return; // the mic is only shown once a handoff conversation exists
     const voice = { data: b64, mime: 'audio/webm', dur, peaks: recordPeaks };
-    bubble('visitor', '🎤 Voice note');
-    try {
-      const result = await Api.cheskySend({ id: convId, voice });
-      if (result.lastId > lastMsgId) lastMsgId = result.lastId;
-    } catch (e) { toast('Could not send the voice note.'); }
+    if (convId) {
+      bubble('visitor', '🎤 Voice note');
+      try {
+        const result = await Api.cheskySend({ id: convId, voice });
+        if (result.lastId > lastMsgId) lastMsgId = result.lastId;
+      } catch (e) { toast('Could not send the voice note.'); }
+    } else {
+      askVoice(voice);
+    }
   }
 
   function renderPanel() {

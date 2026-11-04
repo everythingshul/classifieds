@@ -74,6 +74,11 @@ db.prepare("UPDATE pricing_tiers SET post_type = 'simcha' WHERE category = 'simc
   });
 })();
 
+// Simchas never expire (see utils/cron.js) - brings back any that were
+// already flipped to 'expired' before that rule existed. Idempotent: a no-op
+// once they're all back to 'live'.
+db.prepare("UPDATE posts SET status = 'live', updated_at = ? WHERE type = 'simcha' AND status = 'expired'").run(Date.now());
+
 function seed() {
   const now = Date.now();
 
@@ -198,6 +203,7 @@ function seed() {
   seed('brevo_api_key', process.env.BREVO_API_KEY || '');
   seed('anthropic_api_key', process.env.ANTHROPIC_API_KEY || '');
   seed('chesky_model', 'claude-opus-5-5');
+  seed('openai_api_key', process.env.OPENAI_API_KEY || '');
 
   const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admin_users').get().c;
   if (adminCount === 0 && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {

@@ -41,6 +41,8 @@ async function renderSettingsPage() {
       <form id="cheskyForm">
         ${secretField('anthropic_api_key', 'Anthropic API key', s.anthropic_api_key_isSet, 'sk-ant-...')}
         <div class="form-row"><label>Model <span class="hint">(claude-opus-5-5 is the most capable; claude-haiku-5-5 is far cheaper/faster for a simple FAQ widget like this)</span></label><input name="chesky_model" value="${escapeHtml(s.chesky_model || 'claude-opus-5-5')}"></div>
+        ${secretField('openai_api_key', 'OpenAI API key', s.openai_api_key_isSet, 'sk-...')}
+        <p class="hint" style="margin-top:-6px">Powers voice note transcription (so Chesky can understand a recorded question), via OpenAI's Whisper API. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>. Without it, the mic button still records but voice notes in the AI chat won't be understood - voice notes sent to a real person still work either way.</p>
         <button class="btn btn-sm" type="submit">Save</button>
       </form>
     </div>
@@ -195,6 +197,7 @@ async function renderSettingsPage() {
   bindForm('cheskyForm', (fd) => {
     const out = [['chesky_model', fd.chesky_model]];
     if (fd.anthropic_api_key) out.push(['anthropic_api_key', fd.anthropic_api_key]);
+    if (fd.openai_api_key) out.push(['openai_api_key', fd.openai_api_key]);
     return out;
   }, true);
   document.getElementById('mailProviderSelect').addEventListener('change', (e) => {
