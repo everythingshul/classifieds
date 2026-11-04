@@ -178,6 +178,64 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   created_at INTEGER NOT NULL
 );
 
+-- Chesky chat widget: human-handoff conversations plus the Q&A the team has
+-- taught it. The AI itself is stateless (services/chesky.js calls the
+-- Anthropic API fresh each turn) - only handoff and teaching need storage.
+CREATE TABLE IF NOT EXISTS chat_conversations (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open', -- 'open' | 'closed'
+  unread INTEGER NOT NULL DEFAULT 1,
+  page TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  notified_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_updated ON chat_conversations(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+  from_role TEXT NOT NULL, -- 'visitor' | 'admin' | 'bot'
+  text TEXT,
+  voice_url TEXT,
+  voice_mime TEXT,
+  voice_dur REAL,
+  voice_peaks TEXT, -- JSON array of 0-100 waveform levels
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conv ON chat_messages(conversation_id, id);
+
+-- Answers the team has taught Chesky, checked before the AI is asked - lets
+-- the team pin down exact business answers (pricing, policy) authoritatively.
+CREATE TABLE IF NOT EXISTS chat_learned (
+  id TEXT PRIMARY KEY,
+  questions TEXT NOT NULL, -- JSON array of trigger phrases
+  answer TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- Questions Chesky couldn't help with (visitor declined / thumbs-downed),
+-- grouped by normalized text so the team can review and teach real answers.
+CREATE TABLE IF NOT EXISTS chat_unanswered (
+  normalized_key TEXT PRIMARY KEY,
+  question TEXT NOT NULL,
+  miss_count INTEGER NOT NULL DEFAULT 0,
+  down_count INTEGER NOT NULL DEFAULT 0,
+  first_at INTEGER NOT NULL,
+  last_at INTEGER NOT NULL
+);
+
+-- Thumbs up/down tallies, keyed by a chat_learned id or 'ai' for the model's own replies.
+CREATE TABLE IF NOT EXISTS chat_entry_stats (
+  entry_id TEXT PRIMARY KEY,
+  up_count INTEGER NOT NULL DEFAULT 0,
+  down_count INTEGER NOT NULL DEFAULT 0,
+  last_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS simcha_surprises (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,

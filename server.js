@@ -96,6 +96,7 @@ app.use('/api/editorials', require('./routes/public/editorials'));
 app.use('/api/subscriptions', require('./routes/public/subscriptions'));
 app.use('/api/banners', require('./routes/public/banners'));
 app.use('/api/bulk-post', require('./routes/public/bulkPost'));
+app.use('/api/chat', require('./routes/public/chat'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
@@ -114,6 +115,7 @@ app.use('/api/admin/analytics', require('./routes/admin/analytics'));
 app.use('/api/admin/editorials', require('./routes/admin/editorials'));
 app.use('/api/admin/subscriptions', require('./routes/admin/subscriptions'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
+app.use('/api/admin/chat', require('./routes/admin/chat'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));

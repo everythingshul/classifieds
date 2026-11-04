@@ -36,6 +36,16 @@ async function renderSettingsPage() {
     </div>
 
     <div class="admin-card">
+      <h3 style="margin-top:0">Chesky Chat Assistant</h3>
+      <p class="hint">The chat widget on the site. Get an API key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Without a key, the widget still lets visitors reach your team, but Chesky can't answer anything itself.</p>
+      <form id="cheskyForm">
+        ${secretField('anthropic_api_key', 'Anthropic API key', s.anthropic_api_key_isSet, 'sk-ant-...')}
+        <div class="form-row"><label>Model <span class="hint">(claude-opus-5-5 is the most capable; claude-haiku-5-5 is far cheaper/faster for a simple FAQ widget like this)</span></label><input name="chesky_model" value="${escapeHtml(s.chesky_model || 'claude-opus-5-5')}"></div>
+        <button class="btn btn-sm" type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
       <h3 style="margin-top:0">Payments — Stripe</h3>
       <p class="hint">From your Stripe dashboard: Developers → API keys for the secret key, and Developers → Webhooks (endpoint <code>/api/webhook</code>) for the signing secret.</p>
       <form id="stripeForm">
@@ -180,6 +190,11 @@ async function renderSettingsPage() {
   bindForm('bulkForm', (fd) => {
     const out = [];
     if (fd.bulk_post_password_hash) out.push(['bulk_post_password_hash', fd.bulk_post_password_hash]);
+    return out;
+  }, true);
+  bindForm('cheskyForm', (fd) => {
+    const out = [['chesky_model', fd.chesky_model]];
+    if (fd.anthropic_api_key) out.push(['anthropic_api_key', fd.anthropic_api_key]);
     return out;
   }, true);
   document.getElementById('mailProviderSelect').addEventListener('change', (e) => {

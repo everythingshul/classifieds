@@ -196,6 +196,8 @@ function seed() {
   seed('mail_reply_to', process.env.MAIL_REPLY_TO || '');
   seed('mail_provider', process.env.MAIL_PROVIDER || 'smtp'); // 'smtp' | 'brevo'
   seed('brevo_api_key', process.env.BREVO_API_KEY || '');
+  seed('anthropic_api_key', process.env.ANTHROPIC_API_KEY || '');
+  seed('chesky_model', 'claude-opus-5-5');
 
   const adminCount = db.prepare('SELECT COUNT(*) AS c FROM admin_users').get().c;
   if (adminCount === 0 && process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {

@@ -8,6 +8,7 @@
   }
 
   renderLayout(window.SITE_CONFIG.siteName);
+  Chesky.init();
 
   Router.add('/', renderHomePage);
   Router.add('/classifieds', renderClassifiedsListPage);

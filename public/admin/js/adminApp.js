@@ -40,6 +40,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '#/posts', label: 'All Posts' },
   { href: '#/editorials', label: 'Editorials', badge: 'badge-editorials' },
   { href: '#/contact-messages', label: 'Messages', badge: 'badge-contact' },
+  { href: '#/chat', label: 'Chesky Chat', badge: 'badge-chat' },
   { href: '#/subscriptions', label: 'Email Subscribers' },
   { href: '#/banners', label: 'Banners' },
   { href: '#/crm', label: 'CRM Search' },
@@ -120,8 +121,9 @@ async function refreshNotificationBadges() {
   setBadge('badge-moderation', (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0));
   setBadge('badge-contact', summary.contactMessages || 0);
   setBadge('badge-editorials', (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0));
+  setBadge('badge-chat', summary.unreadChats || 0);
   const totalUnread = (summary.reports || 0) + (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0) + (summary.contactMessages || 0)
-    + (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0);
+    + (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0) + (summary.unreadChats || 0);
   document.title = totalUnread > 0 ? `(${totalUnread > 99 ? '99+' : totalUnread}) Admin — JListings` : 'Admin — JListings';
 }
 
@@ -135,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/editorials', renderEditorialsPage);
   AdminRouter.add('#/editorials/new', renderCreateEditorialPage);
   AdminRouter.add('#/contact-messages', renderContactMessagesPage);
+  AdminRouter.add('#/chat', renderChatPage);
   AdminRouter.add('#/subscriptions', renderSubscriptionsPage);
   AdminRouter.add('#/banners', renderBannersPage);
   AdminRouter.add('#/crm', renderCrmPage);

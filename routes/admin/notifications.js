@@ -16,7 +16,8 @@ router.get('/', (req, res) => {
   const pendingUrlApproval = db.prepare("SELECT COUNT(*) AS c FROM posts WHERE contact_url IS NOT NULL AND contact_url != '' AND contact_url_approved = 0 AND status IN ('live', 'pending_approval')").get().c;
   const pendingEditorials = db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'pending_approval'").get().c;
   const pendingEditorialComments = db.prepare("SELECT COUNT(*) AS c FROM editorial_comments WHERE status = 'pending_approval'").get().c;
-  res.json({ reports, contactMessages, pendingApproval, pendingUrlApproval, pendingEditorials, pendingEditorialComments });
+  const unreadChats = db.prepare("SELECT COUNT(*) AS c FROM chat_conversations WHERE unread = 1 AND status = 'open'").get().c;
+  res.json({ reports, contactMessages, pendingApproval, pendingUrlApproval, pendingEditorials, pendingEditorialComments, unreadChats });
 });
 
 module.exports = router;

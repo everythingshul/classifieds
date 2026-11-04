@@ -100,5 +100,14 @@ const AdminApi = (() => {
     setBannerActive: (id, active) => req(`/banners/${id}/active`, { method: 'PUT', body: { active } }),
     deleteBanner: (id) => req(`/banners/${id}`, { method: 'DELETE' }),
     emailStats: () => req('/subscriptions/email-stats'),
+    chatConversations: () => req('/chat'),
+    chatConversation: (id) => req(`/chat/${id}`),
+    chatSetStatus: (id, status) => req(`/chat/${id}`, { method: 'PUT', body: { status } }),
+    chatReply: (id, text, teach) => req(`/chat/${id}/reply`, { method: 'POST', body: { text, teach } }),
+    deleteChatConversation: (id) => req(`/chat/${id}`, { method: 'DELETE' }),
+    chatLearn: () => req('/chat/learn'),
+    chatTeach: (body) => req('/chat/learn/teach', { method: 'POST', body }),
+    chatForget: (id) => req('/chat/learn/forget', { method: 'POST', body: { id } }),
+    chatDismissUnanswered: (key) => req(`/chat/learn/unanswered/${encodeURIComponent(key)}`, { method: 'DELETE' }),
   };
 })();

@@ -56,4 +56,16 @@ function saveBannerImage(file) {
   return filename;
 }
 
-module.exports = { upload, processAndSaveImage, UPLOAD_DIR, bannerUpload, saveBannerImage };
+// Chesky chat voice notes: same raw-write approach as banners (no re-encoding -
+// just validated bytes to disk), served back from the existing /uploads static mount.
+const VOICE_MIME_EXT = { 'audio/wav': 'wav', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/webm': 'webm' };
+
+function saveVoiceNote(buffer, mime) {
+  const ext = VOICE_MIME_EXT[mime];
+  if (!ext) return null;
+  const filename = `voice-${crypto.randomBytes(16).toString('hex')}.${ext}`;
+  fs.writeFileSync(path.join(UPLOAD_DIR, filename), buffer);
+  return filename;
+}
+
+module.exports = { upload, processAndSaveImage, UPLOAD_DIR, bannerUpload, saveBannerImage, saveVoiceNote, VOICE_MIME_EXT };
