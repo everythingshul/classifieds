@@ -46,6 +46,7 @@ function renderLayout(siteName) {
         <div>
           <div class="footer-links">
             <a href="/subscribe" data-i18n="subscribe_nav">Email Updates</a>
+            <a href="/pricing" data-i18n="pricing_nav">Pricing</a>
             <a href="/contact" data-i18n="contact_us">Contact Us</a>
             <a href="/terms" data-i18n="terms">Terms &amp; Conditions</a>
             <a href="/refund-policy" data-i18n="refund_policy">Refund Policy</a>

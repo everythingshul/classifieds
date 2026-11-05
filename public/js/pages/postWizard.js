@@ -672,7 +672,7 @@ function renderPostWizard() {
         if (state.data.locationLat) fd.set('locationLat', state.data.locationLat);
         if (state.data.locationLng) fd.set('locationLng', state.data.locationLng);
         fd.set('contactPhone', state.data.contactPhone || '');
-        fd.set('contactPhoneCountry', state.data.contactPhoneCountry || 'US');
+        fd.set('contactPhoneCountry', state.data.contactPhoneCountry || defaultPhoneCountry());
         fd.set('contactPhoneExt', state.data.contactPhoneExt || '');
         fd.set('contactPhoneMethods', JSON.stringify(state.data.contactPhoneMethods || ['call']));
         fd.set('contactEmail', state.data.contactEmail || '');
@@ -680,7 +680,7 @@ function renderPostWizard() {
         fd.set('posterFirstName', state.data.posterFirstName || '');
         fd.set('posterLastName', state.data.posterLastName || '');
         fd.set('posterPhone', state.data.posterPhone || '');
-        fd.set('posterPhoneCountry', state.data.posterPhoneCountry || 'US');
+        fd.set('posterPhoneCountry', state.data.posterPhoneCountry || defaultPhoneCountry());
         fd.set('posterEmail', state.data.posterEmail);
         fd.set('fields', JSON.stringify(state.data.fields || {}));
         if (state.data.taxonomyId) fd.set('taxonomyId', state.data.taxonomyId);
@@ -695,7 +695,7 @@ function renderPostWizard() {
         fd.set('posterFirstName', state.data.posterFirstName || '');
         fd.set('posterLastName', state.data.posterLastName || '');
         fd.set('posterPhone', state.data.posterPhone || '');
-        fd.set('posterPhoneCountry', state.data.posterPhoneCountry || 'US');
+        fd.set('posterPhoneCountry', state.data.posterPhoneCountry || defaultPhoneCountry());
         fd.set('posterEmail', state.data.posterEmail);
         fd.set('surpriseEmails', JSON.stringify(state.data.surpriseEmails || []));
         if (state.data.promo) fd.set('promoCode', state.data.promo.code);

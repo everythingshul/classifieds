@@ -286,13 +286,14 @@ p { margin: 0 0 .7em; }
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
+  right: 0;
   z-index: 30;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow);
   padding: 12px;
-  width: 240px;
+  box-sizing: border-box;
 }
 .loc-popover-form { display: flex; gap: 6px; position: relative; }
 .loc-popover-form input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: .8rem; }
@@ -488,6 +489,38 @@ p { margin: 0 0 .7em; }
 .detail-meta-list li:last-child { border-bottom: none; }
 .detail-meta-list li span:first-child { color: var(--ink-soft); font-weight: 600; }
 .detail-meta-list li.stacked { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+/* ---------- Pricing page ---------- */
+.pricing-section { margin-bottom: 34px; }
+.pricing-section-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid var(--navy); padding-bottom: 8px; margin-bottom: 16px; }
+.pricing-section-head h2 { margin: 0; }
+.pricing-section-head a { font-size: .82rem; font-weight: 600; white-space: nowrap; }
+.pricing-group { margin-bottom: 18px; }
+.pricing-group:last-child { margin-bottom: 0; }
+.pricing-group-title { margin: 0 0 10px; font-size: .82rem; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; }
+.pricing-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.pricing-option {
+  flex: 1 1 130px;
+  min-width: 120px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.pricing-option-price { font-size: 1.3rem; font-weight: 800; color: var(--navy); }
+.pricing-option.is-free .pricing-option-price { color: var(--success); }
+.pricing-option-name { font-size: .82rem; font-weight: 600; margin-top: 3px; }
+.pricing-option-duration { font-size: .72rem; color: var(--ink-soft); margin-top: 2px; }
+.pricing-addon-list { list-style: none; margin: 16px 0 0; padding: 0; font-size: .85rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); }
+.pricing-addon-list li { padding: 9px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+.pricing-addon-list li:last-child { border-bottom: none; }
+.pricing-addon-list li span:first-child { color: var(--ink-soft); }
+.pricing-addon-list li span:last-child { font-weight: 700; color: var(--navy); }
+@media (max-width: 480px) {
+  .pricing-option { flex: 1 1 45%; }
+}
 
 /* ---------- Forms / wizard ---------- */
 .wizard-steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }

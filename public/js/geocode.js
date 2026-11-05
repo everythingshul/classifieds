@@ -1,13 +1,17 @@
-// Turns a typed zip code or city name into {lat, lng, label} for the zmanim
-// and weather widgets. Primary path is Google Places (New) via the same
-// attachLocationAutocomplete() used on post-wizard location fields - see
-// initLocationPicker() below. When no Google Maps API key is configured,
-// geocodeZipOrCity() is used as a manual fallback instead: US zip codes go
-// through Zippopotam.us, anything else through Open-Meteo's free geocoding
-// API - no key needed either way, so the picker always works.
-async function geocodeZipOrCity(query) {
+// Turns a typed zip code or city name into a list of {lat, lng, label}
+// candidates for the zmanim and weather widgets. Primary path is Google
+// Places (New) via the same attachLocationAutocomplete() used on
+// post-wizard location fields - see initLocationPicker() below. When no
+// Google Maps API key is configured, or the key can't actually use Places
+// (not enabled, no billing, wrong referrer restriction...), this is used
+// as the fallback suggestion source instead - so the picker always has a
+// real list to choose from either way. US zip codes go through
+// Zippopotam.us, anything else through Open-Meteo's free geocoding API -
+// no key needed for either.
+async function searchLocations(query) {
   const q = String(query || '').trim();
-  if (!q) return null;
+  if (!q) return [];
+  const results = [];
 
   if (/^\d{5}$/.test(q)) {
     try {
@@ -16,27 +20,35 @@ async function geocodeZipOrCity(query) {
         const data = await res.json();
         const place = data.places && data.places[0];
         if (place) {
-          return {
+          results.push({
             lat: parseFloat(place.latitude),
             lng: parseFloat(place.longitude),
             label: `${place['place name']}, ${place['state abbreviation']}`,
-          };
+          });
         }
       }
     } catch (e) { /* fall through to the city-name lookup below */ }
   }
 
   try {
-    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const r = data.results && data.results[0];
-    if (!r) return null;
-    const region = r.admin1 || r.country;
-    return { lat: r.latitude, lng: r.longitude, label: region ? `${r.name}, ${region}` : r.name };
-  } catch (e) {
-    return null;
-  }
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=en&format=json`);
+    if (res.ok) {
+      const data = await res.json();
+      (data.results || []).forEach((r) => {
+        const region = r.admin1 || r.country;
+        results.push({ lat: r.latitude, lng: r.longitude, label: region ? `${r.name}, ${region}` : r.name });
+      });
+    }
+  } catch (e) { /* ignore - results may still have the zip match above */ }
+
+  return results;
+}
+
+// Convenience for a single best match (used by the picker's Enter/Go
+// fallback submit, as a safety net alongside the dropdown).
+async function geocodeZipOrCity(query) {
+  const results = await searchLocations(query);
+  return results[0] || null;
 }
 
 // Default location when the browser's geolocation isn't available/granted
@@ -117,6 +129,16 @@ function initLocationPicker({ root, storageKey, label, isDefault, tzid, onChange
       const place = sel.city ? (sel.state ? `${sel.city}, ${sel.state}` : sel.city) : sel.text;
       pick({ lat: sel.lat, lng: sel.lng, label: place || sel.text });
     },
+  }).then((result) => {
+    if (result.ok) return;
+    // No working Google Places autocomplete (no key configured, Places not
+    // enabled on the project, billing off, referrer-restricted...) - still
+    // give a real list of matches to pick from, via the free fallback
+    // search, instead of leaving the input a dead end until Enter is pressed.
+    mountSuggestionsDropdown(input, {
+      fetchSuggestions: async (q) => (await searchLocations(q)).map((r) => ({ label: r.label, result: r })),
+      onPick: (item) => pick(item.result),
+    });
   });
 
   form.addEventListener('submit', async (e) => {

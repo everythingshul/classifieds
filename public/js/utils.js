@@ -58,9 +58,13 @@ function formatDate(ms) {
   return new Date(ms).toLocaleDateString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function formatTime(iso) {
+// tzid is the location's own IANA timezone (e.g. "Europe/London") - without
+// it, toLocaleTimeString silently falls back to the *viewer's* browser
+// timezone, which shows the wrong clock time for anyone not in the same
+// timezone as the location the zmanim were computed for.
+function formatTime(iso, tzid) {
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString(I18N.get() === 'he' ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit', timeZone: tzid });
 }
 
 function formatRelativeTime(ms) {
@@ -107,11 +111,17 @@ function getBrowserLocation() {
 
 // Fills a <select> with country calling codes (from the server, backed by
 // libphonenumber-js) so phone validation can check the right digit-count
-// rules per country instead of always assuming US.
+// rules per country instead of always assuming US. With no explicit
+// selection, defaults to the country for the domain being browsed (GB on
+// jlistings.co.uk and other .co.uk domains this app serves, US elsewhere)
+// rather than always assuming US.
+function defaultPhoneCountry() {
+  return /\.co\.uk$/i.test(location.hostname) ? 'GB' : 'US';
+}
 function populateCountrySelect(selectEl, selected) {
   if (!selectEl) return;
   const countries = window.SITE_CONFIG?.countries || [{ code: 'US', name: 'United States', dial: '1' }];
-  const value = selected || 'US';
+  const value = selected || defaultPhoneCountry();
   selectEl.innerHTML = countries.map((c) => `<option value="${c.code}" ${c.code === value ? 'selected' : ''}>${c.code} +${c.dial}</option>`).join('');
 }
 

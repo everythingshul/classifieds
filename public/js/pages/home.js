@@ -126,13 +126,13 @@ async function renderHomePage() {
               <div><span class="combo-label">${escapeHtml(c.dafYomi.display)}</span><span class="combo-sub">${escapeHtml(c.dafYomi.displayEn)}</span></div>
             </div>
             <div class="combo-zman-row">
-              <span><b data-i18n="sunrise">Sunrise</b> ${formatTime(z.sunrise)}</span>
-              <span><b data-i18n="sof_zman_shma">Sof Zman Shma</b> ${formatTime(z.sofZmanShmaMGA)} / ${formatTime(z.sofZmanShma)}</span>
-              <span><b data-i18n="sof_zman_tfilla">Sof Zman Tfilla</b> ${formatTime(z.sofZmanTfillaMGA)} / ${formatTime(z.sofZmanTfilla)}</span>
-              <span><b data-i18n="chatzot">Chatzos</b> ${formatTime(z.chatzot)}</span>
-              <span><b data-i18n="shkia">Shkia</b> ${formatTime(z.sunset)}</span>
-              <span><b data-i18n="tzeit60">Tzeis 60</b> ${formatTime(z.tzeit60)}</span>
-              <span><b data-i18n="tzeit72">Tzeis 72</b> ${formatTime(z.tzeit72)}</span>
+              <span><b data-i18n="sunrise">Sunrise</b> ${formatTime(z.sunrise, c.location.tzid)}</span>
+              <span><b data-i18n="sof_zman_shma">Sof Zman Shma</b> ${formatTime(z.sofZmanShmaMGA, c.location.tzid)} / ${formatTime(z.sofZmanShma, c.location.tzid)}</span>
+              <span><b data-i18n="sof_zman_tfilla">Sof Zman Tfilla</b> ${formatTime(z.sofZmanTfillaMGA, c.location.tzid)} / ${formatTime(z.sofZmanTfilla, c.location.tzid)}</span>
+              <span><b data-i18n="chatzot">Chatzos</b> ${formatTime(z.chatzot, c.location.tzid)}</span>
+              <span><b data-i18n="shkia">Shkia</b> ${formatTime(z.sunset, c.location.tzid)}</span>
+              <span><b data-i18n="tzeit60">Tzeis 60</b> ${formatTime(z.tzeit60, c.location.tzid)}</span>
+              <span><b data-i18n="tzeit72">Tzeis 72</b> ${formatTime(z.tzeit72, c.location.tzid)}</span>
             </div>
             <p class="zman-disclaimer">נא להחמיר על הזמנים בכמה דקות.</p>
           </div>

@@ -202,3 +202,85 @@ function renderPrivacyPolicyPage() {
   I18N.apply();
   setPageTitle('Privacy Policy');
 }
+
+function renderPricingPage() {
+  const cfg = window.SITE_CONFIG || {};
+  const isGbp = cfg.currency === 'gbp';
+
+  // Mirrors the post wizard's own per-row preview (see postWizard.js's
+  // siteAmount()): shows £ where the admin has configured a GBP price for
+  // this exact row, $ otherwise. The actual charge at checkout time is
+  // always resolved authoritatively server-side.
+  function priceFor(row) {
+    if (row.price_cents === 0) return 'Free';
+    if (isGbp && row.price_cents_gbp !== null && row.price_cents_gbp !== undefined) return formatCents(row.price_cents_gbp, 'gbp');
+    return formatCents(row.price_cents);
+  }
+
+  function groupByCategory(tiers) {
+    const map = new Map();
+    tiers.forEach((t) => {
+      const key = t.category || 'All categories';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(t);
+    });
+    return [...map.entries()];
+  }
+
+  function tiersHtml(tiers) {
+    if (!tiers.length) return '<p class="hint">No pricing tiers configured yet.</p>';
+    return groupByCategory(tiers).map(([cat, list]) => `
+      <div class="pricing-group">
+        <h4 class="pricing-group-title">${escapeHtml(cat)}</h4>
+        <div class="pricing-options">
+          ${list.map((t) => `
+            <div class="pricing-option ${t.price_cents === 0 ? 'is-free' : ''}">
+              <div class="pricing-option-price">${priceFor(t)}</div>
+              <div class="pricing-option-name">${escapeHtml(t.name)}</div>
+              <div class="pricing-option-duration">${t.duration_days} day${t.duration_days === 1 ? '' : 's'}</div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  function addonsHtml(addons) {
+    const items = Object.entries(addons || {}).filter(([, a]) => a);
+    if (!items.length) return '';
+    return `
+      <ul class="pricing-addon-list">
+        ${items.map(([key, a]) => `<li><span>${escapeHtml(a.config?.label || key)}</span><span>${priceFor(a)}</span></li>`).join('')}
+      </ul>`;
+  }
+
+  const tiers = cfg.pricingTiers || [];
+  const classifiedTiers = tiers.filter((t) => (t.post_type || 'classified') === 'classified');
+  const listingTiers = tiers.filter((t) => t.post_type === 'listing');
+  const simchaTiers = tiers.filter((t) => t.post_type === 'simcha');
+
+  document.getElementById('app').innerHTML = `
+    <div class="container" style="padding:30px 0 60px;max-width:900px">
+      <div class="page-header"><h1>Pricing</h1></div>
+      <p class="hint" style="margin-bottom:26px">Simple, transparent pricing for every way to post. Lost &amp; Found is always free.${isGbp ? ' Prices shown in £ where configured.' : ''}</p>
+
+      <section class="pricing-section">
+        <div class="pricing-section-head"><h2>Classifieds</h2><a href="/post">Post a Classified &rarr;</a></div>
+        ${tiersHtml(classifiedTiers)}
+        ${addonsHtml(cfg.addons?.classified)}
+      </section>
+
+      <section class="pricing-section">
+        <div class="pricing-section-head"><h2>Listings</h2><a href="/post">Post a Listing &rarr;</a></div>
+        ${tiersHtml(listingTiers)}
+        ${addonsHtml(cfg.addons?.listing)}
+      </section>
+
+      <section class="pricing-section">
+        <div class="pricing-section-head"><h2>Simchas</h2><a href="/post">Share a Simcha &rarr;</a></div>
+        ${tiersHtml(simchaTiers)}
+      </section>
+
+      <p class="hint" style="margin-top:10px">See our <a href="/refund-policy">Refund Policy</a> for details on cancellations and refunds.</p>
+    </div>`;
+  I18N.apply();
+  setPageTitle('Pricing');
+}
