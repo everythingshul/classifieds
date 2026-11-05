@@ -38,6 +38,9 @@ addColumnIfMissing('analytics_events', 'banner_id', 'banner_id INTEGER REFERENCE
 // "jlistings.co.uk") - lets the admin analytics dashboard break traffic
 // down per domain. Null on rows logged before this column existed.
 addColumnIfMissing('analytics_events', 'domain', 'domain TEXT');
+addColumnIfMissing('pricing_tiers', 'price_cents_gbp', 'price_cents_gbp INTEGER');
+addColumnIfMissing('addon_pricing', 'price_cents_gbp', 'price_cents_gbp INTEGER');
+addColumnIfMissing('post_payments', 'currency', "currency TEXT NOT NULL DEFAULT 'usd'");
 // Must run after the migrations above, not in schema.sql - CREATE INDEX IF NOT
 // EXISTS still fails with "no such column" on a pre-existing analytics_events
 // table where the column was just added by ALTER TABLE, not by the original

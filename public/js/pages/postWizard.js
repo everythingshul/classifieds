@@ -2,6 +2,24 @@ function renderPostWizard() {
   const cfg = window.SITE_CONFIG;
   const state = { step: 0, postType: null, category: null, data: {}, files: [] };
 
+  // What this site itself charges for `row` (a pricing tier or add-on),
+  // shown here as a preview - the actual charge is always resolved
+  // authoritatively server-side at submit time (routes/public/posts.js),
+  // falling back the whole order to USD if any involved item lacks a GBP
+  // price, so a partially-configured GBP price list can rarely make this
+  // per-row preview differ slightly from the final checkout currency.
+  function siteAmount(row) {
+    if (!row) return { amount: 0, currency: 'usd' };
+    if (cfg.currency === 'gbp' && row.price_cents_gbp !== null && row.price_cents_gbp !== undefined) {
+      return { amount: row.price_cents_gbp, currency: 'gbp' };
+    }
+    return { amount: row.price_cents, currency: 'usd' };
+  }
+  function formatSiteAmount(row) {
+    const { amount, currency } = siteAmount(row);
+    return formatCents(amount, currency);
+  }
+
   function stepsList() {
     return state.postType === 'simcha'
       ? ['Type', 'Category', 'Details', 'Review']
@@ -264,7 +282,7 @@ function renderPostWizard() {
       warningEl.innerHTML = oversized
         ? `<span>${label} is over the ${limits[field]}-character limit.</span>`
         : `<span>${label} is over the ${limits[field]}-character limit.</span>
-           <button type="button" class="btn btn-sm btn-gold extend-limit-btn">Extend to ${overLimits[field]} characters${addon ? ` — ${formatCents(addon.price_cents)}` : ''}</button>`;
+           <button type="button" class="btn btn-sm btn-gold extend-limit-btn">Extend to ${overLimits[field]} characters${addon ? ` — ${formatSiteAmount(addon)}` : ''}</button>`;
       const btn = warningEl.querySelector('.extend-limit-btn');
       if (btn) {
         btn.addEventListener('click', () => {
@@ -433,11 +451,11 @@ function renderPostWizard() {
       ${isFree ? '<p class="tag">This category is always free to post.</p>' : `
       <h3 style="margin-top:0">Choose how long to run your ad</h3>
       <div class="tier-grid" id="tierGrid">
-        ${tiers.map((t) => `<div class="tier-tile ${state.data.pricingTierId == t.id ? 'selected' : ''}" data-id="${t.id}"><div>${escapeHtml(t.name)}</div><div class="price">${formatCents(t.price_cents)}</div></div>`).join('')}
+        ${tiers.map((t) => `<div class="tier-tile ${state.data.pricingTierId == t.id ? 'selected' : ''}" data-id="${t.id}"><div>${escapeHtml(t.name)}</div><div class="price">${formatSiteAmount(t)}</div></div>`).join('')}
       </div>`}
       <h3>Add-ons</h3>
-      <label class="addon-row"><input type="checkbox" id="wantsStrike" ${state.data.wantsStrike ? 'checked' : ''}> Featured / Striking listing — ${currentAddons()?.strike ? formatCents(currentAddons().strike.price_cents) : ''}</label>
-      ${state.data.wantsOversized ? `<p class="hint">Oversized post add-on selected on the Details step${currentAddons()?.oversized ? ` — ${formatCents(currentAddons().oversized.price_cents)}` : ''}.</p>` : ''}
+      <label class="addon-row"><input type="checkbox" id="wantsStrike" ${state.data.wantsStrike ? 'checked' : ''}> Featured / Striking listing — ${currentAddons()?.strike ? formatSiteAmount(currentAddons().strike) : ''}</label>
+      ${state.data.wantsOversized ? `<p class="hint">Oversized post add-on selected on the Details step${currentAddons()?.oversized ? ` — ${formatSiteAmount(currentAddons().oversized)}` : ''}.</p>` : ''}
       <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     document.querySelectorAll('.tier-tile').forEach((el) => el.addEventListener('click', () => {
@@ -487,25 +505,38 @@ function renderPostWizard() {
       return rows;
     }
 
+    // Mirrors services/pricing.js's resolveCurrency: GBP only if every row
+    // involved has a GBP price configured, otherwise the whole order's
+    // preview (like the real checkout) falls back to USD rather than mixing.
+    function resolveOrderCurrency(rows) {
+      if (cfg.currency !== 'gbp') return 'usd';
+      return rows.every((r) => r.price_cents_gbp !== null && r.price_cents_gbp !== undefined) ? 'gbp' : 'usd';
+    }
+
     function currentChargeLines() {
       if (state.postType === 'simcha') {
         const simchaTier = cfg.pricingTiers.find((t) => t.post_type === 'simcha' && t.active);
         if (!simchaTier || simchaTier.price_cents === 0) return null;
-        return [{ kind: 'listing', label: simchaTier.name, amount: simchaTier.price_cents }];
+        const currency = resolveOrderCurrency([simchaTier]);
+        return { currency, lines: [{ kind: 'listing', label: simchaTier.name, amount: currency === 'gbp' ? simchaTier.price_cents_gbp : simchaTier.price_cents }] };
       }
-      if (currentCatDef()?.free) return [{ label: 'Standard (Free)', amount: 0 }];
+      if (currentCatDef()?.free) return { currency: 'usd', lines: [{ label: 'Standard (Free)', amount: 0 }] };
       const tier = cfg.pricingTiers.find((t) => String(t.id) === String(state.data.pricingTierId));
+      const strike = state.data.wantsStrike ? currentAddons()?.strike : null;
+      const oversized = state.data.wantsOversized ? currentAddons()?.oversized : null;
+      const currency = resolveOrderCurrency([tier, strike, oversized].filter(Boolean));
+      const amt = (row) => (currency === 'gbp' ? row.price_cents_gbp : row.price_cents);
       const lines = [];
-      if (tier) lines.push({ kind: 'listing', label: `${tier.name} listing`, amount: tier.price_cents });
-      if (state.data.wantsStrike && currentAddons()?.strike) lines.push({ kind: 'strike', label: currentAddons().strike.config.label || 'Featured / Striking listing', amount: currentAddons().strike.price_cents });
-      if (state.data.wantsOversized && currentAddons()?.oversized) lines.push({ kind: 'oversized', label: currentAddons().oversized.config.label || 'Oversized post', amount: currentAddons().oversized.price_cents });
-      return lines;
+      if (tier) lines.push({ kind: 'listing', label: `${tier.name} listing`, amount: amt(tier) });
+      if (strike) lines.push({ kind: 'strike', label: strike.config.label || 'Featured / Striking listing', amount: amt(strike) });
+      if (oversized) lines.push({ kind: 'oversized', label: oversized.config.label || 'Oversized post', amount: amt(oversized) });
+      return { currency, lines };
     }
 
     function pricingSummary() {
-      const lines = currentChargeLines();
-      if (!lines) return null;
-      return applyPromoToLines(lines);
+      const charge = currentChargeLines();
+      if (!charge) return null;
+      return { currency: charge.currency, ...applyPromoToLines(charge.lines) };
     }
 
     // Mirrors the server's per-feature promo scoping (routes/public/posts.js
@@ -551,8 +582,8 @@ function renderPostWizard() {
       ${pricing ? `
         <h3>Pricing</h3>
         <ul class="detail-meta-list">
-          ${pricing.lines.map((l) => `<li ${l.label.startsWith('Promo') ? 'class="promo-line-new"' : ''}><span>${escapeHtml(l.label)}</span><span>${formatCents(l.amount)}</span></li>`).join('')}
-          <li><span><b>Total</b></span><span><b>${formatCents(pricing.total)}</b></span></li>
+          ${pricing.lines.map((l) => `<li ${l.label.startsWith('Promo') ? 'class="promo-line-new"' : ''}><span>${escapeHtml(l.label)}</span><span>${formatCents(l.amount, pricing.currency)}</span></li>`).join('')}
+          <li><span><b>Total</b></span><span><b>${formatCents(pricing.total, pricing.currency)}</b></span></li>
         </ul>
         ${pricing.total > 0 || state.data.promo ? `
           <div class="form-row" id="promoRow" style="max-width:320px">
@@ -588,7 +619,7 @@ function renderPostWizard() {
       applyPromoBtn.textContent = 'Checking…';
       try {
         const promo = await Api.validatePromo(code, state.postType);
-        const lines = currentChargeLines() || [];
+        const lines = currentChargeLines()?.lines || [];
         if (lines.length && !lines.some((l) => promoCoversFeature(promo, l.kind))) {
           throw new Error(`That promo code doesn't apply to any of your selected options`);
         }

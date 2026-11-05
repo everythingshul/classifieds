@@ -18,6 +18,7 @@ function customersFromPosts(posts) {
         phone: p.poster_phone,
         posts: [],
         totalPaidCents: 0,
+        totalPaidCentsGbp: 0,
       });
     }
     byEmail.get(key).posts.push(formatPostAdmin(p));
@@ -26,11 +27,15 @@ function customersFromPosts(posts) {
   const emails = [...byEmail.keys()];
   if (emails.length) {
     const placeholders = emails.map(() => '?').join(',');
+    // Grouped by currency too, not just email - a blended USD+GBP sum would
+    // misrepresent both if the same email ever posted on both domains.
     const payments = db
-      .prepare(`SELECT payer_email, SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid' AND payer_email IN (${placeholders}) GROUP BY payer_email`)
+      .prepare(`SELECT payer_email, currency, SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid' AND payer_email IN (${placeholders}) GROUP BY payer_email, currency`)
       .all(...emails);
     payments.forEach((row) => {
-      if (byEmail.has(row.payer_email)) byEmail.get(row.payer_email).totalPaidCents = row.total;
+      if (!byEmail.has(row.payer_email)) return;
+      if (row.currency === 'gbp') byEmail.get(row.payer_email).totalPaidCentsGbp = row.total;
+      else byEmail.get(row.payer_email).totalPaidCents = row.total;
     });
   }
 

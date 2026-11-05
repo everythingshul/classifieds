@@ -155,18 +155,24 @@
 
 .chesky-fb { display: flex; gap: 4px; margin-top: 4px; }
 .chesky-fb button {
-  border: none;
-  background: #fff;
   border: 1px solid var(--border);
+  background: #fff;
+  color: var(--ink-soft);
   border-radius: 999px;
   cursor: pointer;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   opacity: 0.6;
-  padding: 3px 8px;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s, transform 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
 }
-.chesky-fb button:hover { opacity: 1; transform: translateY(-1px); }
-.chesky-fb button.picked { opacity: 1; border-color: var(--gold); background: var(--gold-light); }
+.chesky-fb button svg { width: 14px; height: 14px; }
+.chesky-fb button:hover { opacity: 1; transform: translateY(-1px); color: var(--navy); }
+.chesky-fb button[data-fb="up"].picked { opacity: 1; color: var(--success); border-color: var(--success); background: #eaf3ee; }
+.chesky-fb button[data-fb="down"].picked { opacity: 1; color: var(--navy); border-color: var(--navy); background: #eef1f5; }
 
 .chesky-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
 .chesky-chip {

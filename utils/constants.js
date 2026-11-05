@@ -35,6 +35,16 @@ const DEFAULT_BROOKLYN_LOCATION = {
   tzid: 'America/New_York',
 };
 
+// Used (instead of the admin-configured default_location setting) for
+// visitors on a .co.uk domain who haven't picked a location and whose
+// browser geolocation didn't resolve - see routes/public/home.js.
+const DEFAULT_LONDON_LOCATION = {
+  label: 'London, UK',
+  lat: 51.5072,
+  lng: -0.1276,
+  tzid: 'Europe/London',
+};
+
 // Currencies a poster can choose for their own listed price (e.g. an item's
 // asking price) - separate from what the site itself charges for the
 // listing fee via Stripe, which stays in whatever currency the site's
@@ -62,6 +72,7 @@ module.exports = {
   DEFAULT_CHAR_LIMITS,
   OVERSIZED_CHAR_LIMITS,
   DEFAULT_BROOKLYN_LOCATION,
+  DEFAULT_LONDON_LOCATION,
   CURRENCIES,
   CURRENCY_CODES,
 };

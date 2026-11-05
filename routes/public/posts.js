@@ -8,6 +8,7 @@ const { getActivePromo, applyDiscount, recordUse, promoAppliesTo, promoAppliesTo
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive, fulfillCheckoutSession } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
 const { createCheckoutSession } = require('../../services/checkout');
+const { currencyForHost } = require('../../services/currency');
 const { getStripe } = require('../../utils/stripeClient');
 const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
@@ -123,6 +124,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
         pricingTierId: payload.pricingTierId,
         wantsStrike: payload.wantsStrike,
         wantsOversized: payload.wantsOversized,
+        currency: currencyForHost(req.hostname),
       });
       applyPromoToCharges(charges, req.body.promoCode, 'classified');
 
@@ -132,6 +134,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
         postId: post.id,
         kind: 'listing',
         amountCents: charges.totalCents,
+        currency: charges.currency,
         payerEmail: payload.posterEmail,
         status: charges.totalCents === 0 ? 'paid' : 'pending',
       });
@@ -154,6 +157,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
         pricingTierId: payload.pricingTierId,
         wantsStrike: payload.wantsStrike,
         wantsOversized: payload.wantsOversized,
+        currency: currencyForHost(req.hostname),
       });
       applyPromoToCharges(charges, req.body.promoCode, 'listing');
 
@@ -163,6 +167,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
         postId: post.id,
         kind: 'listing',
         amountCents: charges.totalCents,
+        currency: charges.currency,
         payerEmail: payload.posterEmail,
         status: charges.totalCents === 0 ? 'paid' : 'pending',
       });
@@ -176,7 +181,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
     const taxonomy = db.prepare('SELECT name FROM taxonomies WHERE id = ? AND grp = ?').get(payload.taxonomyId, 'simcha');
     if (!taxonomy) return res.status(400).json({ error: 'Validation failed', details: ['a valid simcha category is required'] });
     payload.title = taxonomy.name;
-    const charges = buildSimchaCharges();
+    const charges = buildSimchaCharges({ currency: currencyForHost(req.hostname) });
     applyPromoToCharges(charges, req.body.promoCode, 'simcha');
     const post = insertPost({ type: 'simcha', category: 'simcha', payload, hasImages: false });
     attachSimchaSurprises(post.id, payload.surpriseEmails, `${payload.posterFirstName || ''} ${payload.posterLastName || ''}`.trim());
@@ -184,6 +189,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
       postId: post.id,
       kind: 'listing',
       amountCents: charges.totalCents,
+      currency: charges.currency,
       payerEmail: payload.posterEmail,
       status: charges.totalCents === 0 ? 'paid' : 'pending',
     });
@@ -204,6 +210,7 @@ async function finalizeOrCheckout({ res, post, payment, charges, posterEmail, ty
 
   const session = await createCheckoutSession({
     lineItems: charges.lineItems,
+    currency: charges.currency,
     returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${appUrl()}/post`,
     customerEmail: posterEmail,
@@ -251,17 +258,20 @@ router.post('/:publicId/boost', async (req, res, next) => {
     if (post.type === 'simcha') return res.status(400).json({ error: 'Boost is not available for simchas' });
 
     const addon = getAddon(`${post.type}_boost`);
-    const amount = addon ? addon.price_cents : 0;
+    const wantsGbp = currencyForHost(req.hostname) === 'gbp';
+    const currency = wantsGbp && addon && addon.price_cents_gbp !== null && addon.price_cents_gbp !== undefined ? 'gbp' : 'usd';
+    const amount = addon ? (currency === 'gbp' ? addon.price_cents_gbp : addon.price_cents) : 0;
 
     if (amount === 0) {
       db.prepare('UPDATE posts SET boosted_at = ?, updated_at = ? WHERE id = ?').run(Date.now(), Date.now(), post.id);
-      recordPayment({ postId: post.id, kind: 'boost', amountCents: 0, payerEmail: email, status: 'paid' });
+      recordPayment({ postId: post.id, kind: 'boost', amountCents: 0, currency, payerEmail: email, status: 'paid' });
       return res.json({ requiresPayment: false, boosted: true });
     }
 
-    const payment = recordPayment({ postId: post.id, kind: 'boost', amountCents: amount, payerEmail: email, status: 'pending' });
+    const payment = recordPayment({ postId: post.id, kind: 'boost', amountCents: amount, currency, payerEmail: email, status: 'pending' });
     const session = await createCheckoutSession({
       lineItems: [{ label: `Boost listing: ${post.title}`, amount_cents: amount }],
+      currency,
       returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${appUrl()}${postUrlPath(post)}`,
       customerEmail: email,
@@ -285,17 +295,20 @@ router.post('/:publicId/strike', async (req, res, next) => {
     if (post.type === 'simcha') return res.status(400).json({ error: 'Featuring is not available for simchas' });
 
     const addon = getAddon(`${post.type}_strike`);
-    const amount = addon ? addon.price_cents : 0;
+    const wantsGbp = currencyForHost(req.hostname) === 'gbp';
+    const currency = wantsGbp && addon && addon.price_cents_gbp !== null && addon.price_cents_gbp !== undefined ? 'gbp' : 'usd';
+    const amount = addon ? (currency === 'gbp' ? addon.price_cents_gbp : addon.price_cents) : 0;
 
     if (amount === 0) {
       db.prepare('UPDATE posts SET is_featured_strike = 1, updated_at = ? WHERE id = ?').run(Date.now(), post.id);
-      recordPayment({ postId: post.id, kind: 'strike', amountCents: 0, payerEmail: email, status: 'paid' });
+      recordPayment({ postId: post.id, kind: 'strike', amountCents: 0, currency, payerEmail: email, status: 'paid' });
       return res.json({ requiresPayment: false, featured: true });
     }
 
-    const payment = recordPayment({ postId: post.id, kind: 'strike', amountCents: amount, payerEmail: email, status: 'pending' });
+    const payment = recordPayment({ postId: post.id, kind: 'strike', amountCents: amount, currency, payerEmail: email, status: 'pending' });
     const session = await createCheckoutSession({
       lineItems: [{ label: `Feature listing: ${post.title}`, amount_cents: amount }],
+      currency,
       returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${appUrl()}${postUrlPath(post)}`,
       customerEmail: email,

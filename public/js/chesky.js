@@ -32,6 +32,8 @@ const Chesky = (() => {
 
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
   const MIC_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 11z"/></svg>';
+  const THUMB_UP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3zm0 0 4.5-8a2 2 0 0 1 2.3 2.8L12.5 10H18a2 2 0 0 1 1.94 2.5l-1.5 6A2 2 0 0 1 16.5 20H9a2 2 0 0 1-2-2"/></svg>';
+  const THUMB_DOWN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13V4h3a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-3zm0 0-4.5 8a2 2 0 0 1-2.3-2.8L11.5 14H6a2 2 0 0 1-1.94-2.5l1.5-6A2 2 0 0 1 7.5 4H15a2 2 0 0 1 2 2"/></svg>';
 
   function saveTranscript() {
     try { sessionStorage.setItem(STORAGE_TRANSCRIPT, JSON.stringify(transcript.slice(-16))); } catch (e) { /* ignore */ }
@@ -46,6 +48,30 @@ const Chesky = (() => {
   function fmtDur(s) {
     s = Math.max(0, Math.round(s || 0));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  // Enter sends the message; Ctrl+Enter (or Cmd+Enter) inserts a newline
+  // instead. A plain textarea has no default action bound to Ctrl+Enter (it's
+  // not "same as Enter" - browsers just do nothing with it), so the newline
+  // has to be inserted by hand rather than left to fall through. Also grows
+  // the box as lines are added, since it starts at a single row and the CSS
+  // has no auto-resize of its own.
+  function wireEnterToSend(textarea) {
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const { selectionStart, selectionEnd } = textarea;
+        textarea.setRangeText('\n', selectionStart, selectionEnd, 'end');
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      textarea.form?.requestSubmit();
+    });
+    textarea.addEventListener('input', () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    });
   }
 
   function scrollLog() {
@@ -117,13 +143,23 @@ const Chesky = (() => {
     return node;
   }
 
-  function feedbackRow(question, entryId) {
-    const row = el(`
+  // Markup only - feedbackRow() used to build+wire a detached node and
+  // return its outerHTML, but serializing to a string and re-parsing it (as
+  // bubble() does to embed it in the message) drops DOM event listeners
+  // entirely, so the thumbs buttons never actually did anything. Listeners
+  // are now wired separately, by wireFeedbackRow(), on the real inserted node.
+  function feedbackRowHtml() {
+    return `
       <div class="chesky-fb">
-        <button type="button" data-fb="up" title="Helpful">&#128077;</button>
-        <button type="button" data-fb="down" title="Not helpful">&#128078;</button>
+        <button type="button" data-fb="up" title="Helpful">${THUMB_UP_ICON}</button>
+        <button type="button" data-fb="down" title="Not helpful">${THUMB_DOWN_ICON}</button>
       </div>
-    `);
+    `;
+  }
+
+  function wireFeedbackRow(bubbleNode, question, entryId) {
+    const row = bubbleNode?.querySelector('.chesky-fb');
+    if (!row) return;
     row.querySelectorAll('button').forEach((btn) => {
       btn.addEventListener('click', () => {
         row.querySelectorAll('button').forEach((b) => b.classList.remove('picked'));
@@ -131,7 +167,6 @@ const Chesky = (() => {
         Api.cheskyLog({ type: btn.dataset.fb, q: question, entry: entryId });
       });
     });
-    return row.outerHTML;
   }
 
   function chipsHtml() {
@@ -139,7 +174,8 @@ const Chesky = (() => {
   }
 
   function displayBotReply(question, result) {
-    bubble('bot', escapeHtml(result.reply).replace(/\n/g, '<br>'), feedbackRow(question, result.entryId));
+    const node = bubble('bot', escapeHtml(result.reply).replace(/\n/g, '<br>'), feedbackRowHtml());
+    wireFeedbackRow(node, question, result.entryId);
     transcript.push({ role: 'assistant', text: result.reply });
     saveTranscript();
     if (result.offTopic) {
@@ -210,11 +246,13 @@ const Chesky = (() => {
       <div style="text-align:center;padding:6px 0 10px"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanBtn">Talk to a real person &rarr;</button></div>
     `;
     if (!micAvailable()) document.getElementById('cheskyMicBtn').style.display = 'none';
+    wireEnterToSend(document.getElementById('cheskyAskForm').q);
     document.getElementById('cheskyAskForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const ta = e.target.q;
       const q = ta.value;
       ta.value = '';
+      ta.style.height = '';
       ask(q);
     });
     document.getElementById('cheskyMicBtn').addEventListener('click', () => startRecording('ask'));
@@ -272,12 +310,14 @@ const Chesky = (() => {
       </form>
     `;
     if (!micAvailable()) document.getElementById('cheskyMicBtn').style.display = 'none';
+    if (!disabled) wireEnterToSend(document.getElementById('cheskySendForm').t);
     document.getElementById('cheskySendForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const ta = e.target.t;
       const text = ta.value.trim();
       if (!text) return;
       ta.value = '';
+      ta.style.height = '';
       bubble('visitor', escapeHtml(text));
       try {
         const result = await Api.cheskySend({ id: convId, text });

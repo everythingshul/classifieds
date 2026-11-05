@@ -29,10 +29,12 @@ function computeTotals(from, to) {
     uniqueVisitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE created_at BETWEEN ? AND ?').get(from, to).c,
     // Net of refunds, windowed by the payment's own created_at (a refund
     // issued later still nets out of the period the charge happened in,
-    // matching the lifetime figure on the dashboard).
+    // matching the lifetime figure on the dashboard). USD only - kept
+    // separate from GBP rather than blended into one misleading total, same
+    // reasoning as the dashboard's revenue stat.
     revenueCents: (
-      (db.prepare("SELECT SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
-      - (db.prepare("SELECT SUM(refunded_cents) AS total FROM post_payments WHERE status = 'paid' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
+      (db.prepare("SELECT SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
+      - (db.prepare("SELECT SUM(refunded_cents) AS total FROM post_payments WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
     ),
     // A visitor counts as recurring the moment they've been seen more than
     // once - either multiple events within this window (they came back,
@@ -95,10 +97,11 @@ router.get('/', (req, res) => {
     ORDER BY date
   `).all(tzOffsetSec, from, to);
 
+  // USD only, same reasoning as computeTotals() above.
   const revenueTimeseries = db.prepare(`
     SELECT ${DAY_EXPR} AS date, SUM(amount_cents) - SUM(refunded_cents) AS revenueCents
     FROM post_payments
-    WHERE status = 'paid' AND created_at BETWEEN ? AND ?
+    WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?
     GROUP BY date
     ORDER BY date
   `).all(tzOffsetSec, from, to);
@@ -106,7 +109,7 @@ router.get('/', (req, res) => {
   const revenueByKind = db.prepare(`
     SELECT kind, SUM(amount_cents) - SUM(refunded_cents) AS c
     FROM post_payments
-    WHERE status = 'paid' AND created_at BETWEEN ? AND ?
+    WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?
     GROUP BY kind ORDER BY c DESC
   `).all(from, to);
 

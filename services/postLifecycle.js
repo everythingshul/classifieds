@@ -71,13 +71,13 @@ function attachImages(postId, filenames) {
   filenames.forEach((f, i) => stmt.run(postId, f.filename, f.originalName || null, i, now));
 }
 
-function recordPayment({ postId, kind, amountCents, payerEmail, status, stripeSessionId, invoiceNumber }) {
+function recordPayment({ postId, kind, amountCents, currency, payerEmail, status, stripeSessionId, invoiceNumber }) {
   const info = db
     .prepare(
-      `INSERT INTO post_payments (post_id, kind, amount_cents, stripe_session_id, payer_email, status, invoice_number, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO post_payments (post_id, kind, amount_cents, currency, stripe_session_id, payer_email, status, invoice_number, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(postId, kind, amountCents, stripeSessionId || null, payerEmail, status, invoiceNumber || null, Date.now());
+    .run(postId, kind, amountCents, currency || 'usd', stripeSessionId || null, payerEmail, status, invoiceNumber || null, Date.now());
   return db.prepare('SELECT * FROM post_payments WHERE id = ?').get(info.lastInsertRowid);
 }
 
@@ -171,6 +171,7 @@ async function sendInvoiceForPost(post) {
   const url = `${appUrl()}${urlSegment}${post.public_id}`;
   const invoice = {
     invoiceNumber,
+    currency: payments[0]?.currency || 'usd',
     issuedAt: new Date(),
     poster: { firstName: post.poster_first_name, lastName: post.poster_last_name, email: post.poster_email, phone: post.poster_phone },
     post: {

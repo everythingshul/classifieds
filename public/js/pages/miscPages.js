@@ -70,6 +70,11 @@ function renderContactPage() {
 }
 
 function renderTermsPage() {
+  // jlistings.co.uk (and any other .co.uk domain this app serves) gets an
+  // England & Wales governing-law clause and the UK-consumer-law carve-outs
+  // below; every other domain keeps the US/New York version. Same page,
+  // same content everywhere else - just these couple of sections differ.
+  const isUk = /\.co\.uk$/i.test(location.hostname);
   document.getElementById('app').innerHTML = `
     <div class="container" style="padding:30px 0 60px;max-width:820px">
       <h1 data-i18n="terms">Terms &amp; Conditions</h1>
@@ -83,6 +88,7 @@ function renderTermsPage() {
 
       <h3>3. No Liability</h3>
       <p>The Site is provided on an "as is" and "as available" basis, without warranties of any kind, express or implied. To the fullest extent permitted by law, the Site operator, its owners, employees, and affiliates disclaim all liability for any direct, indirect, incidental, special, consequential, or punitive damages arising out of or related to: (a) your use of or inability to use the Site; (b) any transaction, communication, meeting, or dealing between users arising from a listing; (c) any Content posted by any user, including editorials and comments; (d) any loss of data, profits, goodwill, or other intangible losses; or (e) any conduct of any third party on or off the Site. You use the Site, contact other users, and engage in any transaction entirely at your own risk.</p>
+      <p>Nothing in these Terms excludes or limits our liability for death or personal injury caused by our negligence, for fraud or fraudulent misrepresentation, or for any other liability which cannot be excluded or limited under applicable law. If you are using the Site as a consumer, nothing in these Terms affects your other statutory rights.</p>
 
       <h3>4. No Employment, Sale, or Agency Relationship</h3>
       <p>The Site is a venue only. We are not a party to any job offer, sale, rental, service agreement, or other arrangement made between users. We do not perform background checks, verify credentials, appraise items, or inspect properties.</p>
@@ -98,7 +104,8 @@ function renderTermsPage() {
       <p>You agree to indemnify and hold harmless the Site operator from any claims, damages, losses, liabilities, and expenses (including reasonable attorneys' fees) arising out of your use of the Site, your Content, or your violation of these Terms.</p>
 
       <h3>8. Payments</h3>
-      <p>Listing fees, boosts, featured placement, and other paid add-ons are processed via a third-party payment processor. Editorials are free to submit and publish. See our <a href="/refund-policy">Refund Policy</a> for details on refunds.</p>
+      <p>Listing fees, boosts, featured placement, and other paid add-ons are processed via a third-party payment processor, in the currency shown to you at checkout for the domain you're posting on. Editorials are free to submit and publish. See our <a href="/refund-policy">Refund Policy</a> for details on refunds.</p>
+      ${isUk ? `<p>If you are a consumer in the UK, these paid add-ons are digital services that we begin supplying immediately once your payment is confirmed (for example, a boost or featured placement takes effect right away). By completing payment, you expressly request that we start immediately and acknowledge that, once we have done so, you lose the right to cancel under the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. This does not affect your other statutory rights, including your rights under the Consumer Rights Act 2015 where a service is not performed with reasonable care and skill.</p>` : ''}
 
       <h3>9. Reporting</h3>
       <p>Users may report listings believed to violate these Terms or applicable law. We review reports at our discretion and are under no obligation to take any particular action.</p>
@@ -106,8 +113,13 @@ function renderTermsPage() {
       <h3>10. Changes</h3>
       <p>We may modify these Terms at any time. Continued use of the Site after changes constitutes acceptance of the updated Terms.</p>
 
-      <h3>11. Contact</h3>
-      <p>Questions about these Terms may be directed to the Site administrator.</p>
+      <h3>11. Governing Law &amp; Jurisdiction</h3>
+      ${isUk
+        ? `<p>These Terms, and any dispute or claim arising out of or in connection with them or the Site (including non-contractual disputes or claims), are governed by and construed in accordance with the law of England and Wales. The courts of England and Wales will have exclusive jurisdiction, except that if you are a consumer resident elsewhere in the UK, mandatory local consumer-protection law may also give you rights in your own country of residence.</p>`
+        : `<p>These Terms, and any dispute or claim arising out of or in connection with them or the Site, are governed by and construed in accordance with the laws of the State of New York, without regard to its conflict-of-laws principles, and you agree to the exclusive jurisdiction of the state and federal courts located in New York for any such dispute.</p>`}
+
+      <h3>12. Contact</h3>
+      <p>Questions about these Terms may be directed to the Site administrator via our <a href="/contact">Contact Us</a> page.</p>
     </div>`;
   I18N.apply();
   setPageTitle('Terms & Conditions');

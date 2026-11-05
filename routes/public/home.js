@@ -4,7 +4,8 @@ const { getHomeCalendarData } = require('../../utils/hebrewCalendar');
 const { formatPostPublic } = require('../../services/postFormat');
 const { formatEditorialPublic } = require('../../services/editorial');
 const { getSetting } = require('../../services/pricing');
-const { DEFAULT_BROOKLYN_LOCATION } = require('../../utils/constants');
+const { DEFAULT_BROOKLYN_LOCATION, DEFAULT_LONDON_LOCATION } = require('../../utils/constants');
+const { currencyForHost } = require('../../services/currency');
 
 const router = express.Router();
 
@@ -26,13 +27,24 @@ router.get('/', async (req, res, next) => {
   try {
     const lat = req.query.lat !== undefined ? Number(req.query.lat) : undefined;
     const lng = req.query.lng !== undefined ? Number(req.query.lng) : undefined;
-    const label = req.query.label ? String(req.query.label).slice(0, 100) : undefined;
+    const rawLabel = req.query.label ? String(req.query.label).slice(0, 100) : undefined;
+    // Defends against clients that build their query string from an object
+    // with an unset field (e.g. `new URLSearchParams({label: undefined})`
+    // literally serializes to "label=undefined") - never show that as a
+    // location name.
+    const label = rawLabel && rawLabel !== 'undefined' && rawLabel !== 'null' ? rawLabel : undefined;
+
+    // jlistings.co.uk (and any other .co.uk domain this app serves) defaults
+    // to London rather than the admin's globally-configured default - only
+    // when the visitor truly has no location of their own (no lat/lng sent).
+    const isUkDomain = currencyForHost(req.hostname) === 'gbp';
+    const defaultLocation = isUkDomain ? DEFAULT_LONDON_LOCATION : getSetting('default_location', DEFAULT_BROOKLYN_LOCATION);
 
     const calendar = await getHomeCalendarData({
       lat: Number.isFinite(lat) ? lat : undefined,
       lng: Number.isFinite(lng) ? lng : undefined,
       label,
-      defaultLocation: getSetting('default_location', DEFAULT_BROOKLYN_LOCATION),
+      defaultLocation,
     });
 
     const now = Date.now();

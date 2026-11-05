@@ -92,6 +92,7 @@ async function renderPricingPage() {
         <td><input class="tier-name" value="${escapeHtml(t.name)}" style="width:130px"></td>
         <td><input class="tier-days" type="number" value="${t.duration_days}" style="width:70px"></td>
         <td><input class="tier-price" type="number" step="0.01" value="${(t.price_cents / 100).toFixed(2)}" style="width:90px"></td>
+        <td><input class="tier-price-gbp" type="number" step="0.01" placeholder="not set" value="${t.price_cents_gbp !== null && t.price_cents_gbp !== undefined ? (t.price_cents_gbp / 100).toFixed(2) : ''}" style="width:90px"></td>
         <td><input class="tier-active" type="checkbox" ${t.active ? 'checked' : ''}></td>
         <td><button class="btn btn-sm save-tier">Save</button> <button class="btn btn-sm btn-danger del-tier">Delete</button></td>
       </tr>
@@ -104,7 +105,7 @@ async function renderPricingPage() {
     <div class="admin-card">
       <h3 style="margin-top:0">Classifieds Duration Tiers</h3>
       <table class="admin-table">
-        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price (USD)</th><th>Price (GBP)</th><th>Active</th><th></th></tr></thead>
         <tbody>${tierTableRows(classifiedTiers)}</tbody>
       </table>
       <form id="addTierForm" data-post-type="classified" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
@@ -112,6 +113,7 @@ async function renderPricingPage() {
         <div class="field"><label>Name</label><input name="name" required></div>
         <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
         <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
+        <div class="field"><label>Price (£) <span class="hint">(optional)</span></label><input name="priceGbp" type="number" step="0.01" placeholder="falls back to USD"></div>
         <button class="btn btn-sm" type="submit">Add Tier</button>
       </form>
     </div>
@@ -119,7 +121,7 @@ async function renderPricingPage() {
     <div class="admin-card">
       <h3 style="margin-top:0">Listing Duration Tiers <span class="hint">(separate pricing/rules from Classifieds)</span></h3>
       <table class="admin-table">
-        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price (USD)</th><th>Price (GBP)</th><th>Active</th><th></th></tr></thead>
         <tbody>${tierTableRows(listingTiers)}</tbody>
       </table>
       <form id="addListingTierForm" data-post-type="listing" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
@@ -127,6 +129,7 @@ async function renderPricingPage() {
         <div class="field"><label>Name</label><input name="name" required></div>
         <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
         <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
+        <div class="field"><label>Price (£) <span class="hint">(optional)</span></label><input name="priceGbp" type="number" step="0.01" placeholder="falls back to USD"></div>
         <button class="btn btn-sm" type="submit">Add Tier</button>
       </form>
     </div>
@@ -134,13 +137,14 @@ async function renderPricingPage() {
     <div class="admin-card">
       <h3 style="margin-top:0">Simcha Pricing <span class="hint">(separate from Classifieds/Listings)</span></h3>
       <table class="admin-table">
-        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>Category</th><th>Name</th><th>Days</th><th>Price (USD)</th><th>Price (GBP)</th><th>Active</th><th></th></tr></thead>
         <tbody>${tierTableRows(simchaTiers)}</tbody>
       </table>
       <form id="addSimchaTierForm" data-post-type="simcha" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:16px">
         <div class="field"><label>Name</label><input name="name" required></div>
         <div class="field"><label>Days</label><input name="durationDays" type="number" required></div>
         <div class="field"><label>Price ($)</label><input name="price" type="number" step="0.01" required></div>
+        <div class="field"><label>Price (£) <span class="hint">(optional)</span></label><input name="priceGbp" type="number" step="0.01" placeholder="falls back to USD"></div>
         <button class="btn btn-sm" type="submit">Add Tier</button>
       </form>
     </div>
@@ -154,12 +158,13 @@ async function renderPricingPage() {
           <div class="admin-card">
             <h3 style="margin-top:0">${label} Add-ons</h3>
             <table class="admin-table">
-              <thead><tr><th>Add-on</th><th>Price</th><th></th></tr></thead>
+              <thead><tr><th>Add-on</th><th>Price (USD)</th><th>Price (GBP)</th><th></th></tr></thead>
               <tbody>
                 ${rows.map((a) => `
                   <tr data-key="${a.key}">
                     <td>${escapeHtml(a.config.label || a.key)}</td>
                     <td><input class="addon-price" type="number" step="0.01" value="${(a.price_cents / 100).toFixed(2)}" style="width:90px"></td>
+                    <td><input class="addon-price-gbp" type="number" step="0.01" placeholder="not set" value="${a.price_cents_gbp !== null && a.price_cents_gbp !== undefined ? (a.price_cents_gbp / 100).toFixed(2) : ''}" style="width:90px"></td>
                     <td><button class="btn btn-sm save-addon">Save</button></td>
                   </tr>
                 `).join('')}
@@ -212,10 +217,12 @@ async function renderPricingPage() {
   root.querySelectorAll('tr[data-id]').forEach((row) => {
     const saveTier = row.querySelector('.save-tier');
     if (saveTier) saveTier.addEventListener('click', async () => {
+      const gbpRaw = row.querySelector('.tier-price-gbp').value.trim();
       await AdminApi.updateTier(row.dataset.id, {
         name: row.querySelector('.tier-name').value,
         durationDays: Number(row.querySelector('.tier-days').value),
         priceCents: Math.round(Number(row.querySelector('.tier-price').value) * 100),
+        priceCentsGbp: gbpRaw === '' ? null : Math.round(Number(gbpRaw) * 100),
         active: row.querySelector('.tier-active').checked,
       });
       toast('Saved');
@@ -274,7 +281,11 @@ async function renderPricingPage() {
 
   root.querySelectorAll('tr[data-key]').forEach((row) => {
     row.querySelector('.save-addon').addEventListener('click', async () => {
-      await AdminApi.updateAddon(row.dataset.key, { priceCents: Math.round(Number(row.querySelector('.addon-price').value) * 100) });
+      const gbpRaw = row.querySelector('.addon-price-gbp').value.trim();
+      await AdminApi.updateAddon(row.dataset.key, {
+        priceCents: Math.round(Number(row.querySelector('.addon-price').value) * 100),
+        priceCentsGbp: gbpRaw === '' ? null : Math.round(Number(gbpRaw) * 100),
+      });
       toast('Saved');
     });
   });
@@ -283,12 +294,14 @@ async function renderPricingPage() {
     document.getElementById(formId).addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
+      const gbpRaw = String(fd.get('priceGbp') || '').trim();
       await AdminApi.createTier({
         category: fd.get('category') || null,
         postType: e.target.dataset.postType,
         name: fd.get('name'),
         durationDays: Number(fd.get('durationDays')),
         priceCents: Math.round(Number(fd.get('price')) * 100),
+        priceCentsGbp: gbpRaw === '' ? null : Math.round(Number(gbpRaw) * 100),
       });
       renderPricingPage();
     });

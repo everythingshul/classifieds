@@ -3,14 +3,18 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function formatCents(cents) {
+// currency is 'usd' (default) or 'gbp' - what the site itself charges for a
+// listing fee/add-on (see services/currency.js), not a poster's own listed
+// price, which is formatMoney below.
+function formatCents(cents, currency) {
   const n = Number(cents || 0);
-  return `${n < 0 ? '-' : ''}$${(Math.abs(n) / 100).toFixed(2)}`;
+  const symbol = currency === 'gbp' ? '£' : '$';
+  return `${n < 0 ? '-' : ''}${symbol}${(Math.abs(n) / 100).toFixed(2)}`;
 }
 
 // For a poster's own listed price, which can be in a currency other than
 // USD - unlike formatCents, which is only ever used for what the site
-// itself charges (always USD via Stripe).
+// itself charges.
 function formatMoney(cents, currency) {
   const amount = Number(cents || 0) / 100;
   try {

@@ -2,6 +2,12 @@
 // weather API whose data is licensed CC BY 4.0 - reuse is permitted as long
 // as it's attributed, which is why the widget below always links back to
 // them. No API key is required and no usage terms are being violated.
+//
+// Location for this widget is independent from the zmanim card's (see
+// home.js) - each has its own "change location" picker and its own
+// localStorage key, so picking one never moves the other.
+const WEATHER_LOC_STORAGE = 'jl_weather_location';
+
 const WEATHER_CODES = {
   0: 'Clear sky', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast',
   45: 'Fog', 48: 'Fog',
@@ -17,24 +23,47 @@ function weatherDescription(code) {
   return WEATHER_CODES[code] || 'Weather unavailable';
 }
 
-async function renderWeatherWidget(browserLoc, fallbackLocation) {
+function getCustomWeatherLocation() {
+  try { return JSON.parse(localStorage.getItem(WEATHER_LOC_STORAGE) || 'null'); } catch (e) { return null; }
+}
+
+async function renderWeatherWidget() {
   const el = document.getElementById('weatherWidget');
   if (!el) return;
-  const lat = browserLoc?.lat ?? fallbackLocation?.lat;
-  const lng = browserLoc?.lng ?? fallbackLocation?.lng;
-  if (lat === undefined || lng === undefined) return;
+
+  const custom = getCustomWeatherLocation();
+  const browserLoc = custom ? null : await getBrowserLocation();
+  const fallback = domainDefaultLocation();
+  const loc = custom || browserLoc || fallback;
+  const label = custom?.label || (browserLoc ? 'Your location' : fallback.label);
+  const isDefault = !custom && !browserLoc;
+
+  el.innerHTML = `
+    <div class="combo-widget weather-widget">
+      <div id="weatherLocPicker"></div>
+      <div id="weatherForecast"><p class="hint" style="padding:6px 0">Loading forecast…</p></div>
+    </div>
+  `;
+  initLocationPicker({
+    root: document.getElementById('weatherLocPicker'),
+    storageKey: WEATHER_LOC_STORAGE,
+    label,
+    isDefault,
+    onChange: renderWeatherWidget,
+  });
 
   const isHe = I18N.get() === 'he';
   const unit = isHe ? 'celsius' : 'fahrenheit';
   const degree = isHe ? '°C' : '°F';
+  const forecastEl = document.getElementById('weatherForecast');
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=${unit}&forecast_days=5&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lng}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=${unit}&forecast_days=5&timezone=auto`;
     const res = await fetch(url);
-    if (!res.ok) return;
+    if (!res.ok) throw new Error('forecast unavailable');
     const data = await res.json();
     const days = data.daily;
-    if (!days || !days.time) return;
+    if (!days || !days.time) throw new Error('forecast unavailable');
 
     const dayLabel = (dateStr, i) => {
       if (i === 0) return isHe ? 'היום' : 'Today';
@@ -49,15 +78,15 @@ async function renderWeatherWidget(browserLoc, fallbackLocation) {
       </div>
     `).join('');
 
-    el.innerHTML = `
-      <div class="combo-widget weather-widget">
-        <p class="combo-label" style="margin-bottom:6px">5-Day Forecast</p>
-        ${rows}
-        <p class="weather-attribution">Data by <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)</p>
-      </div>
+    forecastEl.innerHTML = `
+      <p class="combo-label" style="margin-bottom:6px">5-Day Forecast</p>
+      ${rows}
+      <p class="weather-attribution">Data by <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)</p>
     `;
   } catch (e) {
-    // Silently omit the widget if the forecast can't be fetched - it's a
-    // nice-to-have, not something that should ever block the home page.
+    // The forecast is a nice-to-have, not something that should ever block
+    // the home page - just drop the forecast portion silently and leave the
+    // location picker (which still works) in place.
+    forecastEl.innerHTML = '';
   }
 }

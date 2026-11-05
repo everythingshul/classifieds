@@ -35,9 +35,14 @@ function buildStats(from, to) {
   const newPosts = db.prepare('SELECT type, COUNT(*) AS c FROM posts WHERE created_at BETWEEN ? AND ? GROUP BY type').all(from, to);
   const pageviews = db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'pageview' AND created_at BETWEEN ? AND ?").get(from, to).c;
   const uniqueVisitors = db.prepare('SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE created_at BETWEEN ? AND ?').get(from, to).c;
+  // USD only - see routes/admin/analytics.js for why currencies aren't blended.
   const revenueCents = (
-    (db.prepare("SELECT SUM(amount_cents) AS t FROM post_payments WHERE status = 'paid' AND created_at BETWEEN ? AND ?").get(from, to).t || 0) -
-    (db.prepare("SELECT SUM(refunded_cents) AS t FROM post_payments WHERE status = 'paid' AND created_at BETWEEN ? AND ?").get(from, to).t || 0)
+    (db.prepare("SELECT SUM(amount_cents) AS t FROM post_payments WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?").get(from, to).t || 0) -
+    (db.prepare("SELECT SUM(refunded_cents) AS t FROM post_payments WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?").get(from, to).t || 0)
+  );
+  const revenueCentsGbp = (
+    (db.prepare("SELECT SUM(amount_cents) AS t FROM post_payments WHERE status = 'paid' AND currency = 'gbp' AND created_at BETWEEN ? AND ?").get(from, to).t || 0) -
+    (db.prepare("SELECT SUM(refunded_cents) AS t FROM post_payments WHERE status = 'paid' AND currency = 'gbp' AND created_at BETWEEN ? AND ?").get(from, to).t || 0)
   );
   const newSubscribers = db.prepare('SELECT COUNT(*) AS c FROM email_subscriptions WHERE created_at BETWEEN ? AND ?').get(from, to).c;
   const newContactMessages = db.prepare('SELECT COUNT(*) AS c FROM contact_messages WHERE created_at BETWEEN ? AND ?').get(from, to).c;
@@ -50,7 +55,7 @@ function buildStats(from, to) {
   const pendingPosts = db.prepare("SELECT COUNT(*) AS c FROM posts WHERE status = 'pending_approval'").get().c;
   const pendingEditorials = db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'pending_approval'").get().c;
   const pendingComments = db.prepare("SELECT COUNT(*) AS c FROM editorial_comments WHERE status = 'pending_approval'").get().c;
-  return { newPosts, pageviews, uniqueVisitors, revenueCents, newSubscribers, newContactMessages, byDomain, pendingPosts, pendingEditorials, pendingComments };
+  return { newPosts, pageviews, uniqueVisitors, revenueCents, revenueCentsGbp, newSubscribers, newContactMessages, byDomain, pendingPosts, pendingEditorials, pendingComments };
 }
 
 function statRow(label, value) {
@@ -79,7 +84,8 @@ function digestHtml(stats, periodLabel) {
       ${statRow('New posts', totalNewPosts ? `${totalNewPosts}${postsBreakdown ? ` (${escapeHtml(postsBreakdown)})` : ''}` : '0')}
       ${statRow('Pageviews', stats.pageviews)}
       ${statRow('Unique visitors', stats.uniqueVisitors)}
-      ${statRow('Revenue', formatCents(stats.revenueCents))}
+      ${statRow('Revenue (USD)', formatCents(stats.revenueCents))}
+      ${stats.revenueCentsGbp ? statRow('Revenue (GBP)', formatCents(stats.revenueCentsGbp, 'gbp')) : ''}
       ${statRow('New subscribers', stats.newSubscribers)}
       ${statRow('New contact messages', stats.newContactMessages)}
     </table>

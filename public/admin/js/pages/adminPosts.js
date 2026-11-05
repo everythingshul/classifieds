@@ -214,14 +214,14 @@ async function openEditor(id) {
 
       ${p.payments?.length ? `<h4>Payment History</h4><table class="admin-table"><thead><tr><th>Kind</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>${p.payments.map((pay) => {
         const remaining = pay.amount_cents - (pay.refunded_cents || 0);
-        const refundLabel = pay.refunded_cents > 0 ? (remaining <= 0 ? `Refunded ${formatCents(pay.refunded_cents)}` : `Partially refunded ${formatCents(pay.refunded_cents)}`) : '';
+        const refundLabel = pay.refunded_cents > 0 ? (remaining <= 0 ? `Refunded ${formatCents(pay.refunded_cents, pay.currency)}` : `Partially refunded ${formatCents(pay.refunded_cents, pay.currency)}`) : '';
         const canRefund = pay.status === 'paid' && pay.stripe_payment_intent && remaining > 0;
         return `<tr>
           <td>${pay.kind}</td>
-          <td>${formatCents(pay.amount_cents)}${refundLabel ? `<br><span class="hint">${refundLabel}</span>` : ''}</td>
+          <td>${formatCents(pay.amount_cents, pay.currency)}${refundLabel ? `<br><span class="hint">${refundLabel}</span>` : ''}</td>
           <td>${pay.status}</td>
           <td>${formatDate(pay.created_at)}</td>
-          <td>${canRefund ? `<button type="button" class="btn btn-sm btn-danger refund-btn" data-payment-id="${pay.id}" data-remaining="${remaining}">Refund</button>` : ''}</td>
+          <td>${canRefund ? `<button type="button" class="btn btn-sm btn-danger refund-btn" data-payment-id="${pay.id}" data-remaining="${remaining}" data-currency="${pay.currency}">Refund</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody></table>` : ''}
       ${p.reports?.length ? `<h4>Reports (${p.reports.length})</h4><ul>${p.reports.map((r) => `<li>${escapeHtml(r.reason || '(no reason given)')} — ${formatDate(r.created_at)}</li>`).join('')}</ul>` : ''}
@@ -355,12 +355,14 @@ async function openEditor(id) {
   document.querySelectorAll('.refund-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const remaining = Number(btn.dataset.remaining);
-      const input = prompt(`Refund amount in dollars (up to ${formatCents(remaining)}). Leave as-is for a full refund of the remaining amount.`, (remaining / 100).toFixed(2));
+      const currency = btn.dataset.currency;
+      const unit = currency === 'gbp' ? 'pounds' : 'dollars';
+      const input = prompt(`Refund amount in ${unit} (up to ${formatCents(remaining, currency)}). Leave as-is for a full refund of the remaining amount.`, (remaining / 100).toFixed(2));
       if (input === null) return;
       const amountCents = input.trim() === '' ? remaining : Math.round(Number(input) * 100);
       if (!Number.isFinite(amountCents) || amountCents <= 0) return toast('Enter a valid refund amount');
-      if (amountCents > remaining) return toast(`Cannot refund more than ${formatCents(remaining)}`);
-      if (!confirm(`Refund ${formatCents(amountCents)}? This cannot be undone.`)) return;
+      if (amountCents > remaining) return toast(`Cannot refund more than ${formatCents(remaining, currency)}`);
+      if (!confirm(`Refund ${formatCents(amountCents, currency)}? This cannot be undone.`)) return;
       try {
         await AdminApi.refundPayment(id, btn.dataset.paymentId, amountCents);
         toast('Refunded');

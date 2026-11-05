@@ -128,13 +128,13 @@ async function createInvoicePdf(invoice) {
     const rowH = 24;
     if (i % 2 === 1) page.drawRectangle({ x: margin, y: y - rowH, width: tableRight - margin, height: rowH, color: PAPER });
     page.drawText(item.label, { x: margin + 10, y: y - 16, size: 10, font, color: INK });
-    page.drawText(formatCents(item.amount_cents), { x: tableRight - 70, y: y - 16, size: 10, font, color: INK });
+    page.drawText(formatCents(item.amount_cents, invoice.currency), { x: tableRight - 70, y: y - 16, size: 10, font, color: INK });
     y -= rowH;
   });
 
   page.drawRectangle({ x: margin, y: y - 28, width: tableRight - margin, height: 28, color: NAVY_DARK });
   page.drawText('TOTAL', { x: margin + 10, y: y - 18, size: 11, font: bold, color: rgb(1, 1, 1) });
-  page.drawText(formatCents(invoice.totalCents), { x: tableRight - 75, y: y - 18, size: 13, font: bold, color: GOLD });
+  page.drawText(formatCents(invoice.totalCents, invoice.currency), { x: tableRight - 75, y: y - 18, size: 13, font: bold, color: GOLD });
   y -= 50;
 
   page.drawText('This listing will automatically expire on the date above unless renewed.', { x: margin, y, size: 8.5, font: italic, color: INK_SOFT });
@@ -158,7 +158,7 @@ function invoiceHtml(invoice) {
     .map((i, idx) => `
       <tr style="background:${idx % 2 === 1 ? '#faf8f4' : '#ffffff'}">
         <td style="padding:10px 14px;font-size:14px;color:#232323;border-bottom:1px solid #e4e1d8">${i.label}</td>
-        <td style="padding:10px 14px;font-size:14px;color:#232323;text-align:right;border-bottom:1px solid #e4e1d8">${formatCents(i.amount_cents)}</td>
+        <td style="padding:10px 14px;font-size:14px;color:#232323;text-align:right;border-bottom:1px solid #e4e1d8">${formatCents(i.amount_cents, invoice.currency)}</td>
       </tr>`)
     .join('');
 
@@ -232,7 +232,7 @@ function invoiceHtml(invoice) {
             ${rows}
             <tr style="background:#142838">
               <td style="padding:12px 14px;font-size:13px;font-weight:700;color:#ffffff">TOTAL</td>
-              <td style="padding:12px 14px;font-size:15px;font-weight:700;color:#e8dcc0;text-align:right">${formatCents(invoice.totalCents)}</td>
+              <td style="padding:12px 14px;font-size:15px;font-weight:700;color:#e8dcc0;text-align:right">${formatCents(invoice.totalCents, invoice.currency)}</td>
             </tr>
           </table>
         </td>

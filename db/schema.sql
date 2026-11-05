@@ -79,6 +79,10 @@ CREATE TABLE IF NOT EXISTS pricing_tiers (
   name TEXT NOT NULL,
   duration_days INTEGER NOT NULL,
   price_cents INTEGER NOT NULL DEFAULT 0,
+  -- GBP price for .co.uk domains (see services/currency.js). NULL means "not
+  -- configured yet" - checkout falls back to charging the USD price (in USD)
+  -- rather than guessing a conversion or mixing currencies in one order.
+  price_cents_gbp INTEGER,
   sort_order INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1
 );
@@ -88,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_pricing_tiers_category ON pricing_tiers(category)
 CREATE TABLE IF NOT EXISTS addon_pricing (
   key TEXT PRIMARY KEY, -- 'boost' | 'strike' | 'oversized'
   price_cents INTEGER NOT NULL DEFAULT 0,
+  price_cents_gbp INTEGER, -- see pricing_tiers.price_cents_gbp above
   config TEXT -- JSON, e.g. oversized character allowance
 );
 
@@ -250,6 +255,7 @@ CREATE TABLE IF NOT EXISTS post_payments (
   post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
   kind TEXT NOT NULL, -- 'listing' | 'boost' | 'strike' | 'oversized'
   amount_cents INTEGER NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'usd', -- 'usd' | 'gbp' - see services/currency.js
   stripe_session_id TEXT,
   stripe_payment_intent TEXT,
   payer_email TEXT,

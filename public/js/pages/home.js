@@ -26,9 +26,61 @@ function getCustomHomeLocation() {
   try { return JSON.parse(localStorage.getItem(HOME_LOC_STORAGE) || 'null'); } catch (e) { return null; }
 }
 
+// "View More"/"View All" footer shown under each home-page carousel. View
+// More pages through the same list endpoint the full browse page uses
+// (/api/classifieds, /api/listings, /api/simchas) and appends results in
+// place; View All just links to that browse page.
+const HOME_SECTIONS = [
+  { type: 'classified', apiFn: () => Api.classifieds, browseUrl: '/classifieds', carousel: 'classifiedsCarousel', initialCount: (d) => d.recentClassifieds.length },
+  { type: 'listing', apiFn: () => Api.listings, browseUrl: '/listings', carousel: 'listingsCarousel', initialCount: (d) => d.recentListings.length },
+  { type: 'simcha', apiFn: () => Api.simchas, browseUrl: '/simchas', carousel: 'simchasCarousel', initialCount: (d) => d.recentSimchas.length },
+];
+
+function renderSectionFooter(section, hasMore) {
+  return `
+    <div class="home-section-more">
+      ${hasMore ? `<button type="button" class="btn btn-sm btn-outline" data-view-more="${section.type}">View More</button>` : ''}
+      <a href="${section.browseUrl}" class="btn btn-sm">View All</a>
+    </div>`;
+}
+
+function wireViewMoreButtons() {
+  HOME_SECTIONS.forEach((section) => {
+    const btn = document.querySelector(`[data-view-more="${section.type}"]`);
+    if (!btn) return;
+    let page = 1;
+    btn.addEventListener('click', async () => {
+      page += 1;
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Loading…';
+      try {
+        const res = await section.apiFn()({ page, pageSize: 10 });
+        const carousel = document.getElementById(section.carousel);
+        if (res.posts && res.posts.length) {
+          registerCardImpressions(res.posts);
+          carousel.insertAdjacentHTML('beforeend', res.posts.map(postCardHtml).join(''));
+        }
+        if (!res.posts.length || page >= res.totalPages) {
+          btn.remove();
+        } else {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        toast("Couldn't load more right now - please try again.");
+      }
+    });
+  });
+}
+
 async function renderHomePage() {
-  // An explicitly-picked location (zip/city search below) always wins over
-  // the browser's auto-detected one, until reset.
+  // An explicitly-picked location (via the location picker below) always
+  // wins over the browser's auto-detected one, until reset. If neither is
+  // available, the server itself picks Brooklyn or London as the default
+  // based on which domain the request came in on.
   const custom = getCustomHomeLocation();
   const loc = custom || await getBrowserLocation();
   const data = await Api.home(loc ? { lat: loc.lat, lng: loc.lng, label: custom?.label } : {});
@@ -48,33 +100,27 @@ async function renderHomePage() {
             <h2 data-i18n="recent_classifieds">Recent Classifieds</h2>
             <a href="/classifieds" data-i18n="view_all_classifieds">View All Classifieds</a>
           </div>
-          ${renderCarousel(data.recentClassifieds)}
+          <div id="classifiedsCarousel">${renderCarousel(data.recentClassifieds)}</div>
+          ${data.recentClassifieds.length ? renderSectionFooter(HOME_SECTIONS[0], data.recentClassifieds.length >= 10) : ''}
 
           <div class="section-heading">
             <h2 data-i18n="recent_listings">Recent Listings</h2>
             <a href="/listings" data-i18n="view_all_listings">View All Listings</a>
           </div>
-          ${renderCarousel(data.recentListings)}
+          <div id="listingsCarousel">${renderCarousel(data.recentListings)}</div>
+          ${data.recentListings.length ? renderSectionFooter(HOME_SECTIONS[1], data.recentListings.length >= 10) : ''}
 
           <div class="section-heading">
             <h2 data-i18n="recent_simchas">Recent Simchas</h2>
             <a href="/simchas" data-i18n="view_all_simchas">View All Simchas</a>
           </div>
-          ${renderCarousel(data.recentSimchas)}
+          <div id="simchasCarousel">${renderCarousel(data.recentSimchas)}</div>
+          ${data.recentSimchas.length ? renderSectionFooter(HOME_SECTIONS[2], data.recentSimchas.length >= 10) : ''}
         </div>
 
         <aside class="home-sidebar">
           <div class="combo-widget">
-            <p class="sub" style="color:var(--ink-soft);margin:0 0 4px">${escapeHtml(c.location.label)}${c.location.isDefault ? ' (default)' : ''}</p>
-            <div class="loc-picker">
-              ${custom
-                ? `<button type="button" class="loc-picker-link" id="locResetBtn">&larr; Use my location instead</button>`
-                : `<button type="button" class="loc-picker-link" id="locChangeBtn">Change location &rarr;</button>`}
-              <form id="locForm" class="loc-picker-form" style="display:none">
-                <input type="text" id="locInput" placeholder="Zip or city" autocomplete="off">
-                <button type="submit" class="btn btn-sm">Go</button>
-              </form>
-            </div>
+            <div id="zmanimLocPicker"></div>
             <div class="combo-widget-top">
               <div><span class="combo-label">${escapeHtml(c.hebrew.display)}</span><span class="combo-sub">${escapeHtml(c.english.display)}</span></div>
               <div><span class="combo-label">${escapeHtml(c.dafYomi.display)}</span><span class="combo-sub">${escapeHtml(c.dafYomi.displayEn)}</span></div>
@@ -99,37 +145,17 @@ async function renderHomePage() {
   `;
   I18N.apply();
   setPageTitle(null, 'Community classifieds, business listings, and simcha announcements. Post a job, sell an item, find a service, or share a simcha.');
-  if (typeof renderWeatherWidget === 'function') renderWeatherWidget(loc, c.location);
-  if (typeof Banners !== 'undefined') Banners.renderSidebar('home', 'sidebarBannerSlot');
 
-  document.getElementById('locChangeBtn')?.addEventListener('click', (e) => {
-    e.target.style.display = 'none';
-    const form = document.getElementById('locForm');
-    form.style.display = 'flex';
-    form.querySelector('input').focus();
+  initLocationPicker({
+    root: document.getElementById('zmanimLocPicker'),
+    storageKey: HOME_LOC_STORAGE,
+    label: c.location.label,
+    isDefault: c.location.isDefault,
+    tzid: c.location.tzid,
+    onChange: renderHomePage,
   });
-  document.getElementById('locResetBtn')?.addEventListener('click', () => {
-    localStorage.removeItem(HOME_LOC_STORAGE);
-    renderHomePage();
-  });
-  document.getElementById('locForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const input = document.getElementById('locInput');
-    const q = input.value.trim();
-    if (!q) return;
-    const btn = e.target.querySelector('button');
-    input.disabled = true;
-    btn.disabled = true;
-    btn.textContent = '…';
-    const result = await geocodeZipOrCity(q);
-    if (!result) {
-      toast("Couldn't find that location - try a zip code or city name.");
-      input.disabled = false;
-      btn.disabled = false;
-      btn.textContent = 'Go';
-      return;
-    }
-    localStorage.setItem(HOME_LOC_STORAGE, JSON.stringify(result));
-    renderHomePage();
-  });
+
+  if (typeof renderWeatherWidget === 'function') renderWeatherWidget();
+  if (typeof Banners !== 'undefined') Banners.renderSidebar('home', 'sidebarBannerSlot');
+  wireViewMoreButtons();
 }

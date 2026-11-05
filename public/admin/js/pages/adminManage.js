@@ -248,7 +248,7 @@ async function runSearch(q) {
   results.innerHTML = (isDefault ? `<p class="hint">Most recently active customers:</p>` : '') + customers.map((c) => `
     <div class="admin-card">
       <h3 style="margin-top:0">${escapeHtml(`${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email)}</h3>
-      <p class="hint">${escapeHtml(c.email)} ${c.phone ? '• ' + escapeHtml(c.phone) : ''} • Total paid: ${formatCents(c.totalPaidCents)}</p>
+      <p class="hint">${escapeHtml(c.email)} ${c.phone ? '• ' + escapeHtml(c.phone) : ''} • Total paid: ${formatCents(c.totalPaidCents)}${c.totalPaidCentsGbp ? ` + ${formatCents(c.totalPaidCentsGbp, 'gbp')}` : ''}</p>
       <table class="admin-table">
         <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Posted</th><th></th></tr></thead>
         <tbody>

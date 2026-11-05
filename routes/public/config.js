@@ -6,6 +6,7 @@ const runtimeConfig = require('../../services/runtimeConfig');
 const { getCountryList } = require('../../utils/countries');
 const { getAllClassifiedCategories, getOptionNames, getAllListingCategories, orderTaxonomyTree } = require('../../services/taxonomy');
 const { getPublishableKey } = require('../../utils/stripeClient');
+const { currencyForHost } = require('../../services/currency');
 
 const router = express.Router();
 
@@ -14,6 +15,11 @@ router.get('/', (req, res) => {
   const pricingTiers = db.prepare('SELECT * FROM pricing_tiers WHERE active = 1 ORDER BY category, sort_order').all();
 
   res.json({
+    // Which currency this domain charges listing fees/add-ons in (see
+    // services/currency.js) - the post wizard uses this to show the right
+    // symbol/amount, but the actual charge is always resolved authoritatively
+    // server-side at submit time (routes/public/posts.js), not from this.
+    currency: currencyForHost(req.hostname),
     categories: getAllClassifiedCategories(),
     listingCategories: getAllListingCategories(),
     countries: getCountryList(),

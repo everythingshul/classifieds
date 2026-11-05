@@ -6,7 +6,7 @@ const { getStripe, getPublishableKey } = require('../utils/stripeClient');
 // Checkout instead, which only needs the secret key - so a site that never
 // configures the new publishable-key field still takes payments rather than
 // failing outright.
-async function createCheckoutSession({ lineItems, returnUrl, cancelUrl, metadata, customerEmail }) {
+async function createCheckoutSession({ lineItems, currency, returnUrl, cancelUrl, metadata, customerEmail }) {
   const stripe = getStripe();
   const base = {
     mode: 'payment',
@@ -15,7 +15,7 @@ async function createCheckoutSession({ lineItems, returnUrl, cancelUrl, metadata
     line_items: lineItems.map((item) => ({
       quantity: 1,
       price_data: {
-        currency: 'usd',
+        currency: currency || 'usd',
         unit_amount: item.amount_cents,
         product_data: { name: item.label },
       },

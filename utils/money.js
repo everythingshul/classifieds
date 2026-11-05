@@ -1,5 +1,6 @@
-function formatCents(cents) {
-  return `$${(Number(cents || 0) / 100).toFixed(2)}`;
+function formatCents(cents, currency) {
+  const symbol = currency === 'gbp' ? '£' : '$';
+  return `${symbol}${(Number(cents || 0) / 100).toFixed(2)}`;
 }
 
 // For a poster's own listed price (e.g. an item's asking price), which can

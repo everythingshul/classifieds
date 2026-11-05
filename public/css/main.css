@@ -257,12 +257,76 @@ p { margin: 0 0 .7em; }
 .combo-zman-row b { color: var(--ink); font-weight: 600; }
 .zman-disclaimer { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid var(--border); font-size: .68rem; color: var(--ink-soft); text-align: center; direction: rtl; }
 
-.loc-picker { margin-bottom: 8px; }
-.loc-picker-link { background: none; border: none; padding: 0; cursor: pointer; color: var(--cta); font-size: .74rem; font-weight: 600; text-decoration: underline; }
-.loc-picker-link:hover { color: var(--cta-dark); }
-.loc-picker-form { display: flex; gap: 6px; margin-top: 4px; }
-.loc-picker-form input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; font-size: .78rem; }
-.loc-picker-form input:focus { outline: none; border-color: var(--navy); }
+.loc-picker { position: relative; margin-bottom: 8px; }
+.loc-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 12px;
+  font-size: .74rem;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+  text-align: start;
+  transition: background .15s, border-color .15s;
+}
+.loc-chip:hover, .loc-chip[aria-expanded="true"] { background: #fff; border-color: var(--navy); }
+.loc-chip-row { display: flex; align-items: center; gap: 6px; }
+.loc-chip svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--cta); }
+.loc-chip-label { white-space: nowrap; }
+.loc-chip-badge { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-soft); white-space: nowrap; }
+.loc-chip-tz { font-size: .62rem; font-weight: 600; color: var(--cta); white-space: nowrap; padding-inline-start: 18px; }
+
+.loc-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  width: 240px;
+}
+.loc-popover-form { display: flex; gap: 6px; position: relative; }
+.loc-popover-form input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: .8rem; }
+.loc-popover-form input:focus { outline: none; border-color: var(--navy); }
+.loc-popover-go {
+  border: none;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 8px;
+  width: 32px;
+  flex-shrink: 0;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .15s;
+}
+.loc-popover-go:hover { background: var(--navy-dark); }
+.loc-popover-mylocation {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: .74rem;
+  font-weight: 600;
+  color: var(--cta);
+  cursor: pointer;
+}
+.loc-popover-mylocation svg { width: 12px; height: 12px; }
+.loc-popover-mylocation:hover { color: var(--cta-dark); text-decoration: underline; }
 
 .weather-widget .weather-day { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
 .weather-widget .weather-day:last-of-type { border-bottom: none; }
@@ -293,6 +357,8 @@ p { margin: 0 0 .7em; }
   .carousel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .carousel .card { min-width: 0; }
 }
+
+.home-section-more { display: flex; justify-content: center; gap: 10px; margin: 14px 0 28px; }
 
 /* ---------- Cards ---------- */
 /* Square corners by design - no image, the card is a compact text summary;

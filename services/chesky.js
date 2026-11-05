@@ -133,14 +133,19 @@ function buildSiteContext() {
   const name = siteName();
   const classifiedCats = getAllClassifiedCategories().map((c) => c.label);
   const listingCats = getAllListingCategories().map((c) => c.label);
-  const addons = db.prepare('SELECT key, price_cents, config FROM addon_pricing').all();
+  // GBP shown alongside USD when the admin has configured it - jlistings.co.uk
+  // visitors are charged that GBP price (see services/currency.js); everyone
+  // else pays USD. Not domain-specific here since this context is cached and
+  // shared across all visitors regardless of which site they're asking from.
+  const gbpSuffix = (cents) => (cents !== null && cents !== undefined ? ` (£${(cents / 100).toFixed(2)} on jlistings.co.uk)` : '');
+  const addons = db.prepare('SELECT key, price_cents, price_cents_gbp, config FROM addon_pricing').all();
   const addonLines = addons.map((a) => {
     const cfg = a.config ? JSON.parse(a.config) : {};
     const label = cfg.label || a.key;
-    return `- ${label}: $${(a.price_cents / 100).toFixed(2)}`;
+    return `- ${label}: $${(a.price_cents / 100).toFixed(2)}${gbpSuffix(a.price_cents_gbp)}`;
   });
-  const tiers = db.prepare("SELECT category, post_type, name, duration_days, price_cents FROM pricing_tiers WHERE active = 1 ORDER BY post_type, sort_order").all();
-  const tierLines = tiers.map((t) => `- ${t.post_type === 'listing' ? 'Listing' : t.post_type === 'simcha' ? 'Simcha' : 'Classified'}${t.category ? ` (${t.category})` : ''}: ${t.name}, ${t.duration_days} days, ${t.price_cents ? `$${(t.price_cents / 100).toFixed(2)}` : 'free'}`);
+  const tiers = db.prepare("SELECT category, post_type, name, duration_days, price_cents, price_cents_gbp FROM pricing_tiers WHERE active = 1 ORDER BY post_type, sort_order").all();
+  const tierLines = tiers.map((t) => `- ${t.post_type === 'listing' ? 'Listing' : t.post_type === 'simcha' ? 'Simcha' : 'Classified'}${t.category ? ` (${t.category})` : ''}: ${t.name}, ${t.duration_days} days, ${t.price_cents ? `$${(t.price_cents / 100).toFixed(2)}${gbpSuffix(t.price_cents_gbp)}` : 'free'}`);
 
   contextCache = `
 Site name: ${name}
