@@ -17,14 +17,14 @@ function insertPost({ type, category, payload, hasImages }) {
     INSERT INTO posts (
       public_id, type, category, taxonomy_id, title, description, fields,
       location_text, location_city, location_state, location_lat, location_lng, location_place_id,
-      contact_phone, contact_phone_ext, contact_email, contact_url, contact_url_approved,
+      contact_phone, contact_phone_ext, contact_phone_methods, contact_email, contact_url, contact_url_approved,
       poster_first_name, poster_last_name, poster_email, poster_phone,
       pricing_tier_id, price_cents_paid, is_featured_strike, is_oversized,
       status, has_images, view_count, created_at, updated_at
     ) VALUES (
       @public_id, @type, @category, @taxonomy_id, @title, @description, @fields,
       @location_text, @location_city, @location_state, @location_lat, @location_lng, @location_place_id,
-      @contact_phone, @contact_phone_ext, @contact_email, @contact_url, 0,
+      @contact_phone, @contact_phone_ext, @contact_phone_methods, @contact_email, @contact_url, 0,
       @poster_first_name, @poster_last_name, @poster_email, @poster_phone,
       @pricing_tier_id, 0, @is_featured_strike, @is_oversized,
       'pending_payment', @has_images, 0, @created_at, @updated_at
@@ -46,6 +46,7 @@ function insertPost({ type, category, payload, hasImages }) {
     location_place_id: payload.locationPlaceId || null,
     contact_phone: contact.phone || null,
     contact_phone_ext: contact.phoneExt || null,
+    contact_phone_methods: contact.phone ? JSON.stringify(contact.phoneMethods || ['call']) : null,
     contact_email: contact.email || null,
     contact_url: contact.url || null,
     poster_first_name: payload.posterFirstName || null,

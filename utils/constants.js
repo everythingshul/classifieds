@@ -16,6 +16,10 @@ const CLASSIFIED_CATEGORY_KEYS = CLASSIFIED_CATEGORIES.map((c) => c.key);
 
 const LOST_FOUND_OPTIONS = ['lost', 'found'];
 
+// Which ways a posted contact phone number can be reached - shown as
+// icon buttons (call/text/WhatsApp) alongside the number on a listing.
+const CONTACT_PHONE_METHODS = ['call', 'sms', 'whatsapp'];
+
 const POST_STATUSES = ['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'];
 
 const DEFAULT_CHAR_LIMITS = {
@@ -68,6 +72,7 @@ module.exports = {
   CLASSIFIED_CATEGORIES,
   CLASSIFIED_CATEGORY_KEYS,
   LOST_FOUND_OPTIONS,
+  CONTACT_PHONE_METHODS,
   POST_STATUSES,
   DEFAULT_CHAR_LIMITS,
   OVERSIZED_CHAR_LIMITS,

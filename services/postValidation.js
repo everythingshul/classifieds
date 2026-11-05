@@ -1,4 +1,4 @@
-const { LOST_FOUND_OPTIONS, CURRENCY_CODES } = require('../utils/constants');
+const { LOST_FOUND_OPTIONS, CURRENCY_CODES, CONTACT_PHONE_METHODS } = require('../utils/constants');
 const { isValidEmail, isValidUrl, normalizeUrl } = require('../utils/validate');
 const { validatePhone, validateExtension } = require('../utils/phone');
 const { getClassifiedCategoryKeys, findCategory, getOptionNames, getListingCategoryKeys, findListingCategory } = require('./taxonomy');
@@ -190,6 +190,20 @@ function validateClassifiedPayload(body, charLimits) {
   };
 }
 
+// Which ways the posted phone number can be reached (call/sms/whatsapp) -
+// accepts a JSON array string (how the wizard's FormData submits it) or a
+// real array. Falls back to ["call"] (what every phone supported before
+// this existed) when nothing valid was sent but a phone number was.
+function parsePhoneMethods(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    try { arr = JSON.parse(raw); } catch (e) { arr = null; }
+  }
+  if (!Array.isArray(arr)) return ['call'];
+  const methods = [...new Set(arr.filter((m) => CONTACT_PHONE_METHODS.includes(m)))];
+  return methods.length ? methods : ['call'];
+}
+
 function validateContact(body, errors) {
   const contact = {};
   const hasPhone = !!body.contactPhone;
@@ -206,6 +220,7 @@ function validateContact(body, errors) {
     const ext = validateExtension(body.contactPhoneExt);
     if (!ext.valid) errors.push('contact phone extension is invalid');
     else contact.phoneExt = ext.ext || null;
+    contact.phoneMethods = parsePhoneMethods(body.contactPhoneMethods);
   }
   if (hasEmail) {
     if (!isValidEmail(body.contactEmail)) errors.push('contact email is invalid');

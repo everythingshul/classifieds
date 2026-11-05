@@ -12,10 +12,22 @@ function buildContactLinks(post) {
   const contact = {};
   if (post.contact_phone) {
     const ext = post.contact_phone_ext ? `,${post.contact_phone_ext}` : '';
+    // Which ways this number can be reached - posts from before this field
+    // existed have no value stored, and default to ["call"] (the only way
+    // a phone number could ever be reached before). contact_phone is stored
+    // as E.164 (see utils/phone.js), so stripping everything but digits
+    // gives wa.me exactly the country-code-prefixed digits it requires.
+    let methods;
+    try { methods = post.contact_phone_methods ? JSON.parse(post.contact_phone_methods) : ['call']; }
+    catch (e) { methods = ['call']; }
+    const digits = post.contact_phone.replace(/\D/g, '');
     contact.phone = {
       display: formatPhoneDashed(post.contact_phone),
       ext: post.contact_phone_ext || null,
-      tel: `tel:${post.contact_phone.replace(/[^\d+]/g, '')}${ext}`,
+      methods,
+      tel: methods.includes('call') ? `tel:${post.contact_phone.replace(/[^\d+]/g, '')}${ext}` : null,
+      sms: methods.includes('sms') ? `sms:${post.contact_phone.replace(/[^\d+]/g, '')}` : null,
+      whatsapp: methods.includes('whatsapp') ? `https://wa.me/${digits}` : null,
     };
   }
   if (post.contact_email) {

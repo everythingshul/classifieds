@@ -1,3 +1,6 @@
+const SMS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+const WHATSAPP_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.76.46 3.48 1.34 5L2 22l5.14-1.35a9.96 9.96 0 0 0 4.9 1.25h.01c5.52 0 10-4.48 10-10s-4.48-9.9-10.01-9.9zm0 18.1a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3.05.8.82-2.98-.2-.3a8.26 8.26 0 0 1-1.27-4.38c0-4.58 3.73-8.3 8.31-8.3 4.58 0 8.3 3.72 8.3 8.3 0 4.58-3.72 8.2-8.37 8.2zm4.55-6.2c-.25-.12-1.47-.72-1.7-.81-.23-.08-.4-.12-.56.13-.17.25-.65.81-.8.97-.14.17-.3.19-.55.06-.25-.12-1.05-.39-2-1.23a7.5 7.5 0 0 1-1.38-1.72c-.15-.25-.02-.38.11-.5.11-.11.25-.3.37-.44.12-.15.16-.25.24-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08s.9 2.41 1.02 2.58c.12.17 1.76 2.69 4.27 3.77.6.26 1.06.41 1.43.53.6.19 1.14.16 1.57.1.48-.07 1.47-.6 1.68-1.18.2-.58.2-1.08.14-1.18-.06-.1-.23-.16-.48-.28z"/></svg>';
+
 async function renderDetailPage(id, type) {
   const post = type === 'simcha' ? await Api.simchaDetail(id) : type === 'listing' ? await Api.listingDetail(id) : await Api.classifiedDetail(id);
   const isBookmarked = Bookmarks.has(type, id);
@@ -19,7 +22,21 @@ async function renderDetailPage(id, type) {
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
 
   const contactButtons = [];
-  if (post.contact?.phone) contactButtons.push(`<a class="btn contact-link" data-click-type="phone" href="${post.contact.phone.tel}">${I18N.t('call')} ${escapeHtml(post.contact.phone.display)}${post.contact.phone.ext ? ' x' + escapeHtml(post.contact.phone.ext) : ''}</a>`);
+  if (post.contact?.phone) {
+    const phone = post.contact.phone;
+    const numberLabel = `${escapeHtml(phone.display)}${phone.ext ? ' x' + escapeHtml(phone.ext) : ''}`;
+    const parts = [];
+    // The number itself: a Call button when supported, otherwise just shown
+    // as text (it's still worth displaying even if this number is
+    // text/WhatsApp-only) - then small icon buttons for whichever other
+    // ways it can be reached.
+    parts.push(phone.tel
+      ? `<a class="btn contact-link" data-click-type="phone" href="${phone.tel}">${I18N.t('call')} ${numberLabel}</a>`
+      : `<span class="contact-phone-label">${numberLabel}</span>`);
+    if (phone.sms) parts.push(`<a class="btn-icon-contact contact-link" data-click-type="sms" href="${phone.sms}" title="Text/SMS" aria-label="Text/SMS">${SMS_ICON}</a>`);
+    if (phone.whatsapp) parts.push(`<a class="btn-icon-contact contact-link" data-click-type="whatsapp" href="${phone.whatsapp}" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp">${WHATSAPP_ICON}</a>`);
+    contactButtons.push(`<div class="contact-phone-row">${parts.join('')}</div>`);
+  }
   if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="email" href="${post.contact.email.mailto}">${I18N.t('email')} ${escapeHtml(post.contact.email.display)}</a>`);
   if (post.contact?.url) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="website" href="${post.contact.url.href}" target="_blank" rel="noopener">${I18N.t('website')}</a>`);
   const hasContact = contactButtons.length > 0;

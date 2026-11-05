@@ -236,6 +236,16 @@ function renderPostWizard() {
         <div class="form-row"><label>Phone</label><div style="display:flex;gap:6px"><select id="c_phoneCountry" style="width:90px"></select><input type="tel" id="c_phone" value="${escapeHtml(state.data.contactPhone || '')}"></div></div>
         <div class="form-row"><label>Ext.</label><input type="text" id="c_phoneExt" value="${escapeHtml(state.data.contactPhoneExt || '')}"></div>
       </div>
+      <div class="form-row" id="phoneMethodsRow">
+        <label>This number can be reached by <span class="hint">(select all that apply)</span></label>
+        <div style="display:flex;gap:16px;align-items:center;height:34px">
+          ${['call', 'sms', 'whatsapp'].map((m) => `
+            <label style="font-weight:400;display:flex;align-items:center;gap:5px">
+              <input type="checkbox" class="c-phone-method" value="${m}" ${(state.data.contactPhoneMethods || ['call']).includes(m) ? 'checked' : ''}>
+              ${m === 'call' ? 'Call' : m === 'sms' ? 'Text/SMS' : 'WhatsApp'}
+            </label>`).join('')}
+        </div>
+      </div>
       <div class="form-cols">
         <div class="form-row"><label>Email</label><input type="email" id="c_email" value="${escapeHtml(state.data.contactEmail || '')}"></div>
         <div class="form-row"><label>Website <span class="hint">(reviewed before it links live)</span></label><input type="text" id="c_url" value="${escapeHtml(state.data.contactUrl || '')}"></div>
@@ -334,6 +344,8 @@ function renderPostWizard() {
       const contactEmail = document.getElementById('c_email').value.trim();
       const contactUrl = document.getElementById('c_url').value.trim();
       if (!contactPhone && !contactEmail && !contactUrl) errs.push('At least one contact method is required');
+      const contactPhoneMethods = Array.from(document.querySelectorAll('.c-phone-method:checked')).map((el) => el.value);
+      if (contactPhone && !contactPhoneMethods.length) errs.push('Select at least one way this phone number can be reached');
 
       const fields = {};
       const genericTaxSelect = document.getElementById('f_taxonomyId');
@@ -383,7 +395,7 @@ function renderPostWizard() {
         locationLng: state.data._locFromMaps?.lng || null,
         locationPlaceId: state.data._locFromMaps?.placeId || null,
         contactPhone, contactPhoneCountry: document.getElementById('c_phoneCountry').value,
-        contactPhoneExt: document.getElementById('c_phoneExt').value.trim(), contactEmail, contactUrl,
+        contactPhoneExt: document.getElementById('c_phoneExt').value.trim(), contactPhoneMethods, contactEmail, contactUrl,
         posterFirstName: document.getElementById('p_first').value.trim(),
         posterLastName: document.getElementById('p_last').value.trim(),
         posterPhone: document.getElementById('p_phone').value.trim(),
@@ -499,7 +511,11 @@ function renderPostWizard() {
 
     function contactSummaryRows() {
       const rows = [];
-      if (state.data.contactPhone) rows.push(['Contact Phone', state.data.contactPhone + (state.data.contactPhoneExt ? ` x${state.data.contactPhoneExt}` : '')]);
+      if (state.data.contactPhone) {
+        const methodLabels = { call: 'Call', sms: 'Text', whatsapp: 'WhatsApp' };
+        const methods = (state.data.contactPhoneMethods || ['call']).map((m) => methodLabels[m] || m).join(', ');
+        rows.push(['Contact Phone', `${state.data.contactPhone}${state.data.contactPhoneExt ? ` x${state.data.contactPhoneExt}` : ''} (${methods})`]);
+      }
       if (state.data.contactEmail) rows.push(['Contact Email', state.data.contactEmail]);
       if (state.data.contactUrl) rows.push(['Contact Website', state.data.contactUrl]);
       return rows;
@@ -658,6 +674,7 @@ function renderPostWizard() {
         fd.set('contactPhone', state.data.contactPhone || '');
         fd.set('contactPhoneCountry', state.data.contactPhoneCountry || 'US');
         fd.set('contactPhoneExt', state.data.contactPhoneExt || '');
+        fd.set('contactPhoneMethods', JSON.stringify(state.data.contactPhoneMethods || ['call']));
         fd.set('contactEmail', state.data.contactEmail || '');
         fd.set('contactUrl', state.data.contactUrl || '');
         fd.set('posterFirstName', state.data.posterFirstName || '');

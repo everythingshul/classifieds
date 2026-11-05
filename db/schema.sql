@@ -118,6 +118,10 @@ CREATE TABLE IF NOT EXISTS posts (
   location_place_id TEXT,
   contact_phone TEXT,
   contact_phone_ext TEXT,
+  -- JSON array subset of "call"/"sms"/"whatsapp" - which ways contact_phone
+  -- can be reached. NULL (posts from before this existed) is treated as
+  -- ["call"] in code, matching what every phone number supported before.
+  contact_phone_methods TEXT,
   contact_email TEXT,
   contact_url TEXT,
   contact_url_approved INTEGER NOT NULL DEFAULT 0,
