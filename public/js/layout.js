@@ -4,6 +4,14 @@ function stripEmoji(str) {
   return String(str || '').replace(EMOJI_STRIP_RE, '');
 }
 
+// Registered once (not inside renderLayout/wireSiteSearch, which re-run on
+// every language toggle) - looks up the live form each time instead of
+// closing over a specific render's now-possibly-detached element.
+document.addEventListener('click', (e) => {
+  const form = document.getElementById('siteSearchForm');
+  if (form && !form.contains(e.target)) document.getElementById('siteSearchDropdown')?.remove();
+});
+
 function renderLayout(siteName) {
   document.getElementById('layout').innerHTML = `
     <header class="site-header">
@@ -59,16 +67,100 @@ function renderLayout(siteName) {
     Router.resolve();
   });
 
+  wireSiteSearch();
+  I18N.apply();
+}
+
+// Live-as-you-type results dropdown under the header search box, so visitors
+// see what's actually posted before committing to the full /search page.
+function wireSiteSearch() {
+  const form = document.getElementById('siteSearchForm');
   const searchInput = document.getElementById('siteSearchInput');
+  let searchToken = 0;
+
+  function closeDropdown() {
+    document.getElementById('siteSearchDropdown')?.remove();
+  }
+
+  function showDropdown(html) {
+    closeDropdown();
+    const dd = document.createElement('div');
+    dd.className = 'search-dd';
+    dd.id = 'siteSearchDropdown';
+    dd.innerHTML = html;
+    form.appendChild(dd);
+  }
+
+  async function runLiveSearch(q) {
+    const myToken = ++searchToken;
+    showDropdown(`<div class="search-dd-loading">${I18N.t('searching')}</div>`);
+    let classifieds, listings, simchas;
+    try {
+      [classifieds, listings, simchas] = await Promise.all([
+        Api.classifieds({ q, pageSize: 4 }),
+        Api.listings({ q, pageSize: 4 }),
+        Api.simchas({ q, pageSize: 3 }),
+      ]);
+    } catch (e) {
+      if (myToken === searchToken) closeDropdown();
+      return;
+    }
+    if (myToken !== searchToken || searchInput.value.trim() !== q) return; // a newer keystroke superseded this
+
+    const groups = [
+      { label: I18N.t('nav_classifieds'), posts: classifieds.posts },
+      { label: I18N.t('nav_listings'), posts: listings.posts },
+      { label: I18N.t('nav_simchas'), posts: simchas.posts },
+    ].filter((g) => g.posts.length);
+    const total = classifieds.total + listings.total + simchas.total;
+
+    if (!groups.length) {
+      showDropdown(`<div class="search-dd-empty">${I18N.t('no_results')}</div>`);
+      return;
+    }
+    const groupsHtml = groups.map((g) => `
+      <div class="search-dd-group">
+        <div class="search-dd-group-label">${escapeHtml(g.label)}</div>
+        ${g.posts.map((p) => `
+          <a class="search-dd-item" href="${postUrl(p)}">
+            <span class="search-dd-item-title">${escapeHtml(p.title)}</span>
+            <span class="search-dd-item-meta">${escapeHtml(categoryLabelFor(p))}</span>
+          </a>
+        `).join('')}
+      </div>
+    `).join('');
+    showDropdown(`${groupsHtml}<a class="search-dd-seeall" href="/search?q=${encodeURIComponent(q)}">${I18N.t('view_all')} (${total} ${I18N.t('results')})</a>`);
+  }
+
+  const debouncedSearch = debounce((q) => {
+    if (q.length < 2) { closeDropdown(); return; }
+    runLiveSearch(q);
+  }, 300);
+
   searchInput.addEventListener('input', () => {
     const clean = stripEmoji(searchInput.value);
     if (clean !== searchInput.value) searchInput.value = clean;
+    const q = searchInput.value.trim();
+    if (!q) { closeDropdown(); return; }
+    debouncedSearch(q);
   });
-  document.getElementById('siteSearchForm').addEventListener('submit', (e) => {
+  searchInput.addEventListener('focus', () => {
+    const q = searchInput.value.trim();
+    if (q.length >= 2 && !document.getElementById('siteSearchDropdown')) runLiveSearch(q);
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDropdown();
+  });
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
     const q = stripEmoji(searchInput.value).trim();
+    closeDropdown();
     if (q) Router.navigate(`/search?q=${encodeURIComponent(q)}`);
   });
-
-  I18N.apply();
+  // A dropdown result/See-all link navigates via Router's own delegated
+  // click handler (router.js) - just close the dropdown so it doesn't
+  // linger over whatever page renders next.
+  form.addEventListener('click', (e) => {
+    if (e.target.closest('.search-dd-item, .search-dd-seeall')) closeDropdown();
+  });
 }

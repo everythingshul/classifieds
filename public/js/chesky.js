@@ -5,6 +5,8 @@ const Chesky = (() => {
   const STORAGE_CONV = 'chesky_conv_id';
   const STORAGE_NUDGE = 'chesky_nudge_seen';
   const STORAGE_TRANSCRIPT = 'chesky_transcript';
+  const MAX_RECORD_SECONDS = 60;
+  const LIVE_BAR_COUNT = 27;
 
   let open = false;
   let convId = localStorage.getItem(STORAGE_CONV) || null;
@@ -14,12 +16,19 @@ const Chesky = (() => {
   let transcript = [];
   try { transcript = JSON.parse(sessionStorage.getItem(STORAGE_TRANSCRIPT) || '[]'); } catch (e) { transcript = []; }
   let busy = false;
+  let activeAudio = null;
+
+  // Recording state
   let recorder = null;
   let recordedChunks = [];
   let recordStart = 0;
   let recordPeaks = [];
-  let recordAnalyser = null;
+  let liveBars = [];
   let recordStream = null;
+  let recordTimer = null;
+  let recordAutoStop = null;
+  let recordCancelled = false;
+  let recordMode = 'ask'; // 'ask' | 'handoff' - which footer to restore when done
 
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
 
@@ -33,9 +42,61 @@ const Chesky = (() => {
     return t.content.firstElementChild;
   }
 
+  function fmtDur(s) {
+    s = Math.max(0, Math.round(s || 0));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
   function scrollLog() {
     const log = document.getElementById('cheskyLog');
     if (log) log.scrollTop = log.scrollHeight;
+  }
+
+  // -- Voice note bubble: a little play/pause + waveform player, with the
+  // transcript (if any) shown as a caption underneath - "a recording plus
+  // the transcription," not just one or the other.
+  function voiceBubbleHtml(voice, transcriptText) {
+    const peaks = (voice.peaks && voice.peaks.length) ? voice.peaks : Array.from({ length: 24 }, () => 25 + Math.round(Math.random() * 45));
+    const bars = peaks.map((p) => `<i style="height:${Math.max(15, Math.min(100, p))}%"></i>`).join('');
+    return `
+      <div class="chesky-voice" data-src="${escapeHtml(voice.url)}">
+        <button type="button" class="chesky-vp-btn" aria-label="Play voice note">&#9654;</button>
+        <div class="chesky-vp-wave">${bars}</div>
+        <span class="chesky-vp-dur">${fmtDur(voice.dur)}</span>
+      </div>
+      ${transcriptText ? `<div class="chesky-voice-transcript">${escapeHtml(transcriptText)}</div>` : ''}
+    `;
+  }
+
+  function wireVoicePlayers(root) {
+    root.querySelectorAll('.chesky-voice:not([data-wired])').forEach((voiceEl) => {
+      voiceEl.dataset.wired = '1';
+      const btn = voiceEl.querySelector('.chesky-vp-btn');
+      const bars = voiceEl.querySelectorAll('.chesky-vp-wave i');
+      const audio = new Audio(voiceEl.dataset.src);
+      btn.addEventListener('click', () => {
+        if (audio.paused) {
+          if (activeAudio && activeAudio !== audio) activeAudio.pause();
+          activeAudio = audio;
+          audio.play().catch(() => {});
+        } else {
+          audio.pause();
+        }
+      });
+      audio.addEventListener('play', () => { btn.innerHTML = '&#10073;&#10073;'; });
+      audio.addEventListener('pause', () => { btn.innerHTML = '&#9654;'; });
+      audio.addEventListener('ended', () => { bars.forEach((b) => b.classList.remove('on')); });
+      audio.addEventListener('timeupdate', () => {
+        if (!audio.duration) return;
+        const onCount = Math.round((audio.currentTime / audio.duration) * bars.length);
+        bars.forEach((b, i) => b.classList.toggle('on', i < onCount));
+      });
+    });
+  }
+
+  function addCaption(node, text) {
+    if (!node || !text) return;
+    node.querySelector('.chesky-bubble')?.insertAdjacentHTML('beforeend', `<div class="chesky-voice-transcript">${escapeHtml(text)}</div>`);
   }
 
   function bubble(from, html, extraHtml = '') {
@@ -44,6 +105,7 @@ const Chesky = (() => {
     const who = from === 'visitor' ? '' : `<div class="chesky-msg-who">${from === 'admin' ? 'Team' : 'Chesky'}</div>`;
     const node = el(`<div class="chesky-msg from-${from}">${who}<div class="chesky-bubble">${html}</div>${extraHtml}</div>`);
     log.appendChild(node);
+    wireVoicePlayers(log);
     scrollLog();
     return node;
   }
@@ -110,15 +172,18 @@ const Chesky = (() => {
     }
   }
 
-  async function askVoice(voice) {
+  // voice: {data, mime, dur, peaks} plus localUrl for instant local playback
+  // (no need to wait on the server to hear your own just-recorded clip).
+  async function askVoice(voice, localUrl) {
     if (busy) return;
     busy = true;
     document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
+    const node = bubble('visitor', voiceBubbleHtml({ url: localUrl, dur: voice.dur, peaks: voice.peaks }, ''));
     const typingNode = showTyping();
     try {
       const result = await Api.cheskyAskVoice(voice, transcript);
+      addCaption(node, result.transcript);
       typingNode?.remove();
-      bubble('visitor', escapeHtml(result.transcript || '🎤 Voice note'));
       transcript.push({ role: 'user', text: result.transcript || '(voice note)' });
       saveTranscript();
       displayBotReply(result.transcript || '', result);
@@ -128,6 +193,10 @@ const Chesky = (() => {
     } finally {
       busy = false;
     }
+  }
+
+  function micAvailable() {
+    return !!(navigator.mediaDevices && window.MediaRecorder);
   }
 
   function renderAskFooter() {
@@ -142,7 +211,7 @@ const Chesky = (() => {
       </form>
       <div style="text-align:center;padding:6px 0 10px"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanBtn">Talk to a real person &rarr;</button></div>
     `;
-    if (!(navigator.mediaDevices && window.MediaRecorder)) document.getElementById('cheskyMicBtn').style.display = 'none';
+    if (!micAvailable()) document.getElementById('cheskyMicBtn').style.display = 'none';
     document.getElementById('cheskyAskForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const ta = e.target.q;
@@ -150,7 +219,7 @@ const Chesky = (() => {
       ta.value = '';
       ask(q);
     });
-    document.getElementById('cheskyMicBtn').addEventListener('click', toggleRecording);
+    document.getElementById('cheskyMicBtn').addEventListener('click', () => startRecording('ask'));
     document.getElementById('cheskyTalkHumanBtn').addEventListener('click', showHandoffForm);
   }
 
@@ -158,12 +227,17 @@ const Chesky = (() => {
     const foot = document.getElementById('cheskyFoot');
     foot.innerHTML = `
       <form class="chesky-handoff" id="cheskyHandoffForm">
+        <div class="chesky-handoff-head">
+          <span>Talk to a real person</span>
+          <button type="button" class="chesky-handoff-close" id="cheskyHandoffClose" aria-label="Cancel">&#10005;</button>
+        </div>
         <div class="form-row"><label>Your name</label><input name="name" autocomplete="name"></div>
         <div class="form-row"><label>Email *</label><input name="email" type="email" required autocomplete="email"></div>
         <div class="form-row"><label>Message</label><textarea name="message" rows="2"></textarea></div>
         <button type="submit">Start conversation</button>
       </form>
     `;
+    document.getElementById('cheskyHandoffClose').addEventListener('click', renderAskFooter);
     document.getElementById('cheskyHandoffForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector('button');
@@ -199,7 +273,7 @@ const Chesky = (() => {
         </div>
       </form>
     `;
-    if (!(navigator.mediaDevices && window.MediaRecorder)) document.getElementById('cheskyMicBtn').style.display = 'none';
+    if (!micAvailable()) document.getElementById('cheskyMicBtn').style.display = 'none';
     document.getElementById('cheskySendForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const ta = e.target.t;
@@ -212,7 +286,120 @@ const Chesky = (() => {
         if (result.lastId > lastMsgId) lastMsgId = result.lastId;
       } catch (err) { toast(err.message); }
     });
-    document.getElementById('cheskyMicBtn').addEventListener('click', toggleRecording);
+    document.getElementById('cheskyMicBtn').addEventListener('click', () => startRecording('handoff'));
+  }
+
+  function restoreFooter() {
+    if (recordMode === 'handoff') renderHandoffFooter();
+    else renderAskFooter();
+  }
+
+  // -- Recording toolbar: a live red dot + timer + scrolling waveform +
+  // cancel/send, replacing the normal composer while recording.
+  function renderRecordingToolbar() {
+    const foot = document.getElementById('cheskyFoot');
+    foot.innerHTML = `
+      <div class="chesky-rec-row">
+        <span class="chesky-rec-dot"></span>
+        <span class="chesky-rec-time">0:00</span>
+        <div class="chesky-rec-wave" id="cheskyRecWave"></div>
+        <button type="button" class="chesky-rec-btn chesky-rec-cancel" id="cheskyRecCancel" aria-label="Cancel">&#10005;</button>
+        <button type="button" class="chesky-rec-btn chesky-rec-send" id="cheskyRecSend" aria-label="Send">&#10148;</button>
+      </div>
+    `;
+    document.getElementById('cheskyRecCancel').addEventListener('click', () => stopRecording(true));
+    document.getElementById('cheskyRecSend').addEventListener('click', () => stopRecording(false));
+  }
+
+  function paintLiveWave() {
+    const waveEl = document.getElementById('cheskyRecWave');
+    if (waveEl) waveEl.innerHTML = liveBars.map((b) => `<i style="height:${Math.max(10, b)}%"></i>`).join('');
+  }
+
+  async function startRecording(mode) {
+    if (recorder && recorder.state === 'recording') return;
+    recordMode = mode;
+    try {
+      recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      toast('Microphone access was denied.');
+      return;
+    }
+    recordedChunks = [];
+    recordPeaks = [];
+    liveBars = [];
+    recordCancelled = false;
+    recordStart = Date.now();
+    recorder = new MediaRecorder(recordStream, { mimeType: 'audio/webm' });
+    recorder.ondataavailable = (e) => { if (e.data.size) recordedChunks.push(e.data); };
+    recorder.onstop = onRecordingStop;
+
+    renderRecordingToolbar();
+    recordTimer = setInterval(() => {
+      const timeEl = document.querySelector('.chesky-rec-time');
+      if (timeEl) timeEl.textContent = fmtDur((Date.now() - recordStart) / 1000);
+    }, 250);
+    recordAutoStop = setTimeout(() => stopRecording(false), MAX_RECORD_SECONDS * 1000);
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaStreamSource(recordStream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const sample = () => {
+        if (!recorder || recorder.state !== 'recording') return;
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((s, v) => s + v, 0) / data.length;
+        const level = Math.round((avg / 255) * 100);
+        recordPeaks.push(level);
+        liveBars.push(level);
+        if (liveBars.length > LIVE_BAR_COUNT) liveBars.shift();
+        paintLiveWave();
+        setTimeout(sample, 220);
+      };
+      sample();
+    } catch (e) { /* peaks are cosmetic - fine without them */ }
+
+    recorder.start();
+  }
+
+  function stopRecording(cancelled) {
+    if (!recorder || recorder.state !== 'recording') return;
+    recordCancelled = cancelled;
+    recorder.stop();
+  }
+
+  async function onRecordingStop() {
+    clearInterval(recordTimer);
+    clearTimeout(recordAutoStop);
+    recordStream?.getTracks().forEach((t) => t.stop());
+    restoreFooter();
+
+    const dur = (Date.now() - recordStart) / 1000;
+    if (recordCancelled || dur < 0.6 || !recordedChunks.length) return;
+
+    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+    const localUrl = URL.createObjectURL(blob);
+    const b64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.readAsDataURL(blob);
+    });
+    const voice = { data: b64, mime: 'audio/webm', dur, peaks: recordPeaks };
+
+    if (convId) {
+      const node = bubble('visitor', voiceBubbleHtml({ url: localUrl, dur, peaks: recordPeaks }, ''));
+      try {
+        const result = await Api.cheskySend({ id: convId, voice });
+        if (result.lastId > lastMsgId) lastMsgId = result.lastId;
+        addCaption(node, result.transcript);
+      } catch (e) { toast('Could not send the voice note.'); }
+    } else {
+      askVoice(voice, localUrl);
+    }
   }
 
   function enterHandoffMode() {
@@ -223,9 +410,7 @@ const Chesky = (() => {
   function appendIncoming(messages) {
     messages.forEach((m) => {
       if (m.id > lastMsgId) lastMsgId = m.id;
-      const content = m.voice
-        ? `<audio controls src="${m.voice.url}" style="max-width:220px"></audio>`
-        : escapeHtml(m.text || '').replace(/\n/g, '<br>');
+      const content = m.voice ? voiceBubbleHtml(m.voice, m.text) : escapeHtml(m.text || '').replace(/\n/g, '<br>');
       bubble(m.from, content);
     });
   }
@@ -259,71 +444,6 @@ const Chesky = (() => {
     const count = (parseInt(badge?.textContent, 10) || 0) + n;
     if (!badge) { badge = el('<span class="chesky-unread"></span>'); fab.appendChild(badge); }
     badge.textContent = count > 9 ? '9+' : String(count);
-  }
-
-  async function toggleRecording() {
-    const btn = document.getElementById('cheskyMicBtn');
-    if (recorder && recorder.state === 'recording') {
-      recorder.stop();
-      return;
-    }
-    try {
-      recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      toast('Microphone access was denied.');
-      return;
-    }
-    recordedChunks = [];
-    recordPeaks = [];
-    recordStart = Date.now();
-    recorder = new MediaRecorder(recordStream, { mimeType: 'audio/webm' });
-    recorder.ondataavailable = (e) => { if (e.data.size) recordedChunks.push(e.data); };
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioCtx();
-      const source = ctx.createMediaStreamSource(recordStream);
-      recordAnalyser = ctx.createAnalyser();
-      recordAnalyser.fftSize = 256;
-      source.connect(recordAnalyser);
-      const data = new Uint8Array(recordAnalyser.frequencyBinCount);
-      const sample = () => {
-        if (!recorder || recorder.state !== 'recording') return;
-        recordAnalyser.getByteFrequencyData(data);
-        const avg = data.reduce((s, v) => s + v, 0) / data.length;
-        recordPeaks.push(Math.round((avg / 255) * 100));
-        setTimeout(sample, 250);
-      };
-      sample();
-    } catch (e) { /* peaks are cosmetic - fine without them */ }
-    recorder.onstop = onRecordingStop;
-    recorder.start();
-    btn.classList.add('recording');
-    btn.textContent = '⏹';
-  }
-
-  async function onRecordingStop() {
-    const btn = document.getElementById('cheskyMicBtn');
-    btn.classList.remove('recording');
-    btn.innerHTML = '&#127908;';
-    recordStream?.getTracks().forEach((t) => t.stop());
-    const dur = (Date.now() - recordStart) / 1000;
-    if (dur < 0.6 || !recordedChunks.length) return;
-    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-    const b64 = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
-      reader.readAsDataURL(blob);
-    });
-    const voice = { data: b64, mime: 'audio/webm', dur, peaks: recordPeaks };
-    if (convId) {
-      bubble('visitor', '🎤 Voice note');
-      try {
-        const result = await Api.cheskySend({ id: convId, voice });
-        if (result.lastId > lastMsgId) lastMsgId = result.lastId;
-      } catch (e) { toast('Could not send the voice note.'); }
-    } else {
-      askVoice(voice);
-    }
   }
 
   function renderPanel() {

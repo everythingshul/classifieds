@@ -28,9 +28,10 @@ function oneLine(v, max) {
   return clean(v, max).replace(/[\r\n]+/g, ' ');
 }
 
-// Validates & saves a voice note sent as {data (base64), mime, dur, peaks}.
-// Returns the row fields to store on the message, or null if invalid.
-function handleVoice(v) {
+// Validates & saves a voice note sent as {data (base64), mime, dur, peaks},
+// and best-effort transcribes it (via Whisper) so the recording always comes
+// with a readable caption - never fails the send if transcription itself fails.
+async function handleVoice(v) {
   if (!v || typeof v.data !== 'string' || !v.data || v.data.length > MAX_VOICE_B64) return null;
   const mime = String(v.mime || '').split(';')[0].toLowerCase();
   if (!VOICE_MIME_EXT[mime] || !/^[A-Za-z0-9+/]+=*$/.test(v.data)) return null;
@@ -41,7 +42,9 @@ function handleVoice(v) {
   if (!filename) return null;
   const dur = Math.max(0.5, Math.min(MAX_VOICE_SECONDS, Number(v.dur) || 0));
   const peaks = (Array.isArray(v.peaks) ? v.peaks : []).slice(0, 48).map((n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0))));
-  return { voice_url: `/uploads/${filename}`, voice_mime: mime, voice_dur: dur, voice_peaks: JSON.stringify(peaks) };
+  let transcript = '';
+  try { transcript = await transcribeAudio(bytes, mime); } catch (e) { /* no transcript available - the recording still sends fine */ }
+  return { voice_url: `/uploads/${filename}`, voice_mime: mime, voice_dur: dur, voice_peaks: JSON.stringify(peaks), transcript };
 }
 
 function messageOut(m) {
@@ -141,7 +144,7 @@ router.post('/handoff', handoffLimiter, async (req, res, next) => {
     const b = req.body || {};
     const email = oneLine(b.email, 200);
     const message = clean(b.message, MAX_TEXT);
-    const voice = b.voice ? handleVoice(b.voice) : null;
+    const voice = b.voice ? await handleVoice(b.voice) : null;
     if (b.voice && !voice) return res.status(400).json({ error: 'That voice note could not be used. Please try recording it again.' });
     if (!EMAIL_RE.test(email) || (!message && !voice)) return res.status(400).json({ error: 'Please give a valid email and a message.' });
 
@@ -164,11 +167,11 @@ router.post('/handoff', handoffLimiter, async (req, res, next) => {
     if (message) insertMsg.run(id, 'visitor', message, now);
     if (voice) {
       db.prepare('INSERT INTO chat_messages (conversation_id, from_role, text, voice_url, voice_mime, voice_dur, voice_peaks, created_at) VALUES (?, \'visitor\', ?, ?, ?, ?, ?, ?)')
-        .run(id, `Voice note`, voice.voice_url, voice.voice_mime, voice.voice_dur, voice.voice_peaks, now);
+        .run(id, voice.transcript || '', voice.voice_url, voice.voice_mime, voice.voice_dur, voice.voice_peaks, now);
     }
 
     const conv = { id, name, email, page };
-    try { await mailAdminNewChat(conv, message || '(voice note)', true); } catch (e) { console.error('[chat] admin mail failed:', e.message); }
+    try { await mailAdminNewChat(conv, message || voice?.transcript || '(voice note)', true); } catch (e) { console.error('[chat] admin mail failed:', e.message); }
     try {
       await sendMail({
         to: email,
@@ -183,7 +186,7 @@ router.post('/handoff', handoffLimiter, async (req, res, next) => {
       });
     } catch (e) { console.error('[chat] visitor mail failed:', e.message); }
 
-    res.json({ id, baselineId, count: db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE conversation_id = ?').get(id).c });
+    res.json({ id, baselineId, transcript: voice?.transcript || '', count: db.prepare('SELECT COUNT(*) AS c FROM chat_messages WHERE conversation_id = ?').get(id).c });
   } catch (e) {
     next(e);
   }
@@ -201,7 +204,7 @@ router.post('/send', sendLimiter, async (req, res, next) => {
     let text = clean(b.text, MAX_TEXT);
     let voice = null;
     if (b.voice) {
-      voice = handleVoice(b.voice);
+      voice = await handleVoice(b.voice);
       if (!voice) return res.status(400).json({ error: 'That voice note could not be used.' });
     }
     if (!text && !voice) return res.status(400).json({ error: 'Empty message' });
@@ -211,8 +214,8 @@ router.post('/send', sendLimiter, async (req, res, next) => {
     if (text) lastId = db.prepare('INSERT INTO chat_messages (conversation_id, from_role, text, created_at) VALUES (?, \'visitor\', ?, ?)').run(conv.id, text, now).lastInsertRowid;
     if (voice) {
       lastId = db.prepare('INSERT INTO chat_messages (conversation_id, from_role, text, voice_url, voice_mime, voice_dur, voice_peaks, created_at) VALUES (?, \'visitor\', ?, ?, ?, ?, ?, ?)')
-        .run(conv.id, 'Voice note', voice.voice_url, voice.voice_mime, voice.voice_dur, voice.voice_peaks, now).lastInsertRowid;
-      text = [text, '🎤 Voice note'].filter(Boolean).join('\n\n');
+        .run(conv.id, voice.transcript || '', voice.voice_url, voice.voice_mime, voice.voice_dur, voice.voice_peaks, now).lastInsertRowid;
+      text = [text, voice.transcript ? `🎤 ${voice.transcript}` : '🎤 Voice note'].filter(Boolean).join('\n\n');
     }
     db.prepare('UPDATE chat_conversations SET unread = 1, updated_at = ? WHERE id = ?').run(now, conv.id);
 
@@ -222,7 +225,7 @@ router.post('/send', sendLimiter, async (req, res, next) => {
       db.prepare('UPDATE chat_conversations SET notified_at = ? WHERE id = ?').run(now, conv.id);
       try { await mailAdminNewChat(conv, text, false); } catch (e) { console.error('[chat] admin mail failed:', e.message); }
     }
-    res.json({ ok: true, count: count + 1, lastId });
+    res.json({ ok: true, count: count + 1, lastId, transcript: voice?.transcript || '' });
   } catch (e) {
     next(e);
   }
