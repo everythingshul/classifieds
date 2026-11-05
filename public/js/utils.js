@@ -148,6 +148,21 @@ function loadStripeJs() {
 // in `containerEl`, no redirect to a Stripe-hosted page) using the
 // publishable key exposed via /api/config.
 let _stripeInstance = null;
+let _activeCheckout = null;
+
+// Races a promise against a timeout so a hung Stripe.js call (script never
+// firing onload/onerror, initEmbeddedCheckout never resolving for a session
+// Stripe can't actually render - e.g. a currency the connected account
+// isn't set up to accept) can never leave the Submit button stuck on
+// "Submitting..." forever with no feedback. Whatever's pending keeps
+// running in the background; this only stops *waiting* on it.
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 // Stripe.js tracks embedded checkout instances page-wide, not per-container -
 // creating a second one via initEmbeddedCheckout() while an earlier one is
 // still active anywhere on the page (even in a different container) throws
@@ -157,7 +172,6 @@ let _stripeInstance = null;
 // page after an earlier checkout wasn't cleaned up, etc). Destroying any
 // previous instance before creating a new one is the fix Stripe's own docs
 // call for.
-let _activeCheckout = null;
 async function mountEmbeddedCheckout(containerEl, clientSecret) {
   const pk = window.SITE_CONFIG?.stripePublishableKey;
   if (!pk) {
@@ -165,14 +179,18 @@ async function mountEmbeddedCheckout(containerEl, clientSecret) {
     return null;
   }
   if (!_stripeInstance) {
-    await loadStripeJs();
+    await withTimeout(loadStripeJs(), 12000, "Couldn't load the payment form - check your connection and try again.");
     _stripeInstance = Stripe(pk);
   }
   if (_activeCheckout) {
     try { _activeCheckout.destroy(); } catch (e) { /* already destroyed/unmounted - fine */ }
     _activeCheckout = null;
   }
-  const checkout = await _stripeInstance.initEmbeddedCheckout({ clientSecret });
+  const checkout = await withTimeout(
+    _stripeInstance.initEmbeddedCheckout({ clientSecret }),
+    15000,
+    "The payment form didn't load in time. Please try again - if this keeps happening, contact us."
+  );
   checkout.mount(containerEl);
   _activeCheckout = checkout;
   return checkout;
