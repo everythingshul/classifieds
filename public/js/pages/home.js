@@ -21,9 +21,17 @@ function renderHomeEditorialsTeaser(editorials) {
     </div>`;
 }
 
+const HOME_LOC_STORAGE = 'jl_custom_location';
+function getCustomHomeLocation() {
+  try { return JSON.parse(localStorage.getItem(HOME_LOC_STORAGE) || 'null'); } catch (e) { return null; }
+}
+
 async function renderHomePage() {
-  const loc = await getBrowserLocation();
-  const data = await Api.home(loc ? { lat: loc.lat, lng: loc.lng } : {});
+  // An explicitly-picked location (zip/city search below) always wins over
+  // the browser's auto-detected one, until reset.
+  const custom = getCustomHomeLocation();
+  const loc = custom || await getBrowserLocation();
+  const data = await Api.home(loc ? { lat: loc.lat, lng: loc.lng, label: custom?.label } : {});
   const c = data.calendar;
   const z = c.zmanim;
 
@@ -57,7 +65,16 @@ async function renderHomePage() {
 
         <aside class="home-sidebar">
           <div class="combo-widget">
-            <p class="sub" style="color:var(--ink-soft);margin:0 0 8px">${escapeHtml(c.location.label)}${c.location.isDefault ? ' (default)' : ''}</p>
+            <p class="sub" style="color:var(--ink-soft);margin:0 0 4px">${escapeHtml(c.location.label)}${c.location.isDefault ? ' (default)' : ''}</p>
+            <div class="loc-picker">
+              ${custom
+                ? `<button type="button" class="loc-picker-link" id="locResetBtn">&larr; Use my location instead</button>`
+                : `<button type="button" class="loc-picker-link" id="locChangeBtn">Change location &rarr;</button>`}
+              <form id="locForm" class="loc-picker-form" style="display:none">
+                <input type="text" id="locInput" placeholder="Zip or city" autocomplete="off">
+                <button type="submit" class="btn btn-sm">Go</button>
+              </form>
+            </div>
             <div class="combo-widget-top">
               <div><span class="combo-label">${escapeHtml(c.hebrew.display)}</span><span class="combo-sub">${escapeHtml(c.english.display)}</span></div>
               <div><span class="combo-label">${escapeHtml(c.dafYomi.display)}</span><span class="combo-sub">${escapeHtml(c.dafYomi.displayEn)}</span></div>
@@ -84,4 +101,35 @@ async function renderHomePage() {
   setPageTitle(null, 'Community classifieds, business listings, and simcha announcements. Post a job, sell an item, find a service, or share a simcha.');
   if (typeof renderWeatherWidget === 'function') renderWeatherWidget(loc, c.location);
   if (typeof Banners !== 'undefined') Banners.renderSidebar('home', 'sidebarBannerSlot');
+
+  document.getElementById('locChangeBtn')?.addEventListener('click', (e) => {
+    e.target.style.display = 'none';
+    const form = document.getElementById('locForm');
+    form.style.display = 'flex';
+    form.querySelector('input').focus();
+  });
+  document.getElementById('locResetBtn')?.addEventListener('click', () => {
+    localStorage.removeItem(HOME_LOC_STORAGE);
+    renderHomePage();
+  });
+  document.getElementById('locForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('locInput');
+    const q = input.value.trim();
+    if (!q) return;
+    const btn = e.target.querySelector('button');
+    input.disabled = true;
+    btn.disabled = true;
+    btn.textContent = '…';
+    const result = await geocodeZipOrCity(q);
+    if (!result) {
+      toast("Couldn't find that location - try a zip code or city name.");
+      input.disabled = false;
+      btn.disabled = false;
+      btn.textContent = 'Go';
+      return;
+    }
+    localStorage.setItem(HOME_LOC_STORAGE, JSON.stringify(result));
+    renderHomePage();
+  });
 }

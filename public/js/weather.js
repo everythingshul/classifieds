@@ -29,17 +29,21 @@ async function renderWeatherWidget(browserLoc, fallbackLocation) {
   const degree = isHe ? '°C' : '°F';
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=${unit}&forecast_days=2&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=${unit}&forecast_days=5&timezone=auto`;
     const res = await fetch(url);
     if (!res.ok) return;
     const data = await res.json();
     const days = data.daily;
     if (!days || !days.time) return;
 
-    const labels = isHe ? ['היום', 'מחר'] : ['Today', 'Tomorrow'];
-    const rows = days.time.slice(0, 2).map((_, i) => `
+    const dayLabel = (dateStr, i) => {
+      if (i === 0) return isHe ? 'היום' : 'Today';
+      if (i === 1) return isHe ? 'מחר' : 'Tomorrow';
+      return new Date(`${dateStr}T00:00:00`).toLocaleDateString(isHe ? 'he' : 'en', { weekday: 'short' });
+    };
+    const rows = days.time.slice(0, 5).map((dateStr, i) => `
       <div class="weather-day">
-        <span class="weather-day-label">${labels[i]}</span>
+        <span class="weather-day-label">${dayLabel(dateStr, i)}</span>
         <span class="weather-desc">${weatherDescription(days.weathercode[i])}</span>
         <span class="weather-temps"><b>${Math.round(days.temperature_2m_max[i])}${degree}</b> / ${Math.round(days.temperature_2m_min[i])}${degree}</span>
       </div>
@@ -47,7 +51,7 @@ async function renderWeatherWidget(browserLoc, fallbackLocation) {
 
     el.innerHTML = `
       <div class="combo-widget weather-widget">
-        <p class="combo-label" style="margin-bottom:6px">Weather</p>
+        <p class="combo-label" style="margin-bottom:6px">5-Day Forecast</p>
         ${rows}
         <p class="weather-attribution">Data by <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0)</p>
       </div>

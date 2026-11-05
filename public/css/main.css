@@ -257,6 +257,13 @@ p { margin: 0 0 .7em; }
 .combo-zman-row b { color: var(--ink); font-weight: 600; }
 .zman-disclaimer { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid var(--border); font-size: .68rem; color: var(--ink-soft); text-align: center; direction: rtl; }
 
+.loc-picker { margin-bottom: 8px; }
+.loc-picker-link { background: none; border: none; padding: 0; cursor: pointer; color: var(--cta); font-size: .74rem; font-weight: 600; text-decoration: underline; }
+.loc-picker-link:hover { color: var(--cta-dark); }
+.loc-picker-form { display: flex; gap: 6px; margin-top: 4px; }
+.loc-picker-form input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; font-size: .78rem; }
+.loc-picker-form input:focus { outline: none; border-color: var(--navy); }
+
 .weather-widget .weather-day { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
 .weather-widget .weather-day:last-of-type { border-bottom: none; }
 .weather-day-label { font-weight: 700; color: var(--navy); flex-shrink: 0; }
