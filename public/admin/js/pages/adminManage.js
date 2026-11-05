@@ -324,7 +324,7 @@ function renderMessageCard(m) {
     <div class="cm-card" data-id="${m.id}" style="border:1px solid var(--border);padding:12px;margin-bottom:10px;${m.archived ? 'opacity:.7' : ''}">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <div>
-          <b>${escapeHtml(m.name || '(no name)')}</b> &lt;${escapeHtml(m.email)}&gt;
+          <b>${escapeHtml(m.name || '(no name)')}</b> ${m.email ? `&lt;${escapeHtml(m.email)}&gt;` : '<span class="hint">(no reply address)</span>'}
           ${m.subject ? ` — <span>${escapeHtml(m.subject)}</span>` : ''}
         </div>
         <span class="hint">${formatDate(m.created_at)}</span>
@@ -337,14 +337,14 @@ function renderMessageCard(m) {
         </div>
       ` : ''}
       <div style="display:flex;gap:8px;margin-top:6px">
-        <button class="btn btn-sm cm-reply-btn" type="button">Reply</button>
+        ${m.email ? `<button class="btn btn-sm cm-reply-btn" type="button">Reply</button>` : ''}
         <button class="btn btn-sm btn-outline cm-archive-toggle" type="button">${m.archived ? 'Unarchive' : 'Archive'}</button>
         <button class="btn btn-sm btn-danger cm-delete" type="button">Delete</button>
       </div>
-      <div class="cm-reply-box" style="display:none;margin-top:10px">
+      ${m.email ? `<div class="cm-reply-box" style="display:none;margin-top:10px">
         <textarea class="cm-reply-text" rows="4" style="width:100%" placeholder="Type your reply…">${m.reply_text ? escapeHtml(m.reply_text) : ''}</textarea>
         <button class="btn btn-sm btn-gold cm-reply-send" type="button" style="margin-top:6px">Send Reply</button>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }

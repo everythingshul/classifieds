@@ -145,6 +145,9 @@
   box-shadow: 0 1px 2px rgba(31, 59, 87, 0.06);
   white-space: pre-wrap;
 }
+/* A voice note is its own compact pill, not a block of text - tighter
+   padding keeps it close to WhatsApp's voice-bubble proportions. */
+.chesky-bubble:has(.chesky-voice) { padding: 7px 10px; }
 .chesky-msg.from-visitor .chesky-bubble { background: linear-gradient(135deg, var(--navy), var(--navy-dark)); color: #fff; border-bottom-right-radius: 5px; }
 .chesky-msg.from-bot .chesky-bubble { background: #fff; border: 1px solid var(--border); border-bottom-left-radius: 5px; }
 .chesky-msg.from-admin .chesky-bubble { background: var(--gold-light); border: 1px solid var(--gold); border-bottom-left-radius: 5px; }
@@ -227,19 +230,22 @@
 .chesky-form button[type="submit"]:hover:not(:disabled) { background: var(--cta-dark); transform: translateY(-1px); }
 .chesky-form button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none; }
 .chesky-mic-btn {
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 50%;
-  background: #fff;
+  background: var(--cta);
+  color: #fff;
   cursor: pointer;
   width: 38px;
   height: 38px;
   flex-shrink: 0;
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   transition: background 0.15s, transform 0.15s;
 }
-.chesky-mic-btn:hover { background: var(--gold-light); }
-.chesky-mic-btn.recording { background: var(--danger); color: #fff; border-color: var(--danger); animation: chesky-rec-pulse 1.4s infinite; }
-@keyframes chesky-rec-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(161,61,61,0.4); } 50% { box-shadow: 0 0 0 6px rgba(161,61,61,0); } }
+.chesky-mic-btn svg { width: 18px; height: 18px; }
+.chesky-mic-btn:hover { background: var(--cta-dark); transform: scale(1.06); }
 
 /* Voice note player (inside a bubble) */
 .chesky-voice { display: flex; align-items: center; gap: 8px; min-width: 190px; }
@@ -344,6 +350,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chesky-fab, .chesky-panel, .chesky-nudge, .chesky-typing span, .chesky-msg, .chesky-fab::before, .chesky-mic-btn.recording,
+  .chesky-fab, .chesky-panel, .chesky-nudge, .chesky-typing span, .chesky-msg, .chesky-fab::before,
   .chesky-rec-dot, .chesky-rec-wave i, .chesky-vp-btn { transition: none; animation: none; }
 }

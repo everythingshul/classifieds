@@ -140,6 +140,7 @@ table.admin-table tr:last-child td { border-bottom: none; }
 /* ── Pills (generic - distinct from the fixed-vocabulary status-pill above) ── */
 .pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: .7rem; font-weight: 600; }
 .pill-blue { background: var(--accent-pale); color: var(--navy); }
+.pill-danger { background: var(--danger-pale); color: var(--danger); }
 
 /* ── Toggle switch ── */
 .tgl { position: relative; display: inline-block; width: 38px; height: 21px; cursor: pointer; flex-shrink: 0; }
@@ -158,8 +159,8 @@ table.admin-table tr:last-child td { border-bottom: none; }
 #adminRoot .btn-outline:hover { background: var(--navy); color: #fff; }
 #adminRoot .btn-gold { background: var(--accent); border-color: var(--accent); }
 #adminRoot .btn-gold:hover { background: #1b8fcc; border-color: #1b8fcc; }
-#adminRoot .btn:not(.btn-outline):not(.btn-gold):not(.btn-danger) { background: var(--navy); border-color: var(--navy); }
-#adminRoot .btn:not(.btn-outline):not(.btn-gold):not(.btn-danger):hover { background: var(--navy-mid); }
+#adminRoot .btn:not(.btn-outline):not(.btn-gold):not(.btn-danger):not(.btn-ghost) { background: var(--navy); border-color: var(--navy); }
+#adminRoot .btn:not(.btn-outline):not(.btn-gold):not(.btn-danger):not(.btn-ghost):hover { background: var(--navy-mid); }
 .btn-ghost { background: transparent; color: var(--ink-soft); border: 1.5px solid var(--border); }
 .btn-ghost:hover { background: #f6f8fb; }
 .btn-icon { background: transparent; border: none; cursor: pointer; padding: 5px; font-size: 14px; border-radius: 6px; color: var(--ink-soft); }
@@ -194,4 +195,41 @@ table.admin-table tr:last-child td { border-bottom: none; }
 
 /* ── Toast ── */
 #toast-wrap { position: fixed; bottom: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+
+/* ── Chesky Chat ── */
+.chat-layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .chat-layout { grid-template-columns: 1fr; } }
+.chat-list { padding: 0; max-height: 72vh; overflow-y: auto; }
+.chat-row { padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+.chat-row:last-child { border-bottom: none; }
+.chat-row:hover { background: #f8fafc; }
+.chat-row.active { background: var(--accent-pale); }
+.chat-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.chat-row-name { font-size: .92rem; font-weight: 700; color: var(--navy); }
+.chat-row-last { color: var(--ink-soft); font-size: .82rem; margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-row-meta { font-size: .72rem; color: var(--ink-soft); }
+
+.chat-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+.chat-detail-head h3 { margin: 0; font-size: 1.05rem; color: var(--navy); }
+.chat-detail-sub { margin: 2px 0 0; }
+.chat-detail-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.chat-log { max-height: 42vh; overflow-y: auto; padding: 14px; background: #f6f8fb; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; }
+.chat-bubble-row { display: flex; margin-bottom: 10px; }
+.chat-bubble-row:last-child { margin-bottom: 0; }
+.chat-bubble-row.from-admin { justify-content: flex-end; }
+.chat-bubble-col { max-width: 80%; }
+.chat-bubble-who { font-size: .7rem; color: var(--ink-soft); margin-bottom: 2px; }
+.chat-bubble { padding: 8px 12px; border-radius: 10px; background: #fff; border: 1px solid var(--border); font-size: .88rem; line-height: 1.4; }
+.chat-bubble-row.from-admin .chat-bubble { background: var(--navy); color: #fff; border-color: var(--navy); }
+.chat-bubble audio { max-width: 220px; display: block; }
+
+.chat-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.chat-card-head h3 { margin: 0; }
+.chat-teach-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.chat-teach-row:last-child { border-bottom: none; }
+.chat-teach-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.chat-teach-q { font-size: .88rem; }
+.chat-teach-sub { font-size: .72rem; color: var(--ink-soft); margin-top: 2px; }
+.chat-teach-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
 #toast-wrap > div { pointer-events: auto; }

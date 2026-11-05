@@ -31,6 +31,7 @@ const Chesky = (() => {
   let recordMode = 'ask'; // 'ask' | 'handoff' - which footer to restore when done
 
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
+  const MIC_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 11z"/></svg>';
 
   function saveTranscript() {
     try { sessionStorage.setItem(STORAGE_TRANSCRIPT, JSON.stringify(transcript.slice(-16))); } catch (e) { /* ignore */ }
@@ -58,14 +59,11 @@ const Chesky = (() => {
   function voiceBubbleHtml(voice, transcriptText) {
     const peaks = (voice.peaks && voice.peaks.length) ? voice.peaks : Array.from({ length: 24 }, () => 25 + Math.round(Math.random() * 45));
     const bars = peaks.map((p) => `<i style="height:${Math.max(15, Math.min(100, p))}%"></i>`).join('');
-    return `
-      <div class="chesky-voice" data-src="${escapeHtml(voice.url)}">
-        <button type="button" class="chesky-vp-btn" aria-label="Play voice note">&#9654;</button>
-        <div class="chesky-vp-wave">${bars}</div>
-        <span class="chesky-vp-dur">${fmtDur(voice.dur)}</span>
-      </div>
-      ${transcriptText ? `<div class="chesky-voice-transcript">${escapeHtml(transcriptText)}</div>` : ''}
-    `;
+    // Built as one unbroken line, not an indented multi-line template - the
+    // bubble has white-space:pre-wrap, so stray newlines/indentation here
+    // would render as real blank lines inside the bubble.
+    const transcriptHtml = transcriptText ? `<div class="chesky-voice-transcript">${escapeHtml(transcriptText)}</div>` : '';
+    return `<div class="chesky-voice" data-src="${escapeHtml(voice.url)}"><button type="button" class="chesky-vp-btn" aria-label="Play voice note">&#9654;</button><div class="chesky-vp-wave">${bars}</div><span class="chesky-vp-dur">${fmtDur(voice.dur)}</span></div>${transcriptHtml}`;
   }
 
   function wireVoicePlayers(root) {
@@ -204,7 +202,7 @@ const Chesky = (() => {
     foot.innerHTML = `
       <form class="chesky-form" id="cheskyAskForm">
         <div class="chesky-row">
-          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Ask with your voice">&#127908;</button>
+          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Ask with your voice">${MIC_ICON}</button>
           <textarea name="q" rows="1" placeholder="Ask Chesky a question..." required></textarea>
           <button type="submit">Send</button>
         </div>
@@ -267,7 +265,7 @@ const Chesky = (() => {
       ${disabled ? '<p class="hint" style="padding:8px 10px">This conversation has ended.</p>' : ''}
       <form class="chesky-form" id="cheskySendForm">
         <div class="chesky-row">
-          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Record a voice note">&#127908;</button>
+          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Record a voice note">${MIC_ICON}</button>
           <textarea name="t" rows="1" placeholder="Type a message..." ${disabled ? 'disabled' : ''}></textarea>
           <button type="submit" ${disabled ? 'disabled' : ''}>Send</button>
         </div>
@@ -420,14 +418,17 @@ const Chesky = (() => {
     const tick = async () => {
       if (!convId) return;
       try {
+        // lastMsgId only ever moves forward inside appendIncoming (once the
+        // messages are actually on screen) - while the panel is closed the
+        // log doesn't exist yet, so this intentionally keeps re-fetching
+        // from the same baseline rather than silently marking unseen
+        // messages as "seen" before the visitor ever had a chance to see them.
         const result = await Api.cheskyPoll(convId, lastMsgId);
-        if (result.messages.length) {
-          if (document.getElementById('cheskyLog')) appendIncoming(result.messages);
-          else result.messages.forEach((m) => { if (m.id > lastMsgId) lastMsgId = m.id; });
-          if (!open) {
-            const fromOthers = result.messages.filter((m) => m.from !== 'visitor');
-            if (fromOthers.length) showUnreadBadge(fromOthers.length);
-          }
+        if (document.getElementById('cheskyLog')) {
+          if (result.messages.length) appendIncoming(result.messages);
+        } else if (!open) {
+          const fromOthers = result.messages.filter((m) => m.from !== 'visitor');
+          showUnreadBadge(fromOthers.length);
         }
         if (result.status !== convStatus) { convStatus = result.status; if (open) renderHandoffFooter(); }
       } catch (e) { /* transient - keep polling */ }
@@ -437,13 +438,15 @@ const Chesky = (() => {
   }
   function stopPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
 
+  // n is the total unseen count (not a delta) - each closed-state poll
+  // re-fetches the same backlog, so this always replaces rather than adds.
   function showUnreadBadge(n) {
     const fab = document.getElementById('cheskyFab');
     if (!fab) return;
     let badge = fab.querySelector('.chesky-unread');
-    const count = (parseInt(badge?.textContent, 10) || 0) + n;
+    if (!n) { badge?.remove(); return; }
     if (!badge) { badge = el('<span class="chesky-unread"></span>'); fab.appendChild(badge); }
-    badge.textContent = count > 9 ? '9+' : String(count);
+    badge.textContent = n > 9 ? '9+' : String(n);
   }
 
   function renderPanel() {
@@ -469,12 +472,17 @@ const Chesky = (() => {
     document.getElementById('cheskyPanel').classList.toggle('open', open);
     document.getElementById('cheskyNudge').classList.remove('show');
     localStorage.setItem(STORAGE_NUDGE, '1');
+    // renderPanel() (via enterHandoffMode) already starts polling at the
+    // right cadence the first time the log is created - calling it again
+    // right after would fire a second concurrent tick before the first one's
+    // lastMsgId update lands, double-appending the whole history.
+    const logExisted = !!document.getElementById('cheskyLog');
     if (open) {
-      if (!document.getElementById('cheskyLog')) renderPanel();
+      if (!logExisted) renderPanel();
       document.getElementById('cheskyFab').querySelector('.chesky-unread')?.remove();
       scrollLog();
     }
-    if (convId) startPolling();
+    if (convId && logExisted) startPolling();
   }
 
   function init() {

@@ -82,7 +82,23 @@ async function mailAdminNewChat(conv, text, isNew) {
 // -- AI ask (stateless - no handoff conversation created) --
 // Shared by /ask and /ask-voice: checks taught answers first, otherwise asks
 // the AI, logging a miss when it couldn't help so the team can teach it.
-async function answerQuestion(question, transcript) {
+// Relays a message to the admin on the visitor's behalf - one-way, since the
+// AI-chat flow never collects an email (that only happens via /handoff).
+// Logged into contact_messages too, so it shows up in the same Messages
+// inbox as the contact form, not just an email that's easy to miss.
+async function forwardMessageToTeam(question, page) {
+  try {
+    const subject = 'Message forwarded by Chesky';
+    const bodyHtml = `<p>${escapeHtml(question)}</p><p style="margin-top:14px;font-size:12px;color:#62666b">Relayed by Chesky (AI chat) - no reply address given.${page ? ` From ${escapeHtml(page)}.` : ''}</p>`;
+    db.prepare('INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run('Chesky (on behalf of a visitor)', '', subject, question, Date.now());
+    await notifyAdmin(subject, bodyHtml);
+  } catch (e) {
+    console.error('[chat] forwardMessageToTeam failed:', e.message);
+  }
+}
+
+async function answerQuestion(question, transcript, page) {
   const learned = chesky.findLearnedMatch(question);
   if (learned) return { reply: learned.entry.answer, offTopic: false, entryId: learned.entry.id };
 
@@ -96,6 +112,7 @@ async function answerQuestion(question, transcript) {
       else db.prepare('INSERT INTO chat_unanswered (normalized_key, question, miss_count, down_count, first_at, last_at) VALUES (?, ?, 1, 0, ?, ?)').run(key, question, now, now);
     }
   }
+  if (result.forwardToTeam) await forwardMessageToTeam(question, page);
   return { reply: result.reply, offTopic: !!result.offTopic, entryId: 'ai' };
 }
 
@@ -103,8 +120,9 @@ router.post('/ask', askLimiter, async (req, res, next) => {
   try {
     const question = clean(req.body.question, MAX_TEXT);
     const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
+    const page = oneLine(req.body.page, 100);
     if (!question) return res.status(400).json({ error: 'A question is required' });
-    res.json(await answerQuestion(question, transcript));
+    res.json(await answerQuestion(question, transcript, page));
   } catch (e) {
     next(e);
   }
@@ -131,7 +149,8 @@ router.post('/ask-voice', askLimiter, async (req, res, next) => {
     if (!question) return res.json({ transcript: '', reply: "Sorry, I couldn't make out what you said - could you try again, or type it instead?", offTopic: true, entryId: 'ai' });
 
     const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
-    const result = await answerQuestion(question, transcript);
+    const page = oneLine(req.body.page, 100);
+    const result = await answerQuestion(question, transcript, page);
     res.json({ transcript: question, ...result });
   } catch (e) {
     next(e);
