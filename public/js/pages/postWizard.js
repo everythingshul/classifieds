@@ -76,11 +76,12 @@ function renderPostWizard() {
       ${categories.length ? `<div class="category-grid">
         ${categories.map((c) => `<button type="button" class="category-tile ${state.category === c.key ? 'selected' : ''}" data-v="${c.key}">${escapeHtml(I18N.get() === 'he' ? c.labelHe : c.label)}${c.free ? ' <span class="tag">Free</span>' : ''}</button>`).join('')}
       </div>` : `<p class="hint">No categories are available for this section yet. Please check back soon.</p>`}
-      <div style="margin-top:20px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
+      <div style="margin-top:20px"><button class="btn btn-outline" id="backBtn">Back</button></div>
     `);
-    document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => { state.category = btn.dataset.v; render(); }));
+    // Picking a category is the whole point of this step - advance right
+    // away instead of making the poster click a separate Next.
+    document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => { state.category = btn.dataset.v; go(2); }));
     document.getElementById('backBtn').addEventListener('click', () => go(0));
-    document.getElementById('nextBtn').addEventListener('click', () => { if (state.category) go(2); else toast('Choose a category'); });
   }
 
   function renderSimchaCategoryStep() {
@@ -93,13 +94,12 @@ function renderPostWizard() {
           ${simchaTax.map((t) => `<option value="${t.id}" ${state.data.taxonomyId == t.id ? 'selected' : ''}>${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}
         </select>
       </div>
-      <div style="margin-top:10px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
+      <div style="margin-top:10px"><button class="btn btn-outline" id="backBtn">Back</button></div>
     `);
     document.getElementById('backBtn').addEventListener('click', () => go(0));
-    document.getElementById('nextBtn').addEventListener('click', () => {
-      const taxonomyId = document.getElementById('taxonomyId').value;
-      if (!taxonomyId) return toast('Choose a category');
-      state.data.taxonomyId = taxonomyId;
+    document.getElementById('taxonomyId').addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      state.data.taxonomyId = e.target.value;
       go(2);
     });
   }

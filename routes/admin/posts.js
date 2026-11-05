@@ -12,6 +12,7 @@ const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { normalizeUrl } = require('../../utils/validate');
 const { createRefund } = require('../../services/checkout');
 const { validatePhone } = require('../../utils/phone');
+const { getClassifiedCategoryKeys, getListingCategoryKeys } = require('../../services/taxonomy');
 
 // Admin forms don't collect a country selector (unlike the public wizard),
 // so numbers are parsed against a default US/Canada assumption - matching
@@ -121,9 +122,17 @@ router.put('/:id', (req, res) => {
   const b = req.body;
   if (b.status && !POST_STATUSES.includes(b.status)) return res.status(400).json({ error: 'Invalid status' });
 
+  // Simchas don't have a category list to pick from (always 'simcha');
+  // classifieds/listings each validate against their own key set so an admin
+  // can't accidentally save a listing category onto a classified or vice versa.
+  if (b.category !== undefined && post.type !== 'simcha') {
+    const validKeys = post.type === 'listing' ? getListingCategoryKeys() : getClassifiedCategoryKeys();
+    if (!validKeys.includes(b.category)) return res.status(400).json({ error: 'Invalid category' });
+  }
+
   db.prepare(
     `UPDATE posts SET
-      title = ?, description = ?, fields = ?,
+      title = ?, description = ?, fields = ?, category = ?,
       location_text = ?, location_city = ?, location_state = ?, location_lat = ?, location_lng = ?,
       contact_phone = ?, contact_phone_ext = ?, contact_email = ?, contact_url = ?, contact_url_approved = ?,
       taxonomy_id = ?, status = ?, admin_notes = ?, is_featured_strike = ?, scheduled_at = ?, updated_at = ?
@@ -132,6 +141,7 @@ router.put('/:id', (req, res) => {
     b.title ?? post.title,
     b.description ?? post.description,
     b.fields !== undefined ? JSON.stringify(b.fields) : post.fields,
+    (b.category !== undefined && post.type !== 'simcha') ? b.category : post.category,
     b.locationText ?? post.location_text,
     b.locationCity ?? post.location_city,
     b.locationState ?? post.location_state,

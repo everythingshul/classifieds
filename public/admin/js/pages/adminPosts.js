@@ -163,6 +163,10 @@ async function openEditor(id) {
             <select name="status">${['pending_payment', 'pending_approval', 'scheduled', 'live', 'rejected', 'expired', 'removed'].map((s) => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
           </div>
         </div>
+        ${p.type !== 'simcha' ? `<div class="form-row"><label>Category</label>
+            <select name="category">${(p.type === 'listing' ? cfg.listingCategories : cfg.categories).map((c) => `<option value="${c.key}" ${p.category === c.key ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select>
+            <span class="hint">Changing this won't update category-specific fields below until you reopen this editor.</span>
+          </div>` : ''}
         <div class="form-row"><label>Scheduled for <span class="hint">(when status is "scheduled" - the site auto-publishes at this time)</span></label><input type="datetime-local" name="scheduledAt" value="${p.scheduledAt ? toDatetimeLocalValue(p.scheduledAt) : ''}"></div>
         <div class="form-row"><label>Description</label><textarea name="description" rows="4" maxlength="${limits.description}">${escapeHtml(p.description || '')}</textarea><div class="char-counter" id="descCounter"></div></div>
         <label class="addon-row" style="margin:-4px 0 14px">
@@ -268,6 +272,7 @@ async function openEditor(id) {
       contactUrl: raw.contactUrl, contactUrlApproved: raw.contactUrlApproved === '1',
       adminNotes: raw.adminNotes,
     };
+    if ('category' in raw) body.category = raw.category;
     if ('scheduledAt' in raw) body.scheduledAt = raw.scheduledAt ? new Date(raw.scheduledAt).getTime() : null;
     if ('f_taxonomyId' in raw) body.taxonomyId = raw.f_taxonomyId ? Number(raw.f_taxonomyId) : null;
 
