@@ -190,18 +190,18 @@ function validateClassifiedPayload(body, charLimits) {
   };
 }
 
-// Which ways the posted phone number can be reached (call/sms/whatsapp) -
-// accepts a JSON array string (how the wizard's FormData submits it) or a
-// real array. Falls back to ["call"] (what every phone supported before
-// this existed) when nothing valid was sent but a phone number was.
+// Which ways the posted phone number can be reached - call is never
+// optional (any phone number can always be called), so it's forced into
+// the result regardless of what was sent; sms/whatsapp are the only real
+// choices, picked up from a JSON array string (how the wizard's FormData
+// submits it) or a real array.
 function parsePhoneMethods(raw) {
   let arr = raw;
   if (typeof raw === 'string') {
     try { arr = JSON.parse(raw); } catch (e) { arr = null; }
   }
-  if (!Array.isArray(arr)) return ['call'];
-  const methods = [...new Set(arr.filter((m) => CONTACT_PHONE_METHODS.includes(m)))];
-  return methods.length ? methods : ['call'];
+  const extras = Array.isArray(arr) ? arr.filter((m) => CONTACT_PHONE_METHODS.includes(m) && m !== 'call') : [];
+  return [...new Set(['call', ...extras])];
 }
 
 function validateContact(body, errors) {

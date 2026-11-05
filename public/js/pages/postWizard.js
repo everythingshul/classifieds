@@ -237,12 +237,12 @@ function renderPostWizard() {
         <div class="form-row"><label>Ext.</label><input type="text" id="c_phoneExt" value="${escapeHtml(state.data.contactPhoneExt || '')}"></div>
       </div>
       <div class="form-row" id="phoneMethodsRow">
-        <label>This number can be reached by <span class="hint">(select all that apply)</span></label>
+        <label>Also reachable by <span class="hint">(this number can always be called)</span></label>
         <div style="display:flex;gap:16px;align-items:center;height:34px">
-          ${['call', 'sms', 'whatsapp'].map((m) => `
+          ${['sms', 'whatsapp'].map((m) => `
             <label style="font-weight:400;display:flex;align-items:center;gap:5px">
-              <input type="checkbox" class="c-phone-method" value="${m}" ${(state.data.contactPhoneMethods || ['call']).includes(m) ? 'checked' : ''}>
-              ${m === 'call' ? 'Call' : m === 'sms' ? 'Text/SMS' : 'WhatsApp'}
+              <input type="checkbox" class="c-phone-method" value="${m}" ${(state.data.contactPhoneMethods || []).includes(m) ? 'checked' : ''}>
+              ${m === 'sms' ? 'Text/SMS' : 'WhatsApp'}
             </label>`).join('')}
         </div>
       </div>
@@ -344,8 +344,8 @@ function renderPostWizard() {
       const contactEmail = document.getElementById('c_email').value.trim();
       const contactUrl = document.getElementById('c_url').value.trim();
       if (!contactPhone && !contactEmail && !contactUrl) errs.push('At least one contact method is required');
-      const contactPhoneMethods = Array.from(document.querySelectorAll('.c-phone-method:checked')).map((el) => el.value);
-      if (contactPhone && !contactPhoneMethods.length) errs.push('Select at least one way this phone number can be reached');
+      // 'call' is always included - the checkboxes only add text/WhatsApp on top of it.
+      const contactPhoneMethods = ['call', ...Array.from(document.querySelectorAll('.c-phone-method:checked')).map((el) => el.value)];
 
       const fields = {};
       const genericTaxSelect = document.getElementById('f_taxonomyId');

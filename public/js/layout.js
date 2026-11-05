@@ -49,6 +49,7 @@ function renderLayout(siteName) {
             <a href="/contact" data-i18n="contact_us">Contact Us</a>
             <a href="/terms" data-i18n="terms">Terms &amp; Conditions</a>
             <a href="/refund-policy" data-i18n="refund_policy">Refund Policy</a>
+            <a href="/privacy-policy" data-i18n="privacy_policy">Privacy Policy</a>
           </div>
           <div>&copy; ${new Date().getFullYear()} ${escapeHtml(siteName)}</div>
         </div>

@@ -149,3 +149,56 @@ function renderRefundPolicyPage() {
   I18N.apply();
   setPageTitle('Refund Policy');
 }
+
+function renderPrivacyPolicyPage() {
+  const isUk = /\.co\.uk$/i.test(location.hostname);
+  const siteName = escapeHtml(window.SITE_CONFIG?.siteName || 'JListings');
+  document.getElementById('app').innerHTML = `
+    <div class="container" style="padding:30px 0 60px;max-width:820px">
+      <h1 data-i18n="privacy_policy">Privacy Policy</h1>
+      <p><em>Last updated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</em></p>
+
+      <h3>1. Who This Covers</h3>
+      <p>This Privacy Policy explains what personal information ${siteName} (the "Site") collects when you browse, post, respond to a listing, chat with Chesky, or otherwise use the Site, and what we do with it. Questions about this policy or a request concerning your information can be sent via our <a href="/contact">Contact Us</a> page.</p>
+
+      <h3>2. Information We Collect</h3>
+      <p><strong>When you post a classified, listing, or simcha announcement:</strong> your name, email address, and phone number (so we and, where you choose to show it, other users can reach you), the contact details and images you choose to include in the listing itself, and your location as you enter or select it.</p>
+      <p><strong>When you pay for a listing, boost, or other add-on:</strong> payment is handled entirely by Stripe, our payment processor - we never see or store your card number. We keep a record of the amount, currency, invoice number, and Stripe's own transaction reference.</p>
+      <p><strong>When you contact us, report a listing, or request to boost/feature a post:</strong> whatever you submit in that form - typically your name, email, and message or reason.</p>
+      <p><strong>When you chat with Chesky (our AI assistant) or hand off to a real person:</strong> the messages and, if you send one, the voice note and its transcript; if you start a conversation with our team, also your name and email.</p>
+      <p><strong>When you submit an editorial or comment:</strong> the pen name you choose (shown publicly on the Site) plus your real name, email, and phone number, which are kept for our internal records only and are never displayed publicly.</p>
+      <p><strong>When you subscribe to email updates:</strong> your email address and the categories you choose to follow.</p>
+      <p><strong>Automatically, as you browse:</strong> an anonymous identifier stored in your browser's local storage (not a cookie) used only to tell a unique visit from a recurring one, plus which pages and listings you view or click. This is never tied to your name unless you separately give it to us (e.g. by posting or messaging us), and it is not shared with or sold to anyone outside the Site.</p>
+
+      <h3>3. How We Use It</h3>
+      <p>To publish and manage the listings, editorials, and comments you submit; to let other users and our team contact you where you've chosen to be reachable; to process payments and send receipts/invoices; to operate Chesky and route conversations to our team when you ask to talk to one; to send the email updates and digests you've asked for; to moderate content against our <a href="/terms">Terms &amp; Conditions</a>; and to understand overall Site usage so we can keep it running well.</p>
+
+      <h3>4. Who We Share It With</h3>
+      <p>We don't sell personal information. We share it only with the service providers that help us run the Site, each only for that purpose: <strong>Stripe</strong> (payments), <strong>Anthropic</strong> (powers Chesky's text replies), <strong>OpenAI</strong> (transcribes Chesky voice notes), <strong>Google</strong> (location autocomplete, where enabled), our email delivery provider, and our hosting provider. Contact information you include directly in a public listing is, by design, visible to anyone who views that listing. We may also disclose information if required by law or to protect the Site, our users, or the public from fraud or harm.</p>
+
+      <h3>5. Cookies &amp; Tracking</h3>
+      <p>The Site does not use advertising or third-party tracking cookies. The anonymous visitor identifier described above lives in your browser's local storage rather than a cookie; clearing your browser's site data, or browsing in a private/incognito window, removes it and starts a fresh one next time.</p>
+
+      <h3>6. Data Retention</h3>
+      <p>We keep listing, payment, and message records for as long as needed to run the Site, satisfy tax/accounting obligations, and resolve disputes, after which they're deleted or anonymized. Chesky conversations and voice notes are kept to improve replies and resolve support issues and are not retained indefinitely for inactive conversations.</p>
+
+      <h3>7. Children</h3>
+      <p>The Site is not directed at children, and we do not knowingly collect personal information from anyone under 16. If you believe a child has provided us information, contact us and we'll remove it.</p>
+
+      ${isUk ? `
+      <h3>8. Your Rights (UK GDPR)</h3>
+      <p>If you are in the UK, you have the right to ask us for access to, correction of, deletion of, or a copy of your personal information, to object to or restrict certain processing, and to withdraw consent where processing relies on it. Where we process your information to perform a contract with you (e.g. your listing or payment) or for our legitimate interests (e.g. running and securing the Site), you can ask us to stop subject to those interests. To exercise any of these rights, use our <a href="/contact">Contact Us</a> page. If you're not satisfied with our response, you can complain to the UK Information Commissioner's Office (ICO) at ico.org.uk.</p>
+
+      <h3>9. Changes</h3>
+      <p>We may update this Privacy Policy from time to time; continued use of the Site after a change means you accept the updated policy.</p>
+      ` : `
+      <h3>8. Your Choices &amp; Rights</h3>
+      <p>Depending on where you live, you may have rights to access, correct, or delete the personal information we hold about you, or to object to certain uses of it. To ask us about, update, or remove your information, use our <a href="/contact">Contact Us</a> page - we'll do our best to help regardless of where you're located.</p>
+
+      <h3>9. Changes</h3>
+      <p>We may update this Privacy Policy from time to time; continued use of the Site after a change means you accept the updated policy.</p>
+      `}
+    </div>`;
+  I18N.apply();
+  setPageTitle('Privacy Policy');
+}
