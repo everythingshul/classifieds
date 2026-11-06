@@ -489,6 +489,9 @@ p { margin: 0 0 .7em; }
 .detail-meta-list li:last-child { border-bottom: none; }
 .detail-meta-list li span:first-child { color: var(--ink-soft); font-weight: 600; }
 .detail-meta-list li.stacked { flex-direction: column; align-items: flex-start; gap: 4px; }
+.detail-map-actions { display: flex; gap: 8px; margin: 14px 0; }
+.detail-map-actions .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.detail-map-actions .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
 /* ---------- Pricing page ---------- */
 .pricing-section { margin-bottom: 34px; }

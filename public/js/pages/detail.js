@@ -1,5 +1,24 @@
 const SMS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 const WHATSAPP_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.76.46 3.48 1.34 5L2 22l5.14-1.35a9.96 9.96 0 0 0 4.9 1.25h.01c5.52 0 10-4.48 10-10s-4.48-9.9-10.01-9.9zm0 18.1a8.3 8.3 0 0 1-4.24-1.16l-.3-.18-3.05.8.82-2.98-.2-.3a8.26 8.26 0 0 1-1.27-4.38c0-4.58 3.73-8.3 8.31-8.3 4.58 0 8.3 3.72 8.3 8.3 0 4.58-3.72 8.2-8.37 8.2zm4.55-6.2c-.25-.12-1.47-.72-1.7-.81-.23-.08-.4-.12-.56.13-.17.25-.65.81-.8.97-.14.17-.3.19-.55.06-.25-.12-1.05-.39-2-1.23a7.5 7.5 0 0 1-1.38-1.72c-.15-.25-.02-.38.11-.5.11-.11.25-.3.37-.44.12-.15.16-.25.24-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.87.85-.87 2.08s.9 2.41 1.02 2.58c.12.17 1.76 2.69 4.27 3.77.6.26 1.06.41 1.43.53.6.19 1.14.16 1.57.1.48-.07 1.47-.6 1.68-1.18.2-.58.2-1.08.14-1.18-.06-.1-.23-.16-.48-.28z"/></svg>';
+const WAZE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r=".6" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".6" fill="currentColor" stroke="none"/><path d="M8 15c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5"/><path d="M19.5 17.5 22 20"/></svg>';
+const MAPS_PIN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+// Waze/Google Maps deep links for a listing's location - prefers exact
+// coordinates (set whenever the poster picked an address via Places
+// autocomplete) and falls back to the free-text location otherwise.
+function mapsLinksForLocation(loc) {
+  if (!loc) return null;
+  const hasCoords = typeof loc.lat === 'number' && typeof loc.lng === 'number';
+  if (!hasCoords && !loc.text) return null;
+  return {
+    google: hasCoords
+      ? `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.text)}`,
+    waze: hasCoords
+      ? `https://waze.com/ul?ll=${loc.lat},${loc.lng}&navigate=yes`
+      : `https://waze.com/ul?q=${encodeURIComponent(loc.text)}&navigate=yes`,
+  };
+}
 
 async function renderDetailPage(id, type) {
   const post = type === 'simcha' ? await Api.simchaDetail(id) : type === 'listing' ? await Api.listingDetail(id) : await Api.classifiedDetail(id);
@@ -20,6 +39,11 @@ async function renderDetailPage(id, type) {
   const priceDisplay = formatPriceField(post.fields?.price, post.fields?.priceText, post.fields?.currency);
   if (priceDisplay) fieldRows.push(['Price', priceDisplay]);
   if (post.location?.text) fieldRows.push([I18N.t('location'), post.location.text]);
+
+  // Listings are real places (stores, offices, venues) - give a way to
+  // navigate there. Classifieds/simchas only have a general area, not a
+  // specific address, so this stays scoped to type === 'listing'.
+  const mapsLinks = type === 'listing' ? mapsLinksForLocation(post.location) : null;
 
   const contactButtons = [];
   if (post.contact?.phone) {
@@ -68,6 +92,10 @@ async function renderDetailPage(id, type) {
           ${gallery}
           <p class="detail-desc">${escapeHtml(post.description || '')}</p>
           ${fieldRows.length ? `<ul class="detail-meta-list">${fieldRows.map(([k, v]) => `<li><span>${escapeHtml(String(k))}</span><span>${escapeHtml(String(v))}</span></li>`).join('')}</ul>` : ''}
+          ${mapsLinks ? `<div class="detail-map-actions">
+            <a class="btn btn-outline" href="${mapsLinks.waze}" target="_blank" rel="noopener">${WAZE_ICON} Waze</a>
+            <a class="btn btn-outline" href="${mapsLinks.google}" target="_blank" rel="noopener">${MAPS_PIN_ICON} Google Maps</a>
+          </div>` : ''}
           ${shareRow}
         </div>
         <div class="contact-card">
