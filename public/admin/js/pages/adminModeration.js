@@ -10,7 +10,7 @@ async function renderModerationPage() {
     ${urlData.posts.map((p) => `
       <div class="admin-card" data-post-url="${p.id}">
         <h3 style="margin-top:0">${escapeHtml(p.title)} <span class="tag">${escapeHtml(p.categoryLabel)}</span></h3>
-        <p><b>Website:</b> <a href="${p.contact?.url}" target="_blank" rel="noopener">${escapeHtml(p.contact?.url || '')}</a></p>
+        <p><b>Website:</b> <a href="${escapeHtml(p.contact?.url || '')}" target="_blank" rel="noopener">${escapeHtml(p.contact?.url || '')}</a></p>
         <p class="hint">Posted by ${escapeHtml(p.poster.email)}</p>
         <div style="display:flex;gap:10px">
           <button class="btn approve-url" data-id="${p.id}">Approve Website</button>

@@ -37,8 +37,8 @@ async function renderDetailPage(id, type) {
     if (phone.whatsapp) parts.push(`<a class="btn-icon-contact contact-link" data-click-type="whatsapp" href="${phone.whatsapp}" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp">${WHATSAPP_ICON}</a>`);
     contactButtons.push(`<div class="contact-phone-row">${parts.join('')}</div>`);
   }
-  if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="email" href="${post.contact.email.mailto}">${I18N.t('email')} ${escapeHtml(post.contact.email.display)}</a>`);
-  if (post.contact?.url) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="website" href="${post.contact.url.href}" target="_blank" rel="noopener">${I18N.t('website')}</a>`);
+  if (post.contact?.email) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="email" href="${escapeHtml(post.contact.email.mailto)}">${I18N.t('email')} ${escapeHtml(post.contact.email.display)}</a>`);
+  if (post.contact?.url) contactButtons.push(`<a class="btn btn-outline contact-link" data-click-type="website" href="${escapeHtml(post.contact.url.href)}" target="_blank" rel="noopener">${I18N.t('website')}</a>`);
   const hasContact = contactButtons.length > 0;
 
   const images = post.images || [];

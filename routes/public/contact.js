@@ -10,7 +10,9 @@ router.post('/', async (req, res, next) => {
   try {
     const name = String(req.body.name || '').trim().slice(0, 200);
     const email = String(req.body.email || '').trim().toLowerCase();
-    const subject = String(req.body.subject || '').trim().slice(0, 200);
+    // Strip CR/LF - this goes straight into an email Subject header below,
+    // and newlines there are the classic header-injection vector.
+    const subject = String(req.body.subject || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
     const message = String(req.body.message || '').trim().slice(0, 5000);
 
     const errors = [];

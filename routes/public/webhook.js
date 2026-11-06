@@ -11,11 +11,15 @@ router.post('/', async (req, res) => {
   try {
     const stripe = getStripe();
     const webhookSecret = getWebhookSecret();
-    if (webhookSecret) {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } else {
-      event = JSON.parse(req.body.toString('utf8'));
+    // Fail closed: without a secret there's no way to verify this POST
+    // actually came from Stripe, and parsing the body unauthenticated would
+    // let anyone fire 'checkout.session.completed' and get a post published
+    // or boosted without paying. Reject instead of trusting unsigned input.
+    if (!webhookSecret) {
+      console.error('Webhook rejected: no Stripe webhook secret configured');
+      return res.status(503).json({ error: 'Webhook not configured' });
     }
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (e) {
     console.error('Webhook signature verification failed', e.message);
     return res.status(400).send(`Webhook Error: ${e.message}`);

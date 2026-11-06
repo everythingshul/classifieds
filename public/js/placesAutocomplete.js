@@ -69,7 +69,7 @@ function mountSuggestionsDropdown(inputEl, { fetchSuggestions, onPick }) {
     }
     activeItems = items || [];
     if (!activeItems.length) return hide();
-    box.innerHTML = activeItems.map((it, i) => `<li data-i="${i}">${it.label}</li>`).join('');
+    box.innerHTML = activeItems.map((it, i) => `<li data-i="${i}">${escapeHtml(it.label)}</li>`).join('');
     box.style.display = 'block';
   }
 
