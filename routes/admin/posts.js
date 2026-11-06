@@ -66,6 +66,13 @@ router.get('/', (req, res) => {
   if (req.query.needsUrlApproval) {
     where.push("contact_url IS NOT NULL AND contact_url != '' AND contact_url_approved = 0 AND status IN ('live', 'pending_approval')");
   }
+  // Posts already 'live' (bulk-tool/admin-created, see services/
+  // adminPostCreate.js) that still have an unapproved photo - excludes
+  // 'pending_approval' posts since those already get full per-image review
+  // in the main "Posts Awaiting Approval" section above.
+  if (req.query.needsImageApproval) {
+    where.push("status = 'live' AND id IN (SELECT post_id FROM post_images WHERE approved = 0)");
+  }
   if (req.query.q) {
     where.push('(title LIKE ? OR description LIKE ? OR poster_email LIKE ? OR poster_phone LIKE ? OR poster_first_name LIKE ? OR poster_last_name LIKE ? OR public_id LIKE ?)');
     const like = `%${req.query.q}%`;

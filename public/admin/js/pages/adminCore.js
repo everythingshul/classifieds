@@ -122,9 +122,10 @@ async function renderDashboardPage() {
 }
 
 async function renderModerationPage() {
-  const [data, urlData] = await Promise.all([
+  const [data, urlData, imgData] = await Promise.all([
     AdminApi.posts({ status: 'pending_approval', pageSize: 50 }),
     AdminApi.posts({ needsUrlApproval: 1, pageSize: 50 }),
+    AdminApi.posts({ needsImageApproval: 1, pageSize: 50 }),
   ]);
   const root = document.getElementById('adminContent');
 
@@ -133,7 +134,7 @@ async function renderModerationPage() {
     ${urlData.posts.map((p) => `
       <div class="admin-card" data-post-url="${p.id}">
         <h3 style="margin-top:0">${escapeHtml(p.title)} <span class="tag">${escapeHtml(p.categoryLabel)}</span></h3>
-        <p><b>Website:</b> <a href="${p.contact?.url}" target="_blank" rel="noopener">${escapeHtml(p.contact?.url || '')}</a></p>
+        <p><b>Website:</b> <a href="${escapeHtml(p.contact?.url || '')}" target="_blank" rel="noopener">${escapeHtml(p.contact?.url || '')}</a></p>
         <p class="hint">Posted by ${escapeHtml(p.poster.email)}</p>
         <div style="display:flex;gap:10px">
           <button class="btn approve-url" data-id="${p.id}">Approve Website</button>
@@ -144,7 +145,32 @@ async function renderModerationPage() {
     `).join('')}
   ` : '';
 
-  if (!data.posts.length && !urlData.posts.length) {
+  // Posts already live (bulk-tool/admin "+ New Post") whose photos still
+  // need a look - the post itself isn't held back, just each image until
+  // it's individually approved or removed.
+  const imgSection = imgData.posts.length ? `
+    <h2>Photos Awaiting Approval (${imgData.total})</h2>
+    ${imgData.posts.map((p) => `
+      <div class="admin-card" data-post-img="${p.id}">
+        <h3 style="margin-top:0">${escapeHtml(p.title)} <span class="tag">${escapeHtml(p.categoryLabel)}</span></h3>
+        <p class="hint">Posted by ${escapeHtml(p.poster.email)}</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+          ${p.images.filter((img) => !img.approved).map((img) => `
+            <div style="text-align:center">
+              <img class="thumb-mini" src="${img.url}" style="width:120px;height:120px">
+              <div class="img-approve-row">
+                <button class="btn btn-sm approve-img" data-post="${p.id}" data-img="${img.id}">Approve</button>
+                <button class="btn btn-sm btn-danger remove-img" data-post="${p.id}" data-img="${img.id}">Remove</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <a class="btn btn-outline" href="#/posts?q=${p.publicId}">Edit</a>
+      </div>
+    `).join('')}
+  ` : '';
+
+  if (!data.posts.length && !urlData.posts.length && !imgData.posts.length) {
     root.innerHTML = `<h1>Moderation Queue</h1><p>Nothing waiting for approval.</p>`;
     return;
   }
@@ -152,6 +178,7 @@ async function renderModerationPage() {
   root.innerHTML = `
     <h1>Moderation Queue</h1>
     ${urlSection}
+    ${imgSection}
     ${data.posts.length ? `<h2>Posts Awaiting Approval (${data.total})</h2>` : ''}
     ${data.posts.map((p) => `
       <div class="admin-card" data-post="${p.id}">

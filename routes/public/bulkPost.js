@@ -17,13 +17,18 @@ router.post('/auth', authLimiter, (req, res) => {
   res.json({ token: signBulkToken() });
 });
 
-// Same no-payment, no-character-limit, pre-approved-images post creation as
-// the admin "+ New Post" page (see services/adminPostCreate.js) - called
-// once per listing from the bulk tool's page, one at a time, so a mistake
-// on listing #7 doesn't stop the other 20 from going through.
+// Same no-payment, no-character-limit post creation as the admin "+ New
+// Post" page (see services/adminPostCreate.js) - called once per listing
+// from the bulk tool's page, one at a time, so a mistake on listing #7
+// doesn't stop the other 20 from going through. Unlike "+ New Post",
+// website links and photos are NOT pre-approved here - this tool is built
+// for fast, unattended, high-volume entry, and its password is a much more
+// casually-shared credential than a real admin login (middleware/
+// bulkAuth.js), so every listing it creates goes through the same
+// Moderation Queue review a public submission would.
 router.post('/create', requireBulkAccess, upload.array('images', 6), async (req, res, next) => {
   try {
-    const post = await createAdminPost(req.body, req.files, req.bulkCreatorEmail);
+    const post = await createAdminPost(req.body, req.files, req.bulkCreatorEmail, { autoApprove: false });
     res.status(201).json(post);
   } catch (e) {
     if (e instanceof AdminPostCreateError) {

@@ -83,6 +83,39 @@ db.prepare("UPDATE pricing_tiers SET post_type = 'simcha' WHERE category = 'simc
 // once they're all back to 'live'.
 db.prepare("UPDATE posts SET status = 'live', updated_at = ? WHERE type = 'simcha' AND status = 'expired'").run(Date.now());
 
+// One-time migration: website links and photos added through the admin
+// "+ New Post" page and the bulk-posting tool used to be auto-approved with
+// no human review at all (see services/adminPostCreate.js) - including
+// through the bulk tool, whose password is a far more casually-shared,
+// lower-trust credential than a real admin login. None of those approvals
+// were ever actually verified by anyone, so on first boot after that fix,
+// every currently-approved website link and photo is sent back through the
+// Moderation Queue for a real review (see routes/admin/posts.js's
+// needsUrlApproval/needsImageApproval). There's no stored record of which
+// approvals came from that shortcut versus a genuine admin review, so this
+// errs toward re-checking everything rather than risking leaving something
+// unverified - already-fine content just needs one more click to re-approve.
+// Guarded by a flag so it only ever runs once; without it, every restart
+// would also wipe out approvals an admin had since deliberately re-confirmed.
+(function reverifyUnauditedContent() {
+  const FLAG_KEY = 'migration_reverify_unaudited_content_done';
+  const already = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(FLAG_KEY);
+  if (already) return;
+
+  const urlReset = db.prepare(
+    "UPDATE posts SET contact_url_approved = 0 WHERE contact_url_approved = 1 AND contact_url IS NOT NULL AND contact_url != ''"
+  ).run();
+  const imgReset = db.prepare('UPDATE post_images SET approved = 0 WHERE approved = 1').run();
+
+  db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
+    FLAG_KEY,
+    JSON.stringify({ ranAt: Date.now(), websiteLinksReset: urlReset.changes, imagesReset: imgReset.changes })
+  );
+  if (urlReset.changes || imgReset.changes) {
+    console.log(`[migration] Sent ${urlReset.changes} website link(s) and ${imgReset.changes} photo(s) back to the Moderation Queue for verification.`);
+  }
+})();
+
 function seed() {
   const now = Date.now();
 

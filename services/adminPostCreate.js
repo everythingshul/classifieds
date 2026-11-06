@@ -32,7 +32,14 @@ function imagesFor(postId) {
   return db.prepare('SELECT * FROM post_images WHERE post_id = ? ORDER BY sort_order').all(postId);
 }
 
-async function createAdminPost(body, files, creatorEmail) {
+// autoApprove: true for the admin "+ New Post" page (a real, logged-in admin
+// is trusted to publish their own website links/photos immediately) - false
+// for the bulk-posting tool, whose password is a far more casually-shared,
+// lower-trust credential (see middleware/bulkAuth.js) and is specifically
+// meant for fast, high-volume entry where mistakes are more likely to slip
+// through unnoticed. Bulk-created content now goes through the same
+// Moderation Queue review as public submissions instead of skipping it.
+async function createAdminPost(body, files, creatorEmail, { autoApprove = true } = {}) {
   const type = body.type === 'simcha' ? 'simcha' : body.type === 'listing' ? 'listing' : 'classified';
   let fields = {};
   try {
@@ -108,11 +115,13 @@ async function createAdminPost(body, files, creatorEmail) {
 
   const post = insertPost({ type, category: payload.category, payload, hasImages: uploaded.length > 0 });
   attachImages(post.id, uploaded);
-  db.prepare('UPDATE post_images SET approved = 1 WHERE post_id = ?').run(post.id);
-  // Admin-entered links skip the same moderation queue admin-uploaded
-  // images already skip above - whoever is using this tool is trusted, so
-  // it shouldn't need a second self-approval step before it shows up publicly.
-  if (contact.url) db.prepare('UPDATE posts SET contact_url_approved = 1 WHERE id = ?').run(post.id);
+  if (autoApprove) {
+    db.prepare('UPDATE post_images SET approved = 1 WHERE post_id = ?').run(post.id);
+    // Admin-entered links skip the same moderation queue admin-uploaded
+    // images already skip above - whoever is using this tool is trusted, so
+    // it shouldn't need a second self-approval step before it shows up publicly.
+    if (contact.url) db.prepare('UPDATE posts SET contact_url_approved = 1 WHERE id = ?').run(post.id);
+  }
 
   if (type === 'simcha' && body.surpriseEmail) {
     attachSimchaSurprises(post.id, [{ email: body.surpriseEmail, senderDisplayName: payload.posterFirstName || '' }], payload.posterFirstName);
