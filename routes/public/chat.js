@@ -97,8 +97,8 @@ async function mailAdminNewChat(conv, text, isNew) {
 }
 
 // -- AI ask (stateless - no handoff conversation created) --
-// Shared by /ask and /ask-voice: checks taught answers first, otherwise asks
-// the AI, logging a miss when it couldn't help so the team can teach it.
+// Checks taught answers first, otherwise asks the AI, logging a miss when
+// it couldn't help so the team can teach it.
 // Relays a message to the admin on the visitor's behalf - one-way, since the
 // AI-chat flow never collects an email (that only happens via /handoff).
 // Logged into contact_messages too, so it shows up in the same Messages
@@ -115,16 +115,17 @@ async function forwardMessageToTeam(question, page) {
   }
 }
 
-async function answerQuestion(question, transcript, page, image) {
-  // A photo changes the answer (Chesky can describe/use it), so skip the
-  // taught-answer shortcut entirely whenever one is attached - it would
-  // otherwise return a canned answer that never looked at the photo.
-  if (!image) {
+async function answerQuestion(question, transcript, page, image, hadVoice) {
+  // A photo or voice note changes the answer (Chesky can actually see/hear
+  // what they sent), so skip the taught-answer shortcut entirely whenever
+  // one is attached - it would otherwise return a canned answer that never
+  // looked at the attachment.
+  if (!image && !hadVoice) {
     const learned = chesky.findLearnedMatch(question);
     if (learned) return { reply: learned.entry.answer, offTopic: false, entryId: learned.entry.id };
   }
 
-  const result = await chesky.ask(question, transcript, image);
+  const result = await chesky.ask(question, transcript, image, hadVoice);
   if (result.offTopic) {
     const key = chesky.normQ(question);
     if (key) {
@@ -144,44 +145,49 @@ async function answerQuestion(question, transcript, page, image) {
   };
 }
 
+// A visitor can attach a photo and/or a voice note to one message (e.g.
+// "send me a picture and a voice note of what you want to sell and I'll
+// take care of the rest" - see services/chesky.js's system prompt), on top
+// of or instead of typed text. The voice note is transcribed here (Whisper -
+// Claude itself has no audio input) and merged into the question text
+// Chesky actually sees; voiceTranscript comes back separately so the
+// widget can caption the voice bubble with it.
 router.post('/ask', askLimiter, async (req, res, next) => {
   try {
-    const question = clean(req.body.question, MAX_TEXT);
     const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
     const page = oneLine(req.body.page, 100);
+
     const image = req.body.image ? handleChatImage(req.body.image) : null;
     if (req.body.image && !image) return res.status(400).json({ error: 'That photo could not be used - please try a JPG, PNG, or WEBP under 6MB.' });
-    if (!question && !image) return res.status(400).json({ error: 'A question is required' });
-    res.json(await answerQuestion(question || '(sent a photo)', transcript, page, image));
-  } catch (e) {
-    next(e);
-  }
-});
 
-// Transcribes a voice note (OpenAI Whisper - Claude has no audio input), then
-// answers the transcribed text the same way /ask does.
-router.post('/ask-voice', askLimiter, async (req, res, next) => {
-  try {
-    const v = req.body.voice;
-    if (!v || typeof v.data !== 'string' || !v.data || v.data.length > MAX_VOICE_B64) return res.status(400).json({ error: 'No voice note provided' });
-    const mime = String(v.mime || '').split(';')[0].toLowerCase();
-    if (!VOICE_MIME_EXT[mime] || !/^[A-Za-z0-9+/]+=*$/.test(v.data)) return res.status(400).json({ error: 'Unsupported audio format' });
-    let bytes;
-    try { bytes = Buffer.from(v.data, 'base64'); } catch { return res.status(400).json({ error: 'Invalid audio data' }); }
-    if (bytes.length < 200) return res.status(400).json({ error: 'That voice note was too short.' });
-
-    let question;
-    try {
-      question = await transcribeAudio(bytes, mime);
-    } catch (e) {
-      return res.status(e.status || 500).json({ error: e.message });
+    let voiceTranscript = null;
+    if (req.body.voice) {
+      const v = req.body.voice;
+      if (typeof v.data !== 'string' || !v.data || v.data.length > MAX_VOICE_B64) return res.status(400).json({ error: 'That voice note could not be used.' });
+      const mime = String(v.mime || '').split(';')[0].toLowerCase();
+      if (!VOICE_MIME_EXT[mime] || !/^[A-Za-z0-9+/]+=*$/.test(v.data)) return res.status(400).json({ error: 'Unsupported audio format' });
+      let bytes;
+      try { bytes = Buffer.from(v.data, 'base64'); } catch { return res.status(400).json({ error: 'Invalid audio data' }); }
+      if (bytes.length < 200) return res.status(400).json({ error: 'That voice note was too short.' });
+      try {
+        voiceTranscript = await transcribeAudio(bytes, mime);
+      } catch (e) {
+        return res.status(e.status || 500).json({ error: e.message });
+      }
     }
-    if (!question) return res.json({ transcript: '', reply: "Sorry, I couldn't make out what you said - could you try again, or type it instead?", offTopic: true, entryId: 'ai' });
 
-    const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
-    const page = oneLine(req.body.page, 100);
-    const result = await answerQuestion(question, transcript, page);
-    res.json({ transcript: question, ...result });
+    const typedText = clean(req.body.question, MAX_TEXT);
+    const combined = [typedText, voiceTranscript].filter(Boolean).join('\n').trim();
+
+    if (!combined && !image) {
+      // A voice note was sent but came back unclear/silent (not the same as
+      // "nothing was sent at all") - a friendly retry prompt, not a hard error.
+      if (req.body.voice) return res.json({ reply: "Sorry, I couldn't make out what you said - could you try again, or type it instead?", offTopic: true, entryId: 'ai', voiceTranscript: '' });
+      return res.status(400).json({ error: 'A question is required' });
+    }
+
+    const result = await answerQuestion(combined || '(sent a photo)', transcript, page, image, !!req.body.voice);
+    res.json({ ...result, voiceTranscript });
   } catch (e) {
     next(e);
   }

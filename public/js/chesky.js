@@ -17,7 +17,8 @@ const Chesky = (() => {
   try { transcript = JSON.parse(sessionStorage.getItem(STORAGE_TRANSCRIPT) || '[]'); } catch (e) { transcript = []; }
   let busy = false;
   let activeAudio = null;
-  let pendingImage = null; // {data (base64), mime, previewUrl} - attached, not yet sent
+  let pendingImage = null; // {data (base64), mime} - attached, not yet sent
+  let pendingVoice = null; // {data (base64), mime, dur, peaks, localUrl} - attached, not yet sent
 
   // Recording state
   let recorder = null;
@@ -228,21 +229,31 @@ const Chesky = (() => {
 
   async function ask(question) {
     const image = pendingImage;
-    if (busy || (!question.trim() && !image)) return;
+    const voice = pendingVoice;
+    if (busy || (!question.trim() && !image && !voice)) return;
     busy = true;
     document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
-    clearPendingImage();
-    renderPendingImageChip();
-    const imgHtml = image ? `<img class="chesky-sent-photo" src="data:${image.mime};base64,${image.data}" alt="">` : '';
-    if (question.trim()) bubble('visitor', escapeHtml(question), imgHtml);
-    else bubble('visitor', imgHtml);
-    transcript.push({ role: 'user', text: question || (image ? '(sent a photo)' : '') });
-    saveTranscript();
+    clearPendingAttachments();
+    renderPendingAttachments();
+
+    let attachmentsHtml = '';
+    if (voice) attachmentsHtml += voiceBubbleHtml({ url: voice.localUrl, dur: voice.dur, peaks: voice.peaks }, '');
+    if (image) attachmentsHtml += `<img class="chesky-sent-photo" src="data:${image.mime};base64,${image.data}" alt="">`;
+    const bubbleNode = question.trim() ? bubble('visitor', escapeHtml(question), attachmentsHtml) : bubble('visitor', attachmentsHtml);
+
     const typingNode = showTyping();
     try {
-      const result = await Api.cheskyAsk(question, transcript, image ? { data: image.data, mime: image.mime } : null);
+      const result = await Api.cheskyAsk(
+        question, transcript,
+        image ? { data: image.data, mime: image.mime } : null,
+        voice ? { data: voice.data, mime: voice.mime, dur: voice.dur, peaks: voice.peaks } : null
+      );
+      if (voice && result.voiceTranscript) addCaption(bubbleNode, result.voiceTranscript);
+      const historyText = question.trim() || result.voiceTranscript || (image ? '(sent a photo)' : '');
+      transcript.push({ role: 'user', text: historyText });
+      saveTranscript();
       typingNode?.remove();
-      displayBotReply(question, result);
+      displayBotReply(historyText, result);
     } catch (e) {
       typingNode?.remove();
       bubble('bot', "Sorry, something went wrong. Please try again, or talk to our team below.");
@@ -251,26 +262,37 @@ const Chesky = (() => {
     }
   }
 
-  // -- Photo attach: a camera/file button next to the composer. The photo
-  // is only shown as a preview chip above the input until Send is pressed
-  // (sent together with whatever's typed, or alone) - never uploaded just
-  // for picking it, so showing Chesky a photo you don't end up sending
-  // never touches the server at all.
-  function renderPendingImageChip() {
+  // -- Photo/voice attach: a camera button and the mic button both just
+  // attach, shown as preview chips above the composer until Send is
+  // pressed - sent together with whatever's typed, or alone, or together
+  // with each other ("send me a picture and a voice note" is one Send tap).
+  // Nothing is uploaded just for attaching it - picking a photo or
+  // recording a note you don't end up sending never touches the server.
+  function renderPendingAttachments() {
     const host = document.getElementById('cheskyImagePreview');
     if (!host) return;
-    if (!pendingImage) { host.innerHTML = ''; host.style.display = 'none'; return; }
+    if (!pendingImage && !pendingVoice) { host.innerHTML = ''; host.style.display = 'none'; return; }
     host.style.display = '';
     host.innerHTML = `
-      <div class="chesky-img-chip">
-        <img src="data:${pendingImage.mime};base64,${pendingImage.data}" alt="">
-        <button type="button" class="chesky-img-chip-remove" aria-label="Remove photo">${REMOVE_ICON}</button>
-      </div>`;
-    host.querySelector('.chesky-img-chip-remove').addEventListener('click', () => { clearPendingImage(); renderPendingImageChip(); });
+      ${pendingImage ? `
+        <div class="chesky-img-chip" data-attachment="image">
+          <img src="data:${pendingImage.mime};base64,${pendingImage.data}" alt="">
+          <button type="button" class="chesky-img-chip-remove" aria-label="Remove photo">${REMOVE_ICON}</button>
+        </div>` : ''}
+      ${pendingVoice ? `
+        <div class="chesky-voice-chip" data-attachment="voice">
+          ${MIC_ICON}
+          <span>${fmtDur(pendingVoice.dur)}</span>
+          <button type="button" class="chesky-voice-chip-remove" aria-label="Remove voice note">${REMOVE_ICON}</button>
+        </div>` : ''}
+    `;
+    host.querySelector('.chesky-img-chip-remove')?.addEventListener('click', () => { pendingImage = null; renderPendingAttachments(); });
+    host.querySelector('.chesky-voice-chip-remove')?.addEventListener('click', () => { pendingVoice = null; renderPendingAttachments(); });
   }
 
-  function clearPendingImage() {
+  function clearPendingAttachments() {
     pendingImage = null;
+    pendingVoice = null;
   }
 
   async function handlePickedImage(file) {
@@ -280,32 +302,9 @@ const Chesky = (() => {
     try {
       const data = await fileToBase64(file);
       pendingImage = { data, mime: file.type };
-      renderPendingImageChip();
+      renderPendingAttachments();
     } catch (e) {
       toast('Could not use that photo - please try another.');
-    }
-  }
-
-  // voice: {data, mime, dur, peaks} plus localUrl for instant local playback
-  // (no need to wait on the server to hear your own just-recorded clip).
-  async function askVoice(voice, localUrl) {
-    if (busy) return;
-    busy = true;
-    document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
-    const node = bubble('visitor', voiceBubbleHtml({ url: localUrl, dur: voice.dur, peaks: voice.peaks }, ''));
-    const typingNode = showTyping();
-    try {
-      const result = await Api.cheskyAskVoice(voice, transcript);
-      addCaption(node, result.transcript);
-      typingNode?.remove();
-      transcript.push({ role: 'user', text: result.transcript || '(voice note)' });
-      saveTranscript();
-      displayBotReply(result.transcript || '', result);
-    } catch (e) {
-      typingNode?.remove();
-      bubble('bot', "Sorry, something went wrong with that voice note. Please try again, or type it instead.");
-    } finally {
-      busy = false;
     }
   }
 
@@ -320,8 +319,8 @@ const Chesky = (() => {
       <form class="chesky-form" id="cheskyAskForm">
         <div class="chesky-row">
           <button type="button" class="chesky-camera-btn" id="cheskyCameraBtn" title="Attach a photo (e.g. to post an item for sale)">${CAMERA_ICON}</button>
-          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Ask with your voice">${MIC_ICON}</button>
-          <textarea name="q" rows="1" placeholder="Ask Chesky a question, or attach a photo to post it..."></textarea>
+          <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Attach a voice note">${MIC_ICON}</button>
+          <textarea name="q" rows="1" placeholder="Ask a question, or attach a photo/voice note to post something..."></textarea>
           <button type="submit">Send</button>
         </div>
         <input type="file" id="cheskyImageInput" accept="image/png,image/jpeg,image/webp" style="display:none">
@@ -329,7 +328,7 @@ const Chesky = (() => {
       <div style="text-align:center;padding:6px 0 10px"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanBtn">Talk to a real person &rarr;</button></div>
     `;
     if (!micAvailable()) document.getElementById('cheskyMicBtn').style.display = 'none';
-    renderPendingImageChip();
+    renderPendingAttachments();
     wireEnterToSend(document.getElementById('cheskyAskForm').q);
     document.getElementById('cheskyAskForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -499,34 +498,50 @@ const Chesky = (() => {
     recorder.stop();
   }
 
+  function recordedBlobToBase64() {
+    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+    const localUrl = URL.createObjectURL(blob);
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve({ data: String(reader.result).split(',')[1] || '', localUrl });
+      reader.readAsDataURL(blob);
+    });
+  }
+
   async function onRecordingStop() {
     clearInterval(recordTimer);
     clearTimeout(recordAutoStop);
     recordStream?.getTracks().forEach((t) => t.stop());
-    restoreFooter();
 
     const dur = (Date.now() - recordStart) / 1000;
-    if (recordCancelled || dur < 0.6 || !recordedChunks.length) return;
+    const isUsable = !recordCancelled && dur >= 0.6 && recordedChunks.length;
+    const mode = recordMode;
 
-    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-    const localUrl = URL.createObjectURL(blob);
-    const b64 = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
-      reader.readAsDataURL(blob);
-    });
-    const voice = { data: b64, mime: 'audio/webm', dur, peaks: recordPeaks };
-
-    if (convId) {
-      const node = bubble('visitor', voiceBubbleHtml({ url: localUrl, dur, peaks: recordPeaks }, ''));
-      try {
-        const result = await Api.cheskySend({ id: convId, voice });
-        if (result.lastId > lastMsgId) lastMsgId = result.lastId;
-        addCaption(node, result.transcript);
-      } catch (e) { toast('Could not send the voice note.'); }
-    } else {
-      askVoice(voice, localUrl);
+    if (isUsable && mode === 'ask') {
+      // Attach-and-hold, same idea as a photo - lets a voice note and a
+      // photo (and/or typed text) all go out together in one message, so
+      // "send me a picture and a voice note of what you want to sell" is
+      // one Send tap, not two separate messages.
+      const { data, localUrl } = await recordedBlobToBase64();
+      pendingVoice = { data, mime: 'audio/webm', dur, peaks: recordPeaks, localUrl };
+      restoreFooter();
+      return;
     }
+
+    restoreFooter();
+    if (!isUsable) return;
+
+    // Handoff mode (a real human conversation) still sends a voice note
+    // immediately - there's no "compose and attach" step in a live
+    // back-and-forth with a person.
+    const { data, localUrl } = await recordedBlobToBase64();
+    const voice = { data, mime: 'audio/webm', dur, peaks: recordPeaks };
+    const node = bubble('visitor', voiceBubbleHtml({ url: localUrl, dur, peaks: recordPeaks }, ''));
+    try {
+      const result = await Api.cheskySend({ id: convId, voice });
+      if (result.lastId > lastMsgId) lastMsgId = result.lastId;
+      addCaption(node, result.transcript);
+    } catch (e) { toast('Could not send the voice note.'); }
   }
 
   function enterHandoffMode() {
