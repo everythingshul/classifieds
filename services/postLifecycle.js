@@ -14,7 +14,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // wizard, admin "+ New Post", or the bulk tool) - never blocks or fails
 // post creation; a missing API key or a failed call just leaves
 // search_keywords null and search falls back to title/description alone.
+// No AI at all for simchas - family/life-event announcements are kept out
+// of any AI pipeline entirely, not just the "polish" button.
 function queueSearchKeywords(post) {
+  if (post.type === 'simcha') return;
   setImmediate(async () => {
     try {
       const keywords = await generateSearchKeywords({

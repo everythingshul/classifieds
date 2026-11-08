@@ -104,6 +104,9 @@ router.post('/polish', polishLimiter, async (req, res, next) => {
   try {
     const { field, text, type, category } = req.body;
     if (field !== 'title' && field !== 'description') return res.status(400).json({ error: 'field must be "title" or "description"' });
+    // No AI at all for simchas - family/life-event announcements are kept
+    // out of any AI pipeline entirely, not just left off the wizard UI.
+    if (type === 'simcha') return res.status(400).json({ error: 'AI polish is not available for simchas' });
     const result = await polishText({ field, text, type, category });
     res.json({ text: result });
   } catch (e) {

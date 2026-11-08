@@ -479,10 +479,7 @@ function renderPostWizard() {
     shell(`
       <div class="form-row">
         <label>Details <span class="hint">(optional)</span></label>
-        <div class="ai-field-wrap">
-          <textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea>
-          ${aiPolishBtnHtml('polishDescBtn')}
-        </div>
+        <textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Your Info <span class="hint">(never shown publicly - for our records only)</span></h3>
@@ -502,7 +499,6 @@ function renderPostWizard() {
       <div style="margin-top:20px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     populateCountrySelect(document.getElementById('p_phoneCountry'), state.data.posterPhoneCountry);
-    wireAiPolish(document.getElementById('polishDescBtn'), document.getElementById('f_description'), 'description');
     document.getElementById('backBtn').addEventListener('click', () => go(1));
     document.getElementById('nextBtn').addEventListener('click', () => {
       const errs = [];
