@@ -6,8 +6,29 @@ const { sendMail } = require('../utils/mailer');
 const { formatCents } = require('../utils/money');
 const { emailShell, escapeHtml: escapeHtmlShell } = require('./emailLayout');
 const { appUrl } = require('./appUrl');
+const { generateSearchKeywords } = require('./aiAssist');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Fire-and-forget, every post regardless of how it was created (public
+// wizard, admin "+ New Post", or the bulk tool) - never blocks or fails
+// post creation; a missing API key or a failed call just leaves
+// search_keywords null and search falls back to title/description alone.
+function queueSearchKeywords(post) {
+  setImmediate(async () => {
+    try {
+      const keywords = await generateSearchKeywords({
+        title: post.title,
+        description: post.description,
+        category: post.category,
+        type: post.type,
+      });
+      if (keywords) db.prepare('UPDATE posts SET search_keywords = ? WHERE id = ?').run(keywords, post.id);
+    } catch (e) {
+      console.error('[postLifecycle] search keyword generation failed for post', post.id, '-', e.message);
+    }
+  });
+}
 
 function insertPost({ type, category, payload, hasImages }) {
   const now = Date.now();
@@ -60,7 +81,9 @@ function insertPost({ type, category, payload, hasImages }) {
     created_at: now,
     updated_at: now,
   });
-  return db.prepare('SELECT * FROM posts WHERE id = ?').get(info.lastInsertRowid);
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(info.lastInsertRowid);
+  queueSearchKeywords(post);
+  return post;
 }
 
 function attachImages(postId, filenames) {

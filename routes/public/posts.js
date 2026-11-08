@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const db = require('../../db');
 const { upload, processAndSaveImage } = require('../../middleware/upload');
 const { validateClassifiedPayload, validateSimchaPayload, validateListingPayload, ValidationError } = require('../../services/postValidation');
@@ -13,8 +14,13 @@ const { getStripe } = require('../../utils/stripeClient');
 const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
 const { escapeHtml } = require('../../services/emailLayout');
+const { polishText } = require('../../services/aiAssist');
 
 const router = express.Router();
+
+// Each call is a real (billed) AI request, from a page with no login -
+// cap how often one visitor can lean on it while drafting.
+const polishLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
 const { appUrl } = require('../../services/appUrl');
 function postUrlPath(post) {
@@ -87,6 +93,23 @@ router.post('/promo/validate', (req, res) => {
     includedFeatures: parseFeatureList(promo.included_features),
     excludedFeatures: parseFeatureList(promo.excluded_features),
   });
+});
+
+// Interactive "polish this with AI" button in the post wizard (title or
+// description, one at a time) - never offered in the bulk-posting tool,
+// which calls services/adminPostCreate.js directly and has no user sitting
+// in front of it drafting. The poster still chooses whether to keep the
+// result; this only ever returns a suggestion, never writes anything.
+router.post('/polish', polishLimiter, async (req, res, next) => {
+  try {
+    const { field, text, type, category } = req.body;
+    if (field !== 'title' && field !== 'description') return res.status(400).json({ error: 'field must be "title" or "description"' });
+    const result = await polishText({ field, text, type, category });
+    res.json({ text: result });
+  } catch (e) {
+    if (e.status) return res.status(e.status).json({ error: e.message });
+    next(e);
+  }
 });
 
 router.post('/', upload.array('images', 6), async (req, res, next) => {

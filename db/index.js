@@ -42,6 +42,7 @@ addColumnIfMissing('pricing_tiers', 'price_cents_gbp', 'price_cents_gbp INTEGER'
 addColumnIfMissing('addon_pricing', 'price_cents_gbp', 'price_cents_gbp INTEGER');
 addColumnIfMissing('post_payments', 'currency', "currency TEXT NOT NULL DEFAULT 'usd'");
 addColumnIfMissing('posts', 'contact_phone_methods', 'contact_phone_methods TEXT');
+addColumnIfMissing('posts', 'search_keywords', 'search_keywords TEXT');
 // Must run after the migrations above, not in schema.sql - CREATE INDEX IF NOT
 // EXISTS still fails with "no such column" on a pre-existing analytics_events
 // table where the column was just added by ALTER TABLE, not by the original

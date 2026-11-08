@@ -20,6 +20,46 @@ function renderPostWizard() {
     return formatCents(amount, currency);
   }
 
+  // Wires a "Polish with AI" button next to a title/description field.
+  // Toggles into an "Undo" button after a successful polish; typing again
+  // manually drops it back to a fresh "Polish" button, since there's
+  // nothing left to undo to once the poster's edited past it themselves.
+  function wireAiPolish(btn, input, field) {
+    if (!btn || !input) return;
+    let previousValue = null;
+    const idleLabel = '✨ Polish with AI';
+    input.addEventListener('input', () => {
+      if (btn.dataset.applied) {
+        delete btn.dataset.applied;
+        btn.textContent = idleLabel;
+      }
+    });
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.applied) {
+        input.value = previousValue;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      const current = input.value.trim();
+      if (!current) { toast('Write something first'); return; }
+      btn.disabled = true;
+      btn.textContent = 'Polishing…';
+      try {
+        const result = await Api.polishPost({ field, text: current, type: state.postType, category: state.category });
+        previousValue = current;
+        input.value = input.maxLength > 0 ? result.text.slice(0, input.maxLength) : result.text;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        btn.dataset.applied = '1';
+        btn.textContent = '↺ Undo';
+      } catch (e) {
+        toast(e.message || 'AI polish failed, please try again');
+        btn.textContent = idleLabel;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function stepsList() {
     return state.postType === 'simcha'
       ? ['Type', 'Category', 'Details', 'Review']
@@ -216,13 +256,13 @@ function renderPostWizard() {
     shell(`
       <h3 style="margin-top:0">${escapeHtml(catDef.label)}</h3>
       <div class="form-row">
-        <label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}</label>
+        <label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}<button type="button" class="ai-polish-btn" id="polishTitleBtn">&#10024; Polish with AI</button></label>
         <input type="text" id="f_title" value="${escapeHtml(initialTitle)}" required>
         <div class="char-counter" id="titleCounter"></div>
         <div class="field-limit-warning error-list" id="titleLimitWarning" style="display:none"></div>
       </div>
       <div class="form-row">
-        <label>Description</label>
+        <label>Description<button type="button" class="ai-polish-btn" id="polishDescBtn">&#10024; Polish with AI</button></label>
         <textarea id="f_description" rows="5">${escapeHtml(initialDescription)}</textarea>
         <div class="char-counter" id="descCounter"></div>
         <div class="field-limit-warning error-list" id="descriptionLimitWarning" style="display:none"></div>
@@ -309,6 +349,8 @@ function renderPostWizard() {
     titleInput.addEventListener('input', updateCounters);
     descInput.addEventListener('input', updateCounters);
     updateCounters();
+    wireAiPolish(document.getElementById('polishTitleBtn'), titleInput, 'title');
+    wireAiPolish(document.getElementById('polishDescBtn'), descInput, 'description');
     const fileInput = document.getElementById('f_images');
     if (fileInput) {
       fileInput.addEventListener('change', () => {
@@ -411,7 +453,7 @@ function renderPostWizard() {
 
   function renderSimchaDetailsStep() {
     shell(`
-      <div class="form-row"><label>Details <span class="hint">(optional)</span></label><textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
+      <div class="form-row"><label>Details <span class="hint">(optional)</span><button type="button" class="ai-polish-btn" id="polishDescBtn">&#10024; Polish with AI</button></label><textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Your Info <span class="hint">(never shown publicly - for our records only)</span></h3>
       <div class="form-cols">
@@ -430,6 +472,7 @@ function renderPostWizard() {
       <div style="margin-top:20px;display:flex;justify-content:space-between"><button class="btn btn-outline" id="backBtn">Back</button><button class="btn" id="nextBtn">Next</button></div>
     `);
     populateCountrySelect(document.getElementById('p_phoneCountry'), state.data.posterPhoneCountry);
+    wireAiPolish(document.getElementById('polishDescBtn'), document.getElementById('f_description'), 'description');
     document.getElementById('backBtn').addEventListener('click', () => go(1));
     document.getElementById('nextBtn').addEventListener('click', () => {
       const errs = [];

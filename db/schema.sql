@@ -123,6 +123,11 @@ CREATE TABLE IF NOT EXISTS posts (
   -- ["call"] in code, matching what every phone number supported before.
   contact_phone_methods TEXT,
   contact_email TEXT,
+  -- AI-generated search aid (services/aiAssist.js) - synonyms/related terms
+  -- a visitor might search for that the title/description don't literally
+  -- contain. Never shown to visitors or admins anywhere, only ever checked
+  -- alongside title/description in a search query's WHERE clause.
+  search_keywords TEXT,
   contact_url TEXT,
   contact_url_approved INTEGER NOT NULL DEFAULT 0,
   poster_first_name TEXT,

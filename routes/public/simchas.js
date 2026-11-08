@@ -21,9 +21,12 @@ router.get('/', (req, res, next) => {
       params.push(Number(req.query.taxonomyId));
     }
     if (req.query.q) {
-      where.push('(title LIKE ? OR description LIKE ?)');
+      // search_keywords is an AI-generated, hidden list of synonyms/related
+      // terms (see services/aiAssist.js) - never shown to visitors, just
+      // widens what a search can match beyond the literal title/description.
+      where.push('(title LIKE ? OR description LIKE ? OR search_keywords LIKE ?)');
       const like = `%${req.query.q}%`;
-      params.push(like, like);
+      params.push(like, like, like);
     }
     if (req.query.city) {
       where.push('location_city LIKE ?');

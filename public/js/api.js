@@ -33,6 +33,7 @@ const Api = (() => {
     simchaDetail: (id) => req(`/simchas/${id}`),
     postsByIds: (ids) => req(`/posts/by-ids?ids=${ids.join(',')}`),
     createPost: (formData) => req('/posts', { method: 'POST', body: formData }),
+    polishPost: (body) => req('/posts/polish', { method: 'POST', body }),
     validatePromo: (code, postType) => req('/posts/promo/validate', { method: 'POST', body: { code, postType } }),
     report: (id, body) => req(`/posts/${id}/report`, { method: 'POST', body }),
     boost: (id, body) => req(`/posts/${id}/boost`, { method: 'POST', body }),

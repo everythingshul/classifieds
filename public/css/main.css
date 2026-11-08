@@ -454,6 +454,12 @@ p { margin: 0 0 .7em; }
   font-size: .8rem; font-weight: 600; color: var(--cta); background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
 }
 .share-row a:hover, .share-row button:hover { text-decoration: underline; }
+.ai-polish-btn {
+  font-size: .78rem; font-weight: 600; color: var(--navy); background: #fff; border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 3px 10px; cursor: pointer; font-family: inherit; margin-inline-start: 8px;
+}
+.ai-polish-btn:hover:not(:disabled) { border-color: var(--navy); background: var(--paper); }
+.ai-polish-btn:disabled { opacity: .6; cursor: default; }
 .contact-card { background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--cta); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); position: sticky; top: 66px; }
 .contact-card .btn { width: 100%; margin-bottom: 6px; text-align: center; }
 .contact-phone-row { display: flex; gap: 6px; margin-bottom: 6px; }
