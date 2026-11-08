@@ -88,7 +88,7 @@ function renderPostWizard() {
     const steps = stepsList();
     const progressPct = steps.length > 1 ? Math.round((state.step / (steps.length - 1)) * 100) : 0;
     document.getElementById('app').innerHTML = `
-      <div class="container" style="padding:30px 0 60px">
+      <div class="container" style="padding-top:30px;padding-bottom:60px">
         <h1 data-i18n="nav_post">Post an Ad</h1>
         <div class="wizard-steps">
           <div class="wizard-progress-track"><div class="wizard-progress-fill" id="wizardProgressFill"></div></div>
@@ -810,7 +810,7 @@ function postSubmittedHtml(post) {
   const path = `/${post.type === 'simcha' ? 'simchas' : post.type === 'listing' ? 'listings' : 'classifieds'}/${post.id}`;
   if (post.status === 'pending_approval') {
     return `
-      <div class="container" style="padding:60px 0;text-align:center;max-width:520px">
+      <div class="container" style="padding-top:60px;padding-bottom:60px;text-align:center;max-width:520px">
         <div class="success-pop">
           ${successCheckHtml()}
           <h1>Your post has been submitted!</h1>
@@ -820,7 +820,7 @@ function postSubmittedHtml(post) {
       </div>`;
   }
   return `
-    <div class="container" style="padding:60px 0;text-align:center">
+    <div class="container" style="padding-top:60px;padding-bottom:60px;text-align:center">
       <div class="success-pop">
         ${successCheckHtml()}
         <h1>Your post is live!</h1>
