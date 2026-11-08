@@ -463,10 +463,18 @@ p { margin: 0 0 .7em; }
   background: transparent; color: var(--navy); cursor: pointer;
   animation: ai-polish-nudge 1.3s ease-in-out 3;
 }
-.ai-polish-icon-btn svg { width: 18px; height: 18px; }
+.ai-polish-icon-btn svg { width: 18px; height: 18px; transition: transform .15s ease; }
 .ai-polish-icon-btn:hover:not(:disabled) { background: var(--paper); animation-play-state: paused; opacity: 1; }
+.ai-polish-icon-btn:hover:not(:disabled) svg { transform: scale(1.1); }
 .ai-polish-icon-btn:disabled { cursor: default; animation: ai-polish-spin 1s linear infinite; opacity: .85; }
-.ai-polish-icon-btn.is-applied { color: var(--cta); animation: none; opacity: 1; }
+/* Applied/"Undo" state - a solid filled pill instead of just a color swap,
+   so it's obvious at a glance that the field was actually changed. */
+.ai-polish-icon-btn.is-applied {
+  color: #fff; background: var(--cta); opacity: 1; animation: ai-polish-pop .3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+}
+.ai-polish-icon-btn.is-applied:hover:not(:disabled) { background: var(--cta); filter: brightness(1.08); }
+.ai-polish-icon-btn.is-applied:hover:not(:disabled) svg { transform: scale(1.1) rotate(-25deg); }
 /* Custom tooltip (not the native title attribute) so it matches the site's look and shows instantly. */
 .ai-polish-icon-btn::after {
   content: attr(data-tooltip); position: absolute; bottom: 130%; inset-inline-end: 0; white-space: nowrap;
@@ -478,6 +486,11 @@ p { margin: 0 0 .7em; }
 @keyframes ai-polish-nudge {
   0%, 100% { opacity: .5; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.18); }
+}
+@keyframes ai-polish-pop {
+  0% { transform: scale(.6); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
 }
 @keyframes ai-polish-spin {
   from { transform: rotate(0deg); }
