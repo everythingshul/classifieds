@@ -1,12 +1,11 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const db = require('../../db');
-const { upload, processAndSaveImage } = require('../../middleware/upload');
-const { validateClassifiedPayload, validateSimchaPayload, validateListingPayload, ValidationError } = require('../../services/postValidation');
-const { buildClassifiedCharges, buildListingCharges, buildSimchaCharges, getAddon, getClassifiedCharLimits, getSimchaCharLimits, getOversizedCharLimits, getListingCharLimits } = require('../../services/pricing');
-const { findCategory, findListingCategory } = require('../../services/taxonomy');
-const { getActivePromo, applyDiscount, recordUse, promoAppliesTo, promoAppliesToFeature } = require('../../services/promoCodes');
-const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive, fulfillCheckoutSession } = require('../../services/postLifecycle');
+const { upload } = require('../../middleware/upload');
+const { ValidationError } = require('../../services/postValidation');
+const { getAddon } = require('../../services/pricing');
+const { getActivePromo, promoAppliesTo } = require('../../services/promoCodes');
+const { recordPayment, fulfillCheckoutSession } = require('../../services/postLifecycle');
 const { formatPostPublic } = require('../../services/postFormat');
 const { createCheckoutSession } = require('../../services/checkout');
 const { currencyForHost } = require('../../services/currency');
@@ -15,6 +14,8 @@ const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
 const { escapeHtml } = require('../../services/emailLayout');
 const { polishText } = require('../../services/aiAssist');
+const { submitPost, SECTION_LABELS } = require('../../services/postSubmit');
+const { appUrl } = require('../../services/appUrl');
 
 const router = express.Router();
 
@@ -22,55 +23,16 @@ const router = express.Router();
 // cap how often one visitor can lean on it while drafting.
 const polishLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
-const { appUrl } = require('../../services/appUrl');
 function postUrlPath(post) {
   if (post.type === 'simcha') return `/simchas/${post.public_id}`;
   if (post.type === 'listing') return `/listings/${post.public_id}`;
   return `/classifieds/${post.public_id}`;
 }
 
-const SECTION_LABELS = { classified: 'classifieds', listing: 'listings', simcha: 'simchas' };
-
-// Mutates `charges` in place: discounts only the line items the promo is
-// scoped to (via included/excluded features - e.g. a promo can cover the
-// base listing but exclude "oversized"), collapsing that eligible subset
-// into one discounted line so Stripe (and the invoice) show a clean total,
-// while any ineligible line items pass through at full price untouched.
-function applyPromoToCharges(charges, code, postType) {
-  if (!code) return null;
-  const promo = getActivePromo(code);
-  if (!promo) throw Object.assign(new Error('That promo code is invalid or expired'), { status: 400 });
-  if (!promoAppliesTo(promo, postType)) {
-    throw Object.assign(new Error(`That promo code isn't valid for ${SECTION_LABELS[postType] || postType}`), { status: 400 });
-  }
-  const eligible = charges.lineItems.filter((li) => promoAppliesToFeature(promo, li.kind));
-  const ineligible = charges.lineItems.filter((li) => !promoAppliesToFeature(promo, li.kind));
-  if (!eligible.length) {
-    throw Object.assign(new Error(`That promo code doesn't apply to any of the selected options`), { status: 400 });
-  }
-  const eligibleSubtotal = eligible.reduce((s, li) => s + li.amount_cents, 0);
-  const discountedEligible = applyDiscount(eligibleSubtotal, promo);
-  const eligibleLabel = eligible.map((li) => li.label).join(' + ');
-
-  charges.lineItems = [...ineligible, { kind: eligible[0].kind, label: `${eligibleLabel} (promo ${promo.code} applied)`, amount_cents: discountedEligible }];
-  charges.totalCents = discountedEligible + ineligible.reduce((s, li) => s + li.amount_cents, 0);
-  charges.promo = promo;
-  return promo;
-}
-
-async function processUploadedImages(files) {
-  if (!files || !files.length) return [];
-  const out = [];
-  for (const file of files) {
-    const filename = await processAndSaveImage(file.buffer);
-    out.push({ filename, originalName: file.originalname });
-  }
-  return out;
-}
-
 // Lets the post wizard preview a promo code's discount before final submit,
 // without creating anything - the actual discount is still re-applied (and
-// re-validated) server-side in applyPromoToCharges() at submit time.
+// re-validated) server-side in services/postSubmit.js's applyPromoToCharges
+// at submit time.
 router.post('/promo/validate', (req, res) => {
   const promo = getActivePromo(req.body.code);
   if (!promo) return res.status(400).json({ error: 'That promo code is invalid or expired' });
@@ -117,134 +79,14 @@ router.post('/polish', polishLimiter, async (req, res, next) => {
 
 router.post('/', upload.array('images', 6), async (req, res, next) => {
   try {
-    const type = req.body.type === 'simcha' ? 'simcha' : req.body.type === 'listing' ? 'listing' : 'classified';
-    let parsedFields = {};
-    try {
-      parsedFields = req.body.fields ? JSON.parse(req.body.fields) : {};
-    } catch (e) {
-      return res.status(400).json({ error: 'fields must be valid JSON' });
-    }
-    let surpriseEmails = [];
-    if (req.body.surpriseEmails) {
-      try {
-        surpriseEmails = JSON.parse(req.body.surpriseEmails);
-      } catch (e) {
-        return res.status(400).json({ error: 'surpriseEmails must be valid JSON' });
-      }
-    }
-
-    const wantsOversized = !!req.body.wantsOversized && req.body.wantsOversized !== 'false';
-
-    if (type === 'classified') {
-      const charLimits = wantsOversized ? getOversizedCharLimits() : getClassifiedCharLimits();
-      const payload = validateClassifiedPayload({ ...req.body, fields: parsedFields, wantsOversized }, charLimits);
-      const catDef = findCategory(payload.category);
-      const uploaded = await processUploadedImages(req.files);
-      if (uploaded.length && !catDef.hasImages) {
-        return res.status(400).json({ error: `${catDef.label} does not support image uploads` });
-      }
-
-      const charges = buildClassifiedCharges({
-        category: payload.category,
-        categoryDef: catDef,
-        pricingTierId: payload.pricingTierId,
-        wantsStrike: payload.wantsStrike,
-        wantsOversized: payload.wantsOversized,
-        currency: currencyForHost(req.hostname),
-      });
-      applyPromoToCharges(charges, req.body.promoCode, 'classified');
-
-      const post = insertPost({ type: 'classified', category: payload.category, payload, hasImages: uploaded.length > 0 });
-      attachImages(post.id, uploaded);
-      const payment = recordPayment({
-        postId: post.id,
-        kind: 'listing',
-        amountCents: charges.totalCents,
-        currency: charges.currency,
-        payerEmail: payload.posterEmail,
-        status: charges.totalCents === 0 ? 'paid' : 'pending',
-      });
-
-      return await finalizeOrCheckout({ res, post, payment, charges, posterEmail: payload.posterEmail, type: 'classified' });
-    }
-
-    if (type === 'listing') {
-      const charLimits = wantsOversized ? getOversizedCharLimits() : getListingCharLimits();
-      const payload = validateListingPayload({ ...req.body, fields: parsedFields, wantsOversized }, charLimits);
-      const catDef = findListingCategory(payload.category);
-      const uploaded = await processUploadedImages(req.files);
-      if (uploaded.length && !catDef.hasImages) {
-        return res.status(400).json({ error: `${catDef.label} does not support image uploads` });
-      }
-
-      const charges = buildListingCharges({
-        category: payload.category,
-        categoryDef: catDef,
-        pricingTierId: payload.pricingTierId,
-        wantsStrike: payload.wantsStrike,
-        wantsOversized: payload.wantsOversized,
-        currency: currencyForHost(req.hostname),
-      });
-      applyPromoToCharges(charges, req.body.promoCode, 'listing');
-
-      const post = insertPost({ type: 'listing', category: payload.category, payload, hasImages: uploaded.length > 0 });
-      attachImages(post.id, uploaded);
-      const payment = recordPayment({
-        postId: post.id,
-        kind: 'listing',
-        amountCents: charges.totalCents,
-        currency: charges.currency,
-        payerEmail: payload.posterEmail,
-        status: charges.totalCents === 0 ? 'paid' : 'pending',
-      });
-
-      return await finalizeOrCheckout({ res, post, payment, charges, posterEmail: payload.posterEmail, type: 'listing' });
-    }
-
-    // simcha - no title/date/location are collected; the title is the
-    // chosen category name (e.g. "Engagement", "New Home").
-    const payload = validateSimchaPayload({ ...req.body, fields: parsedFields, surpriseEmails }, getSimchaCharLimits());
-    const taxonomy = db.prepare('SELECT name FROM taxonomies WHERE id = ? AND grp = ?').get(payload.taxonomyId, 'simcha');
-    if (!taxonomy) return res.status(400).json({ error: 'Validation failed', details: ['a valid simcha category is required'] });
-    payload.title = taxonomy.name;
-    const charges = buildSimchaCharges({ currency: currencyForHost(req.hostname) });
-    applyPromoToCharges(charges, req.body.promoCode, 'simcha');
-    const post = insertPost({ type: 'simcha', category: 'simcha', payload, hasImages: false });
-    attachSimchaSurprises(post.id, payload.surpriseEmails, `${payload.posterFirstName || ''} ${payload.posterLastName || ''}`.trim());
-    const payment = recordPayment({
-      postId: post.id,
-      kind: 'listing',
-      amountCents: charges.totalCents,
-      currency: charges.currency,
-      payerEmail: payload.posterEmail,
-      status: charges.totalCents === 0 ? 'paid' : 'pending',
-    });
-
-    return await finalizeOrCheckout({ res, post, payment, charges, posterEmail: payload.posterEmail, type: 'simcha' });
+    const result = await submitPost({ type: req.body.type, body: req.body, files: req.files, hostname: req.hostname });
+    res.status(result.status).json(result.body);
   } catch (e) {
     if (e instanceof ValidationError) return res.status(400).json({ error: 'Validation failed', details: e.errors });
+    if (e.status) return res.status(e.status).json({ error: e.message });
     next(e);
   }
 });
-
-async function finalizeOrCheckout({ res, post, payment, charges, posterEmail, type }) {
-  if (charges.totalCents === 0) {
-    if (charges.promo) recordUse(charges.promo);
-    const finalPost = await finalizePostLive(post.id);
-    return res.json({ requiresPayment: false, post: formatPostPublic(finalPost) });
-  }
-
-  const session = await createCheckoutSession({
-    lineItems: charges.lineItems,
-    currency: charges.currency,
-    returnUrl: `${appUrl()}/post-success.html?session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl: `${appUrl()}/post`,
-    customerEmail: posterEmail,
-    metadata: { kind: 'listing', postId: String(post.id), paymentId: String(payment.id), type, promoCode: charges.promo?.code || '' },
-  });
-  db.prepare('UPDATE post_payments SET stripe_session_id = ? WHERE id = ?').run(session.id, payment.id);
-  return res.json({ requiresPayment: true, clientSecret: session.client_secret || null, checkoutUrl: session.url || null });
-}
 
 // Fallback verification for the success page: normally the Stripe webhook
 // fulfills a paid session, but if the webhook is misconfigured or hasn't
