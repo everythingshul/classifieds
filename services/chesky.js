@@ -11,6 +11,25 @@ const runtimeConfig = require('../services/runtimeConfig');
 const { siteName, appUrl } = require('./emailLayout');
 const { getAllClassifiedCategories } = require('./taxonomy');
 const { getAllListingCategories } = require('./listingCategories');
+const { currencyForHost } = require('./currency');
+const { currentOrigin } = require('./requestContext');
+const { CURRENCIES } = require('../utils/constants');
+
+const CURRENCY_SYMBOLS = Object.fromEntries(CURRENCIES.map((c) => [c.code, c.symbol]));
+
+// Which currency the visitor currently talking to Chesky would actually be
+// charged (see services/currency.js) - available via AsyncLocalStorage
+// (services/requestContext.js), so no req/hostname needs threading through
+// routes/public/chat.js just for this.
+function currentCurrency() {
+  const origin = currentOrigin();
+  if (!origin) return 'usd';
+  try {
+    return currencyForHost(new URL(origin).hostname);
+  } catch (e) {
+    return 'usd';
+  }
+}
 
 const ReplySchema = z.object({
   reply: z.string(),
@@ -116,44 +135,58 @@ function searchRelevantPosts(question, limit = 5) {
   return rows.map((p) => {
     let fields = {};
     try { fields = JSON.parse(p.fields || '{}'); } catch (e) { /* ignore */ }
-    const price = fields.price !== undefined && fields.price !== null ? `$${fields.price}` : fields.priceText || null;
+    // An item's own asking price is whatever currency the poster chose for
+    // it (fields.currency), not necessarily this visitor's own - a listed
+    // price is a fact about the post, never converted.
+    const symbol = CURRENCY_SYMBOLS[fields.currency] || '$';
+    const price = fields.price !== undefined && fields.price !== null ? `${symbol}${fields.price}` : fields.priceText || null;
     const loc = [p.location_city, p.location_state].filter(Boolean).join(', ');
     return { title: p.title, category: p.category, location: loc, price, url: postPublicPath(p) };
   });
 }
 
-let contextCache = null;
-let contextCacheAt = 0;
+// Keyed by currency ('usd'/'gbp') - a .co.uk visitor and a .com visitor
+// must never share a cached context, or one domain's pricing would leak
+// into the other's conversation.
+const contextCache = new Map();
 
 // Live site facts the AI is grounded in, so it never has to guess or make up
-// a category name or price - rebuilt at most once every 30s.
+// a category name or price - rebuilt at most once every 30s per currency.
 function buildSiteContext() {
-  if (contextCache && Date.now() - contextCacheAt < 30000) return contextCache;
+  const currency = currentCurrency();
+  const cached = contextCache.get(currency);
+  if (cached && Date.now() - cached.at < 30000) return cached.text;
 
+  const isGbp = currency === 'gbp';
   const name = siteName();
   const classifiedCats = getAllClassifiedCategories().map((c) => c.label);
   const listingCats = getAllListingCategories().map((c) => c.label);
-  // GBP shown alongside USD when the admin has configured it - jlistings.co.uk
-  // visitors are charged that GBP price (see services/currency.js); everyone
-  // else pays USD. Not domain-specific here since this context is cached and
-  // shared across all visitors regardless of which site they're asking from.
-  const gbpSuffix = (cents) => (cents !== null && cents !== undefined ? ` (£${(cents / 100).toFixed(2)} on jlistings.co.uk)` : '');
+  // A GBP visitor (jlistings.co.uk) sees the GBP price as the real one
+  // they'd pay - falling back to USD only if the admin never configured a
+  // GBP price for that item, same all-or-nothing rule checkout itself uses
+  // (services/pricing.js). Everyone else just sees USD, with no mention of
+  // a currency that will never apply to them.
+  const price = (usdCents, gbpCents) => {
+    if (isGbp && gbpCents !== null && gbpCents !== undefined) return `£${(gbpCents / 100).toFixed(2)}`;
+    return `$${(usdCents / 100).toFixed(2)}`;
+  };
   const addons = db.prepare('SELECT key, price_cents, price_cents_gbp, config FROM addon_pricing').all();
   const addonLines = addons.map((a) => {
     const cfg = a.config ? JSON.parse(a.config) : {};
     const label = cfg.label || a.key;
-    return `- ${label}: $${(a.price_cents / 100).toFixed(2)}${gbpSuffix(a.price_cents_gbp)}`;
+    return `- ${label}: ${price(a.price_cents, a.price_cents_gbp)}`;
   });
   const tiers = db.prepare("SELECT category, post_type, name, duration_days, price_cents, price_cents_gbp FROM pricing_tiers WHERE active = 1 ORDER BY post_type, sort_order").all();
-  const tierLines = tiers.map((t) => `- ${t.post_type === 'listing' ? 'Listing' : t.post_type === 'simcha' ? 'Simcha' : 'Classified'}${t.category ? ` (${t.category})` : ''}: ${t.name}, ${t.duration_days} days, ${t.price_cents ? `$${(t.price_cents / 100).toFixed(2)}${gbpSuffix(t.price_cents_gbp)}` : 'free'}`);
+  const tierLines = tiers.map((t) => `- ${t.post_type === 'listing' ? 'Listing' : t.post_type === 'simcha' ? 'Simcha' : 'Classified'}${t.category ? ` (${t.category})` : ''}: ${t.name}, ${t.duration_days} days, ${t.price_cents ? price(t.price_cents, t.price_cents_gbp) : 'free'}`);
 
-  contextCache = `
+  const text = `
 Site name: ${name}
+Currency for this visitor: ${isGbp ? 'GBP (£) - they are on the .co.uk site' : 'USD ($)'}
 
 Classifieds categories: ${classifiedCats.join(', ') || 'none configured'}
 Listings categories: ${listingCats.join(', ') || 'none configured'}
 
-Posting durations & prices (exact tier names/prices/durations can change - these are what's configured right now):
+Posting durations & prices (exact tier names/prices/durations can change - these are what's configured right now, already converted to this visitor's own currency):
 ${tierLines.join('\n') || '(none configured)'}
 
 Boost / Feature add-ons (make a post appear higher or with a highlighted style):
@@ -166,8 +199,8 @@ Policies to know:
 - To boost or feature an existing post, the poster opens their post's page and uses the "Boost or Feature this listing" section with the email they posted under.
 - Simchas (celebrations like a birth, bar/bat mitzvah, wedding) are a separate free-text section from Classifieds/Listings.
 `.trim();
-  contextCacheAt = Date.now();
-  return contextCache;
+  contextCache.set(currency, { text, at: Date.now() });
+  return text;
 }
 
 function buildSystemPrompt(question) {
