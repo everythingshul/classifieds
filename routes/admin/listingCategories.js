@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
-const { getAllListingCategories, slugify, uniqueListingSlug } = require('../../services/taxonomy');
+const { getAllListingCategories, createListingCategory } = require('../../services/taxonomy');
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -11,16 +11,11 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { label, labelHe, hasImages, hasPrice, free } = req.body;
-  if (!label || !label.trim()) return res.status(400).json({ error: 'Name is required' });
-  const key = uniqueListingSlug(slugify(label));
-  const info = db
-    .prepare(
-      `INSERT INTO listing_categories (key, label, label_he, has_images, has_price, free, sort_order, active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
-    )
-    .run(key, label.trim(), labelHe || null, hasImages ? 1 : 0, hasPrice ? 1 : 0, free ? 1 : 0, 100, Date.now());
-  res.status(201).json(db.prepare('SELECT * FROM listing_categories WHERE id = ?').get(info.lastInsertRowid));
+  try {
+    res.status(201).json(createListingCategory(req.body));
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
 });
 
 router.put('/:id', (req, res) => {

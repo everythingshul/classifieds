@@ -36,6 +36,15 @@ async function renderSettingsPage() {
     </div>
 
     <div class="admin-card">
+      <h3 style="margin-top:0">Listing Category Manager</h3>
+      <p class="hint">A hidden page at <code>/catmap924</code> that lists every business listing and lets whoever has this password mass-change their category, or add new listing categories - nothing else (no contact info, no other fields, no other admin access). A separate password from the Bulk Posting Tool above. Visiting it from the "Manage Categories" link in this portal's nav skips the password, since you're already signed in.</p>
+      <form id="catMgrForm">
+        ${secretField('category_manage_password_hash', 'Password', s.category_manage_password_hash_isSet, 'Choose a password')}
+        <button class="btn btn-sm" type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
       <h3 style="margin-top:0">Chesky Chat Assistant</h3>
       <p class="hint">The chat widget on the site. Get an API key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Without a key, the widget still lets visitors reach your team, but Chesky can't answer anything itself.</p>
       <form id="cheskyForm">
@@ -192,6 +201,11 @@ async function renderSettingsPage() {
   bindForm('bulkForm', (fd) => {
     const out = [];
     if (fd.bulk_post_password_hash) out.push(['bulk_post_password_hash', fd.bulk_post_password_hash]);
+    return out;
+  }, true);
+  bindForm('catMgrForm', (fd) => {
+    const out = [];
+    if (fd.category_manage_password_hash) out.push(['category_manage_password_hash', fd.category_manage_password_hash]);
     return out;
   }, true);
   bindForm('cheskyForm', (fd) => {

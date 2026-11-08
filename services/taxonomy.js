@@ -99,6 +99,22 @@ function uniqueListingSlug(base) {
   return `${base}-${i}`;
 }
 
+// Shared by the admin Categories page (routes/admin/listingCategories.js)
+// and the hidden category-management tool (routes/public/categoryManage.js)
+// so both validate/slugify identically.
+function createListingCategory({ label, labelHe, hasImages, hasPrice, free } = {}) {
+  const trimmed = String(label || '').trim();
+  if (!trimmed) throw Object.assign(new Error('Name is required'), { status: 400 });
+  const key = uniqueListingSlug(slugify(trimmed));
+  const info = db
+    .prepare(
+      `INSERT INTO listing_categories (key, label, label_he, has_images, has_price, free, sort_order, active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    )
+    .run(key, trimmed, labelHe || null, hasImages ? 1 : 0, hasPrice ? 1 : 0, free ? 1 : 0, 100, Date.now());
+  return db.prepare('SELECT * FROM listing_categories WHERE id = ?').get(info.lastInsertRowid);
+}
+
 // -- Generic taxonomy tree ordering --
 
 // Re-orders a flat taxonomy list (parent_id, sort_order) into hierarchical
@@ -145,5 +161,6 @@ module.exports = {
   getListingCategoryKeys,
   findListingCategory,
   uniqueListingSlug,
+  createListingCategory,
   orderTaxonomyTree,
 };

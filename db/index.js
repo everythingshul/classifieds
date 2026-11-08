@@ -225,6 +225,7 @@ function seed() {
   // services/appUrl.js. Adding one here needs no deploy, just DNS + this.
   seed('app_domains', []);
   seed('bulk_post_password_hash', '');
+  seed('category_manage_password_hash', '');
   seed('stripe_publishable_key', process.env.STRIPE_PUBLISHABLE_KEY || '');
   seed('stripe_secret_key', process.env.STRIPE_SECRET_KEY || '');
   seed('stripe_webhook_secret', process.env.STRIPE_WEBHOOK_SECRET || '');

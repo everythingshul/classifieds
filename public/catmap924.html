@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Manage Listing Categories</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body { background: var(--paper); }
+    .catmgr-wrap { max-width: 920px; margin: 0 auto; padding: 40px 18px 100px; }
+    .auth-card { max-width: 380px; margin: 80px auto; background: #fff; border: 1px solid var(--border); padding: 28px; }
+    .auth-card h1 { font-size: 1.2rem; margin: 0 0 6px; }
+    .catmgr-top-bar { position: sticky; top: 0; background: var(--paper); z-index: 10; padding: 14px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .catmgr-top-bar h1 { font-size: 1.3rem; margin: 0; }
+    .catmgr-bulk-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff; border: 1px solid var(--border); padding: 12px; margin-bottom: 14px; position: sticky; top: 56px; z-index: 9; }
+    .catmgr-bulk-bar select { flex: 1; min-width: 180px; }
+    .admin-table td, .admin-table th { vertical-align: middle; }
+    .catmgr-row-select { width: 18px; height: 18px; }
+  </style>
+</head>
+<body>
+  <div class="catmgr-wrap">
+    <div id="authGate">
+      <div class="auth-card">
+        <h1>Manage Listing Categories</h1>
+        <p class="hint">Enter the password to continue.</p>
+        <form id="authForm">
+          <div class="form-row"><input type="password" id="catPassword" autocomplete="current-password" required></div>
+          <div id="authError" class="error-list" style="display:none"></div>
+          <button class="btn" type="submit" style="width:100%">Continue</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="catTool" style="display:none">
+      <div class="catmgr-top-bar">
+        <h1>Manage Listing Categories</h1>
+        <div class="hint" id="catSummary"></div>
+      </div>
+
+      <div class="admin-card">
+        <h3 style="margin-top:0">Add a Category</h3>
+        <form id="addCatForm">
+          <div class="form-cols">
+            <div class="form-row"><label>Name (English)</label><input type="text" id="newCatLabel" required></div>
+            <div class="form-row"><label>Name (Hebrew) <span class="hint">optional</span></label><input type="text" id="newCatLabelHe"></div>
+          </div>
+          <div style="display:flex;gap:16px;margin:8px 0">
+            <label><input type="checkbox" id="newCatHasPrice"> Has a price field</label>
+            <label><input type="checkbox" id="newCatHasImages"> Allows photos (admin-approved)</label>
+            <label><input type="checkbox" id="newCatFree"> Free to post</label>
+          </div>
+          <button class="btn btn-sm" type="submit">Add Category</button>
+        </form>
+      </div>
+
+      <div class="catmgr-bulk-bar">
+        <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="selectAllBox"> Select all</label>
+        <select id="bulkCategorySelect"></select>
+        <button class="btn btn-sm" type="button" id="applyBulkBtn">Apply to Selected</button>
+      </div>
+
+      <table class="admin-table" style="width:100%">
+        <thead><tr><th></th><th>Title</th><th>Current Category</th><th>Status</th></tr></thead>
+        <tbody id="listingsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/categoryManage.js"></script>
+</body>
+</html>

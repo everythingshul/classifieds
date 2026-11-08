@@ -96,6 +96,7 @@ app.use('/api/editorials', require('./routes/public/editorials'));
 app.use('/api/subscriptions', require('./routes/public/subscriptions'));
 app.use('/api/banners', require('./routes/public/banners'));
 app.use('/api/bulk-post', require('./routes/public/bulkPost'));
+app.use('/api/category-manage', require('./routes/public/categoryManage'));
 app.use('/api/chat', require('./routes/public/chat'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
@@ -126,6 +127,12 @@ app.get('/admin*', (req, res) => {
 // own "Bulk Add" link). See routes/public/bulkPost.js for its API.
 app.get('/tabadd137', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'tabadd137.html'));
+});
+
+// Hidden listing-category management tool - same idea, its own separate
+// password, not linked in the public nav. See routes/public/categoryManage.js.
+app.get('/catmap924', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'catmap924.html'));
 });
 
 // Client-side routed pages (classified/listing/simcha detail, view-all, etc.)

@@ -48,6 +48,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '#/pricing', label: 'Pricing' },
   { href: '#/settings', label: 'Settings' },
   { href: '/tabadd137', label: 'Bulk Add', target: '_blank' },
+  { href: '/catmap924', label: 'Manage Categories', target: '_blank' },
 ];
 
 function renderShell() {
