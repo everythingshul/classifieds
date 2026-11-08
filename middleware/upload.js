@@ -68,4 +68,4 @@ function saveVoiceNote(buffer, mime) {
   return filename;
 }
 
-module.exports = { upload, processAndSaveImage, UPLOAD_DIR, bannerUpload, saveBannerImage, saveVoiceNote, VOICE_MIME_EXT };
+module.exports = { upload, processAndSaveImage, UPLOAD_DIR, bannerUpload, saveBannerImage, saveVoiceNote, VOICE_MIME_EXT, ALLOWED_MIME };

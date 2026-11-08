@@ -62,7 +62,11 @@ app.use(cookieParser());
 // Stripe needs the raw body to verify webhook signatures, so mount it before json().
 app.use('/api/webhook', express.raw({ type: 'application/json' }), require('./routes/public/webhook'));
 
-app.use(express.json({ limit: '2mb' }));
+// Raised from 2mb for Chesky's photo-from-chat feature (routes/public/chat.js) -
+// a base64-encoded photo plus its JSON wrapper runs well past 2mb for a real
+// camera photo. Matches the existing per-image ceiling multer already
+// enforces for the regular post wizard's uploads (middleware/upload.js).
+app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 240, standardHeaders: true, legacyHeaders: false });

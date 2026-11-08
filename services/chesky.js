@@ -249,6 +249,7 @@ const CREATE_POST_TOOL = {
       tierName: { type: 'string', description: 'Optional - the posting plan/duration name the visitor asked for, exactly as listed in the site facts. Defaults to the standard plan for the category if omitted.' },
       wantsStrike: { type: 'boolean', description: 'Optional add-on to feature/highlight the post, if they asked for it and it was mentioned as available.' },
       wantsOversized: { type: 'boolean' },
+      attachPhoto: { type: 'boolean', description: 'Whether to attach the photo the visitor most recently sent in this conversation to the post. Defaults to true whenever a photo was sent and hasn\'t already been used for a different post - set it to false if the photo clearly isn\'t for this post.' },
       posterFirstName: { type: 'string' },
       posterLastName: { type: 'string' },
       posterEmail: { type: 'string', description: 'Required - where their invoice/confirmation goes.' },
@@ -289,8 +290,11 @@ function resolveTierId(tiers, categoryDef, tierName) {
 // Runs the actual, same-as-the-public-wizard post creation (services/
 // postSubmit.js) - never anything bespoke to Chesky, so a post it creates
 // is validated, charged, and (if free) published exactly the way a post
-// from the regular "+ Post" page is.
-async function execCreatePost(input) {
+// from the regular "+ Post" page is. `image` (buffer+mime, or null) is the
+// photo the visitor most recently sent in this conversation, if any - goes
+// through the exact same processAndSaveImage/moderation-queue pipeline a
+// wizard-uploaded photo does, never anything bespoke to chat.
+async function execCreatePost(input, image) {
   try {
     const type = ['classified', 'listing', 'simcha'].includes(input.type) ? input.type : 'classified';
     const body = {
@@ -309,13 +313,14 @@ async function execCreatePost(input) {
       fields: {},
     };
 
+    let catDef = null;
     if (type === 'simcha') {
       const taxonomy = db.prepare("SELECT id FROM taxonomies WHERE grp = 'simcha' AND active = 1 AND name = ?").get(String(input.simchaCategory || '').trim());
       if (!taxonomy) return { status: 'error', errors: [`"${input.simchaCategory}" is not a valid simcha category - check the exact name in the site facts and ask them to confirm which one they mean.`] };
       body.taxonomyId = taxonomy.id;
     } else {
       body.category = input.category;
-      const catDef = type === 'listing' ? findListingCategory(input.category) : findCategory(input.category);
+      catDef = type === 'listing' ? findListingCategory(input.category) : findCategory(input.category);
       if (!catDef) return { status: 'error', errors: [`"${input.category}" is not a valid category key - double check the exact key in the site facts.`] };
       if (catDef.hasPrice && input.price !== undefined && input.price !== '') body.fields.price = input.price;
       const tiers = type === 'listing' ? getListingTiersForCategory(input.category) : getTiersForCategory(input.category);
@@ -324,13 +329,27 @@ async function execCreatePost(input) {
       if (tierId) body.pricingTierId = tierId;
     }
 
-    const result = await submitPost({ type, body, files: [], hostname: currentHostname() });
+    // Simchas never show images (site-wide, not a Chesky-specific rule) -
+    // skip a photo entirely there rather than letting submitPost reject the
+    // whole post over an attachment it can't use.
+    const categorySupportsPhotos = type === 'simcha' ? false : !!catDef?.hasImages;
+    const wantsPhoto = !!(image && input.attachPhoto !== false && categorySupportsPhotos);
+    const files = wantsPhoto ? [{ buffer: image.buffer, originalname: `chesky-photo.${image.mime === 'image/png' ? 'png' : image.mime === 'image/webp' ? 'webp' : 'jpg'}` }] : [];
+    const photoSkipped = !!(image && input.attachPhoto !== false && !categorySupportsPhotos);
+
+    const result = await submitPost({ type, body, files, hostname: currentHostname() });
     if (result.status !== 200) return { status: 'error', errors: [result.body?.error || 'Could not create that post.'] };
     if (result.body.requiresPayment) {
-      return { status: 'checkout_required', clientSecret: result.body.clientSecret };
+      return { status: 'checkout_required', clientSecret: result.body.clientSecret, photoAttached: files.length > 0, photoSkipped };
     }
     const post = result.body.post;
-    return { status: post.status === 'pending_approval' ? 'pending_approval' : 'live', postUrl: postPublicPath({ type: post.type, public_id: post.id }), title: post.title };
+    return {
+      status: post.status === 'pending_approval' ? 'pending_approval' : 'live',
+      postUrl: postPublicPath({ type: post.type, public_id: post.id }),
+      title: post.title,
+      photoAttached: files.length > 0,
+      photoSkipped,
+    };
   } catch (e) {
     if (e instanceof ValidationError) return { status: 'error', errors: e.errors };
     if (e.status) return { status: 'error', errors: [e.message] };
@@ -373,13 +392,13 @@ async function execSubscribe(input) {
   }
 }
 
-async function executeTool(name, input) {
-  if (name === 'create_post') return execCreatePost(input || {});
+async function executeTool(name, input, image) {
+  if (name === 'create_post') return execCreatePost(input || {}, image);
   if (name === 'subscribe_to_updates') return execSubscribe(input || {});
   return { status: 'error', errors: ['Unknown tool'] };
 }
 
-function buildSystemPrompt(question) {
+function buildSystemPrompt(question, hasImage) {
   const name = siteName();
   const posts = searchRelevantPosts(question);
   const postsBlock = posts.length
@@ -392,7 +411,9 @@ PERSONALITY - this matters a lot: talk like a kind, down-to-earth staff member t
 
 SCOPE: you only help with ${name} itself - how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, advertising (see below), email updates (see below), general site navigation, and (per the live posts below) what's currently posted on the site. If someone asks about something unrelated to ${name} - general knowledge, other websites/companies, personal advice - don't answer it; warmly say that's outside what you can help with here, and set offTopic to true.
 
-POSTING FOR SOMEONE, RIGHT HERE IN CHAT: you can actually create a post for a visitor using the create_post tool, including handling payment for a paid category - but you can NEVER ask for or accept card/payment details yourself (you have no way to charge anyone). Here's the flow: gather everything you need through normal conversation (what they're posting, which category it fits - match it to an exact category key from the site facts, a short description, their location if relevant, and an email to send their invoice/confirmation to), confirm with them what you're about to post, then call create_post. If it comes back needing payment, tell them warmly that a secure payment form just opened right here in the chat (Stripe's own form - you never see or touch their card details) and that their post goes live the moment they complete it. If it's free, tell them it's live now and share the link. If it comes back with an error, explain what's missing or wrong in plain language and ask for a fix - never retry blindly with guessed values. No photos through chat (text only) - if asked, say photos can be added via the invoice/management link afterward, or suggest the regular "+ Post" page if they'd rather do it with photos from the start.
+POSTING FOR SOMEONE, RIGHT HERE IN CHAT: you can actually create a post for a visitor using the create_post tool, including handling payment for a paid category - but you can NEVER ask for or accept card/payment details yourself (you have no way to charge anyone). Here's the flow: gather everything you need through normal conversation (what they're posting, which category it fits - match it to an exact category key from the site facts, a short description, their location if relevant, and an email to send their invoice/confirmation to), confirm with them what you're about to post, then call create_post. If it comes back needing payment, tell them warmly that a secure payment form just opened right here in the chat (Stripe's own form - you never see or touch their card details) and that their post goes live the moment they complete it. If it's free, tell them it's live now and share the link. If it comes back with an error, explain what's missing or wrong in plain language and ask for a fix - never retry blindly with guessed values.
+
+PHOTOS: a visitor can take or upload a photo right in this chat (there's a camera button next to the message box) - when they do, you'll actually see the image. Use it: describe what you see to help them write a good title/description, and when you call create_post for that item it'll automatically attach that photo (the tool result tells you whether it actually got attached - mention it only if something unexpected happened, like the category not supporting photos). Every photo still goes through the normal human moderation queue before it's publicly visible, same as any other post's photo - mention that if it's relevant, but don't over-explain it. Only one photo per post through chat; if they want more, point them to the invoice/management link after their post is live, or the regular "+ Post" page.${hasImage ? '\n\nThe visitor just sent a photo with this message - look at it.' : ''}
 
 ADVERTISING: boosting/featuring an existing post (making it jump to the top or stand out) is self-serve from that post's own page, using the email it was posted under - mention this when relevant, and the price from the site facts. Banner ad placements on the site itself are a separate, bigger arrangement handled by the team, not something you can set up or price here - if someone asks about that, offer warmly to pass their interest along to the team (set forwardToTeam to true) rather than guessing at pricing or availability.
 
@@ -421,16 +442,26 @@ function shapeFinal(input) {
   };
 }
 
-// transcript: [{role: 'user'|'assistant', text}], oldest first, excluding the new question.
-async function ask(question, transcript = []) {
+// transcript: [{role: 'user'|'assistant', text}], oldest first, excluding
+// the new question. image (optional): {buffer, mime} - a photo the visitor
+// just sent with this question, validated by routes/public/chat.js. Claude
+// actually sees it (as an image content block) and, if create_post gets
+// called this turn, it's attached to the post exactly like a wizard upload.
+async function ask(question, transcript = [], image = null) {
   const c = getClient();
   if (!c) return { reply: "I'm not quite set up yet - please use the \"talk to our team\" option below.", offTopic: true, unavailable: true };
 
   const model = runtimeConfig.get('chesky_model') || MODEL_FALLBACK;
-  const system = buildSystemPrompt(question);
+  const system = buildSystemPrompt(question, !!image);
+  const questionContent = image
+    ? [
+        { type: 'text', text: String(question).slice(0, 1500) },
+        { type: 'image', source: { type: 'base64', media_type: image.mime, data: image.buffer.toString('base64') } },
+      ]
+    : String(question).slice(0, 1500);
   const messages = [
     ...transcript.slice(-12).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.text || '').slice(0, 1500) })),
-    { role: 'user', content: String(question).slice(0, 1500) },
+    { role: 'user', content: questionContent },
   ];
 
   let final = null;
@@ -464,7 +495,7 @@ async function ask(question, transcript = []) {
 
       const toolResults = [];
       for (const use of actionUses) {
-        const outcome = await executeTool(use.name, use.input);
+        const outcome = await executeTool(use.name, use.input, image);
         toolResults.push({ type: 'tool_result', tool_use_id: use.id, content: JSON.stringify(outcome) });
         if (use.name === 'create_post') {
           if (outcome.status === 'checkout_required') checkout = outcome;

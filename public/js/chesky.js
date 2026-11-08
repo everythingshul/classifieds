@@ -17,6 +17,7 @@ const Chesky = (() => {
   try { transcript = JSON.parse(sessionStorage.getItem(STORAGE_TRANSCRIPT) || '[]'); } catch (e) { transcript = []; }
   let busy = false;
   let activeAudio = null;
+  let pendingImage = null; // {data (base64), mime, previewUrl} - attached, not yet sent
 
   // Recording state
   let recorder = null;
@@ -32,6 +33,10 @@ const Chesky = (() => {
 
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
   const MIC_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 11z"/></svg>';
+  const CAMERA_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  const REMOVE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+  const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
   const THUMB_UP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3zm0 0 4.5-8a2 2 0 0 1 2.3 2.8L12.5 10H18a2 2 0 0 1 1.94 2.5l-1.5 6A2 2 0 0 1 16.5 20H9a2 2 0 0 1-2-2"/></svg>';
   const THUMB_DOWN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13V4h3a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-3zm0 0-4.5 8a2 2 0 0 1-2.3-2.8L11.5 14H6a2 2 0 0 1-1.94-2.5l1.5-6A2 2 0 0 1 7.5 4H15a2 2 0 0 1 2 2"/></svg>';
 
@@ -48,6 +53,15 @@ const Chesky = (() => {
   function fmtDur(s) {
     s = Math.max(0, Math.round(s || 0));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error('Could not read that file'));
+      reader.readAsDataURL(file);
+    });
   }
 
   // Enter sends the message; Ctrl+Enter (or Cmd+Enter) inserts a newline
@@ -213,15 +227,20 @@ const Chesky = (() => {
   }
 
   async function ask(question) {
-    if (busy || !question.trim()) return;
+    const image = pendingImage;
+    if (busy || (!question.trim() && !image)) return;
     busy = true;
     document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
-    bubble('visitor', escapeHtml(question));
-    transcript.push({ role: 'user', text: question });
+    clearPendingImage();
+    renderPendingImageChip();
+    const imgHtml = image ? `<img class="chesky-sent-photo" src="data:${image.mime};base64,${image.data}" alt="">` : '';
+    if (question.trim()) bubble('visitor', escapeHtml(question), imgHtml);
+    else bubble('visitor', imgHtml);
+    transcript.push({ role: 'user', text: question || (image ? '(sent a photo)' : '') });
     saveTranscript();
     const typingNode = showTyping();
     try {
-      const result = await Api.cheskyAsk(question, transcript);
+      const result = await Api.cheskyAsk(question, transcript, image ? { data: image.data, mime: image.mime } : null);
       typingNode?.remove();
       displayBotReply(question, result);
     } catch (e) {
@@ -229,6 +248,41 @@ const Chesky = (() => {
       bubble('bot', "Sorry, something went wrong. Please try again, or talk to our team below.");
     } finally {
       busy = false;
+    }
+  }
+
+  // -- Photo attach: a camera/file button next to the composer. The photo
+  // is only shown as a preview chip above the input until Send is pressed
+  // (sent together with whatever's typed, or alone) - never uploaded just
+  // for picking it, so showing Chesky a photo you don't end up sending
+  // never touches the server at all.
+  function renderPendingImageChip() {
+    const host = document.getElementById('cheskyImagePreview');
+    if (!host) return;
+    if (!pendingImage) { host.innerHTML = ''; host.style.display = 'none'; return; }
+    host.style.display = '';
+    host.innerHTML = `
+      <div class="chesky-img-chip">
+        <img src="data:${pendingImage.mime};base64,${pendingImage.data}" alt="">
+        <button type="button" class="chesky-img-chip-remove" aria-label="Remove photo">${REMOVE_ICON}</button>
+      </div>`;
+    host.querySelector('.chesky-img-chip-remove').addEventListener('click', () => { clearPendingImage(); renderPendingImageChip(); });
+  }
+
+  function clearPendingImage() {
+    pendingImage = null;
+  }
+
+  async function handlePickedImage(file) {
+    if (!file) return;
+    if (!ALLOWED_IMAGE_MIME.has(file.type)) return toast('Please choose a JPG, PNG, or WEBP photo.');
+    if (file.size > MAX_IMAGE_BYTES) return toast('That photo is too large - please use one under 6MB.');
+    try {
+      const data = await fileToBase64(file);
+      pendingImage = { data, mime: file.type };
+      renderPendingImageChip();
+    } catch (e) {
+      toast('Could not use that photo - please try another.');
     }
   }
 
@@ -262,16 +316,20 @@ const Chesky = (() => {
   function renderAskFooter() {
     const foot = document.getElementById('cheskyFoot');
     foot.innerHTML = `
+      <div id="cheskyImagePreview" class="chesky-img-preview" style="display:none"></div>
       <form class="chesky-form" id="cheskyAskForm">
         <div class="chesky-row">
+          <button type="button" class="chesky-camera-btn" id="cheskyCameraBtn" title="Attach a photo (e.g. to post an item for sale)">${CAMERA_ICON}</button>
           <button type="button" class="chesky-mic-btn" id="cheskyMicBtn" title="Ask with your voice">${MIC_ICON}</button>
-          <textarea name="q" rows="1" placeholder="Ask Chesky a question..." required></textarea>
+          <textarea name="q" rows="1" placeholder="Ask Chesky a question, or attach a photo to post it..."></textarea>
           <button type="submit">Send</button>
         </div>
+        <input type="file" id="cheskyImageInput" accept="image/png,image/jpeg,image/webp" style="display:none">
       </form>
       <div style="text-align:center;padding:6px 0 10px"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanBtn">Talk to a real person &rarr;</button></div>
     `;
     if (!micAvailable()) document.getElementById('cheskyMicBtn').style.display = 'none';
+    renderPendingImageChip();
     wireEnterToSend(document.getElementById('cheskyAskForm').q);
     document.getElementById('cheskyAskForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -282,6 +340,11 @@ const Chesky = (() => {
       ask(q);
     });
     document.getElementById('cheskyMicBtn').addEventListener('click', () => startRecording('ask'));
+    document.getElementById('cheskyCameraBtn').addEventListener('click', () => document.getElementById('cheskyImageInput').click());
+    document.getElementById('cheskyImageInput').addEventListener('change', (e) => {
+      handlePickedImage(e.target.files[0]);
+      e.target.value = '';
+    });
     document.getElementById('cheskyTalkHumanBtn').addEventListener('click', showHandoffForm);
   }
 

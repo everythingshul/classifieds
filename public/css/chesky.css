@@ -150,6 +150,9 @@
   box-shadow: 0 1px 2px rgba(31, 59, 87, 0.06);
   white-space: pre-wrap;
 }
+/* A photo-only message (no text) is just the photo, not a block of text -
+   tighter padding around it, same idea as the voice-note case below. */
+.chesky-bubble:has(> .chesky-sent-photo:only-child) { padding: 4px; }
 /* A voice note is its own compact pill, not a block of text - tighter
    padding keeps it close to WhatsApp's voice-bubble proportions. */
 .chesky-bubble:has(.chesky-voice) { padding: 7px 10px; }
@@ -257,6 +260,37 @@
 }
 .chesky-mic-btn svg { width: 18px; height: 18px; }
 .chesky-mic-btn:hover { background: var(--cta-dark); transform: scale(1.06); }
+.chesky-camera-btn {
+  border: none;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  cursor: pointer;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s, transform 0.15s;
+}
+.chesky-camera-btn svg { width: 18px; height: 18px; }
+.chesky-camera-btn:hover { background: var(--navy-dark); transform: scale(1.06); }
+
+/* Photo attached but not yet sent - a small preview chip above the composer. */
+.chesky-img-preview { padding: 8px 10px 0; }
+.chesky-img-chip { position: relative; display: inline-block; }
+.chesky-img-chip img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); display: block; }
+.chesky-img-chip-remove {
+  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--ink); color: #fff; border: 2px solid #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.chesky-img-chip-remove svg { width: 10px; height: 10px; }
+
+/* A photo actually sent in a message bubble. */
+.chesky-sent-photo { display: block; max-width: 180px; max-height: 180px; border-radius: 10px; margin-top: 4px; object-fit: cover; }
 
 /* Voice note player (inside a bubble) */
 .chesky-voice { display: flex; align-items: center; gap: 8px; min-width: 190px; }

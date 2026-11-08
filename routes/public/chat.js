@@ -2,7 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const db = require('../../db');
 const { newPublicId } = require('../../utils/ids');
-const { saveVoiceNote, VOICE_MIME_EXT } = require('../../middleware/upload');
+const { saveVoiceNote, VOICE_MIME_EXT, ALLOWED_MIME: ALLOWED_IMAGE_MIME } = require('../../middleware/upload');
 const { sendMail, notifyAdmin } = require('../../utils/mailer');
 const { emailShell, escapeHtml, appUrl, siteName } = require('../../services/emailLayout');
 const chesky = require('../../services/chesky');
@@ -20,6 +20,7 @@ const MAX_TEXT = 1500;
 const MAX_MESSAGES = 300;
 const MAX_VOICE_B64 = 3_200_000; // ~2.4MB of audio
 const MAX_VOICE_SECONDS = 65;
+const MAX_IMAGE_B64 = 8_000_000; // ~6MB of photo, matches middleware/upload.js's 8MB multer ceiling
 
 function clean(v, max) {
   return String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max);
@@ -45,6 +46,22 @@ async function handleVoice(v) {
   let transcript = '';
   try { transcript = await transcribeAudio(bytes, mime); } catch (e) { /* no transcript available - the recording still sends fine */ }
   return { voice_url: `/uploads/${filename}`, voice_mime: mime, voice_dur: dur, voice_peaks: JSON.stringify(peaks), transcript };
+}
+
+// Validates a photo sent as {data (base64), mime} for Chesky's create_post
+// tool - unlike handleVoice, this never writes to disk itself: most photos
+// shown to Chesky are never actually posted, so only services/postSubmit.js's
+// usual image pipeline (via execCreatePost) should ever save one, the same
+// way a photo from the regular post wizard does (moderation queue, EXIF
+// stripped, re-encoded - see middleware/upload.js's processAndSaveImage).
+function handleChatImage(img) {
+  if (!img || typeof img.data !== 'string' || !img.data || img.data.length > MAX_IMAGE_B64) return null;
+  const mime = String(img.mime || '').split(';')[0].toLowerCase();
+  if (!ALLOWED_IMAGE_MIME.has(mime) || !/^[A-Za-z0-9+/]+=*$/.test(img.data)) return null;
+  let buffer;
+  try { buffer = Buffer.from(img.data, 'base64'); } catch { return null; }
+  if (buffer.length < 200) return null;
+  return { buffer, mime };
 }
 
 function messageOut(m) {
@@ -98,11 +115,16 @@ async function forwardMessageToTeam(question, page) {
   }
 }
 
-async function answerQuestion(question, transcript, page) {
-  const learned = chesky.findLearnedMatch(question);
-  if (learned) return { reply: learned.entry.answer, offTopic: false, entryId: learned.entry.id };
+async function answerQuestion(question, transcript, page, image) {
+  // A photo changes the answer (Chesky can describe/use it), so skip the
+  // taught-answer shortcut entirely whenever one is attached - it would
+  // otherwise return a canned answer that never looked at the photo.
+  if (!image) {
+    const learned = chesky.findLearnedMatch(question);
+    if (learned) return { reply: learned.entry.answer, offTopic: false, entryId: learned.entry.id };
+  }
 
-  const result = await chesky.ask(question, transcript);
+  const result = await chesky.ask(question, transcript, image);
   if (result.offTopic) {
     const key = chesky.normQ(question);
     if (key) {
@@ -127,8 +149,10 @@ router.post('/ask', askLimiter, async (req, res, next) => {
     const question = clean(req.body.question, MAX_TEXT);
     const transcript = Array.isArray(req.body.transcript) ? req.body.transcript.slice(-12) : [];
     const page = oneLine(req.body.page, 100);
-    if (!question) return res.status(400).json({ error: 'A question is required' });
-    res.json(await answerQuestion(question, transcript, page));
+    const image = req.body.image ? handleChatImage(req.body.image) : null;
+    if (req.body.image && !image) return res.status(400).json({ error: 'That photo could not be used - please try a JPG, PNG, or WEBP under 6MB.' });
+    if (!question && !image) return res.status(400).json({ error: 'A question is required' });
+    res.json(await answerQuestion(question || '(sent a photo)', transcript, page, image));
   } catch (e) {
     next(e);
   }

@@ -55,7 +55,7 @@ const Api = (() => {
     banners: (zone) => req(`/banners?zone=${encodeURIComponent(zone)}`),
     registerBannerImpressions: (ids) => trackingOk() ? req('/banners/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
     registerBannerClicks: (ids) => trackingOk() ? req('/banners/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
-    cheskyAsk: (question, transcript) => req('/chat/ask', { method: 'POST', body: { question, transcript, page: location.pathname } }),
+    cheskyAsk: (question, transcript, image) => req('/chat/ask', { method: 'POST', body: { question, transcript, page: location.pathname, image: image || undefined } }),
     cheskyAskVoice: (voice, transcript) => req('/chat/ask-voice', { method: 'POST', body: { voice, transcript, page: location.pathname } }),
     cheskyHandoff: (body) => req('/chat/handoff', { method: 'POST', body }),
     cheskySend: (body) => req('/chat/send', { method: 'POST', body }),
