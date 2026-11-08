@@ -9,7 +9,7 @@
 const db = require('../db');
 const runtimeConfig = require('./runtimeConfig');
 const { getSetting } = require('./pricing');
-const { getAllClassifiedCategories, getAllListingCategories } = require('./taxonomy');
+const { getAllClassifiedCategories } = require('./taxonomy');
 const { formatPostPublic } = require('./postFormat');
 const { stripHtml } = require('../utils/htmlSanitize');
 const { DEFAULT_BROOKLYN_LOCATION } = require('../utils/constants');
@@ -24,13 +24,13 @@ function escapeHtml(str) {
 }
 
 // Every topic a subscriber can pick: each classifieds/listings category
-// individually (posts in those two sections are meaningfully categorized),
+// individually (posts in that section are meaningfully categorized),
 // plus one flat toggle each for simchas and editorials (neither has
-// sub-categories worth splitting on).
+// sub-categories worth splitting on). Business Listings are deliberately
+// not offered here - the daily digest is classifieds/simchas/editorials only.
 function availableTopics() {
   const topics = [];
   getAllClassifiedCategories().forEach((c) => topics.push({ value: `classified:${c.key}`, label: c.label, labelHe: c.labelHe, group: 'classifieds' }));
-  getAllListingCategories().forEach((c) => topics.push({ value: `listing:${c.key}`, label: c.label, labelHe: c.labelHe, group: 'listings' }));
   topics.push({ value: 'simcha', label: 'Simchas', labelHe: 'שמחות', group: 'simchas' });
   topics.push({ value: 'editorial', label: 'Editorials', labelHe: 'מאמרים', group: 'editorials' });
   return topics;
@@ -97,7 +97,6 @@ function collectDigestSections(sub) {
   const now = Date.now();
 
   const classifiedCats = topics.filter((t) => t.startsWith('classified:')).map((t) => t.slice('classified:'.length));
-  const listingCats = topics.filter((t) => t.startsWith('listing:')).map((t) => t.slice('listing:'.length));
 
   const sections = [];
   function queryByCategory(type, cats) {
@@ -114,9 +113,6 @@ function collectDigestSections(sub) {
 
   const classifieds = queryByCategory('classified', classifiedCats);
   if (classifieds.length) sections.push({ title: 'Classifieds', items: classifieds.map(toDigestItem) });
-
-  const listings = queryByCategory('listing', listingCats);
-  if (listings.length) sections.push({ title: 'Listings', items: listings.map(toDigestItem) });
 
   if (topics.includes('simcha')) {
     const simchas = db

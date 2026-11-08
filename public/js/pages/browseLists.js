@@ -100,7 +100,51 @@ function renderPagination(page, totalPages, category) {
   return html;
 }
 
+const LISTING_CAT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9 20v-6h6v6"/></svg>';
+const LISTING_CAT_ACCENTS = ['navy', 'gold', 'cta', 'success'];
+
+// Landing view for /listings with no category chosen yet - a picker grid
+// instead of dumping every business at once, so a visitor narrows down to
+// what they actually want first. Only categories with at least one live
+// listing show up (an empty category is a dead end, not a useful choice).
+async function renderListingCategoryChooser() {
+  const cfg = window.SITE_CONFIG;
+  const counts = await Api.listingCategoryCounts();
+  const heb = I18N.get() === 'he';
+  const withBusinesses = cfg.listingCategories.filter((c) => (counts[c.key] || 0) > 0);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  document.getElementById('app').innerHTML = `
+    <div class="container">
+      <div class="page-header">
+        <h1 data-i18n="nav_listings">Listings</h1>
+        <p class="sub" style="color:var(--ink-soft)">Which kind of business are you looking for?</p>
+      </div>
+      ${withBusinesses.length ? `
+        <div class="listing-cat-chooser">
+          ${withBusinesses.map((c, i) => `
+            <a class="listing-cat-card" href="/listings?category=${c.key}">
+              <span class="listing-cat-icon accent-${LISTING_CAT_ACCENTS[i % LISTING_CAT_ACCENTS.length]}">${LISTING_CAT_ICON}</span>
+              <span class="cat-name">${escapeHtml(heb && c.labelHe ? c.labelHe : c.label)}</span>
+              <span class="cat-count">${counts[c.key]} ${counts[c.key] === 1 ? 'business' : 'businesses'}</span>
+            </a>
+          `).join('')}
+          <a class="listing-cat-card listing-cat-viewall" href="/listings?all=1">
+            <span class="listing-cat-icon accent-navy">${LISTING_CAT_ICON}</span>
+            <span class="cat-name" data-i18n="view_all">View All</span>
+            <span class="cat-count">${total} ${total === 1 ? 'business' : 'businesses'} total</span>
+          </a>
+        </div>
+      ` : `<p class="empty-state">No businesses have been listed yet - check back soon.</p>`}
+    </div>
+  `;
+  I18N.apply();
+  setPageTitle('Listings', 'Browse community business listings on JListings, by category.');
+}
+
 async function renderListingsListPage({ query }) {
+  if (!query.category && !query.all) return renderListingCategoryChooser();
+
   const cfg = window.SITE_CONFIG;
   const category = query.category || '';
   const page = parseInt(query.page, 10) || 1;
@@ -117,7 +161,8 @@ async function renderListingsListPage({ query }) {
       <div class="page-header">
         <h1>${catDef ? escapeHtml(I18N.get() === 'he' ? catDef.labelHe : catDef.label) : escapeHtml(I18N.t('view_all_listings'))}</h1>
         <div class="category-pills">
-          ${pills.map((p) => `<a href="/listings${p.key ? `?category=${p.key}` : ''}" class="${p.key === category ? 'active' : ''}">${escapeHtml(p.label)} <span class="count">(${p.count})</span></a>`).join('')}
+          <a href="/listings">&larr; Choose a different category</a>
+          ${pills.map((p) => `<a href="/listings${p.key ? `?category=${p.key}` : '?all=1'}" class="${p.key === category ? 'active' : ''}">${escapeHtml(p.label)} <span class="count">(${p.count})</span></a>`).join('')}
         </div>
       </div>
 
@@ -143,7 +188,7 @@ async function renderListingsListPage({ query }) {
   document.getElementById('filtersForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const next = { category };
+    const next = category ? { category } : { all: 1 };
     for (const [k, v] of fd.entries()) if (v) next[k] = v;
     Router.navigate(`/listings?${qs(next)}`);
   });
@@ -157,7 +202,7 @@ function renderListingsPagination(page, totalPages, category) {
       if (p === page - 3 || p === page + 3) html += '<span>…</span>';
       continue;
     }
-    html += `<a href="/listings?${qs({ category, page: p })}" class="${p === page ? 'active' : ''}">${p}</a>`;
+    html += `<a href="/listings?${qs(category ? { category, page: p } : { all: 1, page: p })}" class="${p === page ? 'active' : ''}">${p}</a>`;
   }
   html += '</div>';
   return html;

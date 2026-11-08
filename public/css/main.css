@@ -404,6 +404,24 @@ p { margin: 0 0 .7em; }
 .category-pills a .count { color: var(--ink-soft); margin-inline-start: 3px; }
 .category-pills a.active .count { color: rgba(255,255,255,.7); }
 
+/* Listings landing page - "which kind of business" category chooser. */
+.listing-cat-chooser { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin: 20px 0 36px; }
+.listing-cat-card {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 14px;
+  color: var(--ink); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.listing-cat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--navy); }
+.listing-cat-icon { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+.listing-cat-icon svg { width: 26px; height: 26px; }
+.listing-cat-icon.accent-navy { background: var(--navy); }
+.listing-cat-icon.accent-gold { background: var(--gold); }
+.listing-cat-icon.accent-cta { background: var(--cta); }
+.listing-cat-icon.accent-success { background: var(--success); }
+.listing-cat-card .cat-name { font-weight: 700; font-size: .92rem; }
+.listing-cat-card .cat-count { font-size: .76rem; color: var(--ink-soft); }
+.listing-cat-viewall { border-style: dashed; }
+
 .filters-bar { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 13px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .field { display: flex; flex-direction: column; gap: 3px; font-size: .76rem; color: var(--ink-soft); }
 .field input, .field select, .field textarea {
@@ -466,7 +484,7 @@ p { margin: 0 0 .7em; }
 .ai-polish-icon-btn svg { width: 18px; height: 18px; transition: transform .15s ease; }
 .ai-polish-icon-btn:hover:not(:disabled) { background: var(--paper); animation-play-state: paused; opacity: 1; }
 .ai-polish-icon-btn:hover:not(:disabled) svg { transform: scale(1.1); }
-.ai-polish-icon-btn:disabled { cursor: default; animation: ai-polish-spin 1s linear infinite; opacity: .85; }
+.ai-polish-icon-btn:disabled { cursor: default; color: var(--cta); animation: ai-polish-thinking 1.1s ease-in-out infinite; }
 /* Applied/"Undo" state - a solid filled pill instead of just a color swap,
    so it's obvious at a glance that the field was actually changed. */
 .ai-polish-icon-btn.is-applied {
@@ -492,9 +510,11 @@ p { margin: 0 0 .7em; }
   60% { transform: scale(1.18); }
   100% { transform: scale(1); }
 }
-@keyframes ai-polish-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* A soft breathing glow while waiting on the AI, reading as "thinking"
+   rather than a mechanical spinner. */
+@keyframes ai-polish-thinking {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(47,107,99,.35); }
+  50% { transform: scale(1.12); box-shadow: 0 0 0 5px rgba(47,107,99,0); }
 }
 .contact-card { background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--cta); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); position: sticky; top: 66px; }
 .contact-card .btn { width: 100%; margin-bottom: 6px; text-align: center; }
