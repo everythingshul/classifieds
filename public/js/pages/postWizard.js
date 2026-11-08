@@ -194,6 +194,17 @@ function renderPostWizard() {
     return `<div class="form-row"><label>Category</label><select id="f_taxonomyId"><option value="">Select…</option>${opts.map((t) => `<option value="${t.id}">${'— '.repeat(t.parent_id ? 1 : 0)}${escapeHtml(t.name)}</option>`).join('')}</select></div>`;
   }
 
+  // Listings only: let a business appear under up to 4 more categories.
+  // The primary category stays authoritative for pricing.
+  function extraCategoriesHtml() {
+    if (state.postType !== 'listing') return '';
+    const others = currentCategories().filter((c) => c.key !== state.category);
+    if (!others.length) return '';
+    const picked = state.data.categories || [];
+    return `<div class="form-row"><label>Also show under <span class="hint">(optional - up to 4 more categories)</span></label>
+      <div class="extra-cats" style="display:flex;flex-wrap:wrap;gap:6px 14px">${others.map((c) => `<label style="font-weight:normal"><input type="checkbox" class="f-extra-cat" value="${c.key}" ${picked.includes(c.key) ? 'checked' : ''}> ${escapeHtml(I18N.get() === 'he' ? c.labelHe : c.label)}</label>`).join('')}</div></div>`;
+  }
+
   function priceFieldHtml() {
     const currencies = cfg.currencies || [{ code: 'USD', symbol: '$', label: 'US Dollar (USD)' }];
     return `
@@ -292,6 +303,7 @@ function renderPostWizard() {
         <div class="field-limit-warning error-list" id="descriptionLimitWarning" style="display:none"></div>
       </div>
       ${categorySpecificFieldsHtml()}
+      ${extraCategoriesHtml()}
       <div class="form-row"><label>Location</label><input type="text" id="f_location" placeholder="City, State" value="${escapeHtml(state.data.locationText || '')}" required></div>
       ${imageUploadHtml()}
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
@@ -412,6 +424,10 @@ function renderPostWizard() {
       if (!contactPhone && !contactEmail && !contactUrl) errs.push('At least one contact method is required');
       // 'call' is always included - the checkboxes only add text/WhatsApp on top of it.
       const contactPhoneMethods = ['call', ...Array.from(document.querySelectorAll('.c-phone-method:checked')).map((el) => el.value)];
+
+      let extraCats = Array.from(document.querySelectorAll('.f-extra-cat:checked')).map((el) => el.value);
+      if (extraCats.length > 4) { errs.push('Choose at most 4 additional categories'); extraCats = extraCats.slice(0, 4); }
+      state.data.categories = extraCats;
 
       const fields = {};
       const genericTaxSelect = document.getElementById('f_taxonomyId');
@@ -733,6 +749,7 @@ function renderPostWizard() {
       fd.set('type', state.postType);
       if (state.postType === 'classified' || state.postType === 'listing') {
         fd.set('category', state.category);
+        if (state.postType === 'listing' && (state.data.categories || []).length) fd.set('categories', JSON.stringify(state.data.categories));
         fd.set('title', state.data.title);
         fd.set('description', state.data.description || '');
         fd.set('locationText', state.data.locationText);

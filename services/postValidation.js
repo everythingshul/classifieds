@@ -250,9 +250,14 @@ function validateListingPayload(body, charLimits) {
   }
 
   let extraCategories = [];
-  if (Array.isArray(body.categories)) {
+  let rawExtras = body.categories;
+  // Multipart forms send this as a JSON string.
+  if (typeof rawExtras === 'string') {
+    try { rawExtras = JSON.parse(rawExtras); } catch (e) { rawExtras = []; }
+  }
+  if (Array.isArray(rawExtras)) {
     const seen = new Set([category]);
-    for (const key of body.categories) {
+    for (const key of rawExtras) {
       if (seen.has(key)) continue;
       seen.add(key);
       if (!findListingCategory(key)) {
