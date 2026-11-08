@@ -75,6 +75,51 @@ async function renderSubscribePage(params) {
   I18N.apply();
   setPageTitle('Daily Email Updates', 'Sign up for a daily email digest of new classifieds, simchas, and editorials - by category, at the time you choose.');
 
+  wireSubscribeForm(existing, manageToken);
+}
+
+// The "View All" link a digest email shows once there's more than fits in
+// its own preview (see services/emailDigest.js's EMAIL_PREVIEW_MAX) lands
+// here - same token plus the exact since/until that email's window used,
+// so this reproduces precisely what it was built from, not whatever is
+// "new" by the time it's clicked.
+async function renderDigestAllPage(params) {
+  const token = params.query.token || '';
+  const since = params.query.since;
+  const until = params.query.until;
+  let sections = [];
+  try {
+    const result = await Api.subscriptionDigestAll(token, since, until);
+    sections = result.sections || [];
+  } catch (e) {
+    document.getElementById('app').innerHTML = `<div class="container" style="padding:40px 0;max-width:560px"><p class="error-list">This link is invalid or has expired. <a href="/subscribe">Manage your email updates</a> instead.</p></div>`;
+    setPageTitle('Email Updates');
+    return;
+  }
+
+  document.getElementById('app').innerHTML = `
+    <div class="container" style="padding:30px 0 60px;max-width:700px">
+      <div class="page-header">
+        <h1>All Your Updates</h1>
+        <p class="hint">Everything new in the topics you follow.</p>
+      </div>
+      ${sections.length ? sections.map((sec) => `
+        <h3 style="margin:24px 0 8px">${escapeHtml(sec.title)}</h3>
+        <div class="digest-all-list">
+          ${sec.items.map((it) => `
+            <a class="digest-all-item" href="${it.url}">
+              <div class="digest-all-item-title">${escapeHtml(it.title)}</div>
+              ${it.categoryLabel || it.location ? `<div class="digest-all-item-meta">${[it.categoryLabel, it.location].filter(Boolean).map(escapeHtml).join(' • ')}</div>` : ''}
+              ${it.price ? `<div class="digest-all-item-price">${escapeHtml(it.price)}</div>` : ''}
+              ${it.excerpt ? `<div class="digest-all-item-excerpt">${escapeHtml(it.excerpt)}</div>` : ''}
+            </a>`).join('')}
+        </div>`).join('') : `<p class="empty-state">Nothing new right now - check back later.</p>`}
+    </div>
+  `;
+  setPageTitle('All Your Updates');
+}
+
+function wireSubscribeForm(existing, manageToken) {
   document.getElementById('subscribeForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('subSubmitBtn');

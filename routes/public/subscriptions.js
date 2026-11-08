@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../../db');
 const { isValidEmail } = require('../../utils/validate');
 const { newPublicId } = require('../../utils/ids');
-const { validTopicValues, sendConfirmationEmail, escapeHtml, siteName } = require('../../services/emailDigest');
+const { validTopicValues, sendConfirmationEmail, escapeHtml, siteName, collectDigestSections } = require('../../services/emailDigest');
 const { appUrl } = require('../../services/appUrl');
 
 const router = express.Router();
@@ -27,6 +27,17 @@ router.get('/manage', (req, res) => {
   const sub = findByToken(String(req.query.token || ''));
   if (!sub || sub.status === 'unsubscribed') return res.status(404).json({ error: 'Not found' });
   res.json({ email: sub.email, categories: JSON.parse(sub.categories || '[]'), sendHour: sub.send_hour, status: sub.status });
+});
+
+// Backs the "View All" link a digest email shows once there's more than
+// fits in the preview (see services/emailDigest.js's EMAIL_PREVIEW_MAX) -
+// the complete, un-truncated list of everything that email was built from.
+router.get('/digest-all', (req, res) => {
+  const sub = findByToken(String(req.query.token || ''));
+  if (!sub || sub.status === 'unsubscribed') return res.status(404).json({ error: 'Not found' });
+  const since = Number(req.query.since) || undefined;
+  const until = Number(req.query.until) || undefined;
+  res.json({ sections: collectDigestSections(sub, { since, until }) });
 });
 
 router.post('/', subscribeLimiter, async (req, res, next) => {

@@ -29,6 +29,7 @@
   Router.add('/pricing', renderPricingPage);
   Router.add('/contact', renderContactPage);
   Router.add('/subscribe', renderSubscribePage);
+  Router.add('/digest-all', renderDigestAllPage);
 
   Router.init();
 })();

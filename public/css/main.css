@@ -448,6 +448,14 @@ p { margin: 0 0 .7em; }
 @media (max-width: 600px) { .results-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
 .empty-state { text-align: center; padding: 44px 16px; color: var(--ink-soft); font-size: .9rem; }
 
+/* /digest-all - the full list behind a digest email's "View All" button. */
+.digest-all-list { display: flex; flex-direction: column; }
+.digest-all-item { display: block; padding: 12px 0; border-bottom: 1px solid var(--border); color: inherit; }
+.digest-all-item-title { font-weight: 700; color: var(--navy); font-size: .95rem; }
+.digest-all-item-meta { font-size: .78rem; color: var(--ink-soft); margin-top: 2px; }
+.digest-all-item-price { font-size: .78rem; font-weight: 700; color: var(--success); margin-top: 2px; }
+.digest-all-item-excerpt { font-size: .85rem; margin-top: 4px; }
+
 .pagination { display: flex; justify-content: center; gap: 5px; margin: 22px 0; flex-wrap: wrap; }
 .pagination a, .pagination span { padding: 6px 11px; border: 1px solid var(--border); border-radius: 0; background: #fff; font-size: .82rem; }
 .pagination a.active { background: var(--navy); color: #fff; border-color: var(--navy); }

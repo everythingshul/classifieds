@@ -71,7 +71,15 @@ function priceLine(fields) {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_ITEMS_PER_SECTION = 12;
+// Not a UX cap - every matching post is included (no limit on how much a
+// subscriber catches up on). This is purely a query safety net against a
+// single pathological digest (e.g. a subscriber who paused updates for
+// months) pulling an unbounded number of rows.
+const SECTION_QUERY_SAFETY_LIMIT = 500;
+// The email itself shows at most this many items total (across every
+// section combined) - past that, a "View all" button takes the reader to
+// a page with the complete list instead of growing the email endlessly.
+const EMAIL_PREVIEW_MAX = 25;
 
 function toDigestItem(post) {
   const pub = formatPostPublic(post);
@@ -85,16 +93,22 @@ function toDigestItem(post) {
   };
 }
 
-// New live posts/editorials matching a subscription's chosen topics, since
-// its last send (or the last 24h for a first-ever send). Capped per section
-// so a subscriber who paused their digest for a while doesn't come back to
-// a wall of 100 posts in one email - that's a complaint/unsubscribe risk in
-// itself.
-function collectDigestSections(sub) {
+// Every live post/editorial matching a subscription's chosen topics, since
+// its last send (or the last 24h for a first-ever send) - no cap on how
+// much a subscriber catches up on. digestEmailHtml/Text below are what
+// decide how much of this actually gets listed in the email body itself
+// versus behind a "View all" link, so a subscriber who paused their digest
+// for a while doesn't come back to a wall of 100 posts in one email.
+// since/until default to the normal "since this subscription's last send"
+// window, but a caller can pin them explicitly (see digestWindowFor below) -
+// the "View all" page needs the exact same window the email it was linked
+// from used, not whatever the subscription's last_sent_at has since moved
+// on to (it's bumped forward right after that email is sent).
+function collectDigestSections(sub, { since, until } = {}) {
   const topics = parseTopics(sub.categories);
   if (!topics.length) return [];
-  const since = sub.last_sent_at || Date.now() - DAY_MS;
-  const now = Date.now();
+  since = since ?? (sub.last_sent_at || Date.now() - DAY_MS);
+  const now = until ?? Date.now();
 
   const classifiedCats = topics.filter((t) => t.startsWith('classified:')).map((t) => t.slice('classified:'.length));
 
@@ -108,7 +122,7 @@ function collectDigestSections(sub) {
          AND published_at > ? AND published_at <= ? AND (expires_at IS NULL OR expires_at > ?)
          ORDER BY published_at DESC LIMIT ?`
       )
-      .all(type, ...cats, since, now, now, MAX_ITEMS_PER_SECTION);
+      .all(type, ...cats, since, now, now, SECTION_QUERY_SAFETY_LIMIT);
   }
 
   const classifieds = queryByCategory('classified', classifiedCats);
@@ -120,7 +134,7 @@ function collectDigestSections(sub) {
         `SELECT * FROM posts WHERE type = 'simcha' AND status = 'live' AND published_at > ? AND published_at <= ?
          ORDER BY published_at DESC LIMIT ?`
       )
-      .all(since, now, MAX_ITEMS_PER_SECTION);
+      .all(since, now, SECTION_QUERY_SAFETY_LIMIT);
     if (simchas.length) sections.push({ title: 'Simchas', items: simchas.map(toDigestItem) });
   }
 
@@ -130,7 +144,7 @@ function collectDigestSections(sub) {
         `SELECT * FROM editorials WHERE status = 'live' AND published_at > ? AND published_at <= ?
          ORDER BY published_at DESC LIMIT ?`
       )
-      .all(since, now, MAX_ITEMS_PER_SECTION);
+      .all(since, now, SECTION_QUERY_SAFETY_LIMIT);
     if (eds.length) {
       sections.push({
         title: 'Editorials',
@@ -157,6 +171,37 @@ function manageUrl(sub) {
 function unsubscribeUrl(sub) {
   return `${appUrl()}/api/subscriptions/unsubscribe?token=${sub.public_id}`;
 }
+// The exact same since/until a send will use (or just did use) to collect
+// its sections - computed once, up front, and reused for both the actual
+// query and the "View all" link, so the link always reproduces precisely
+// what that email was built from.
+function digestWindowFor(sub) {
+  return { since: sub.last_sent_at || Date.now() - DAY_MS, until: Date.now() };
+}
+
+// Same token plus the send's exact since/until, a plain "show me
+// everything" page instead of an action - linked from the email whenever
+// there's more than fits in the preview.
+function viewAllUrl(sub, since, until) {
+  return `${appUrl()}/digest-all?token=${sub.public_id}&since=${since}&until=${until}`;
+}
+
+// Caps how many items actually get listed in the email body (EMAIL_PREVIEW_MAX
+// total, spread across sections in order) - the full set from
+// collectDigestSections() is never thrown away, just not all printed inline.
+function truncateForPreview(sections) {
+  const totalCount = sections.reduce((n, s) => n + s.items.length, 0);
+  if (totalCount <= EMAIL_PREVIEW_MAX) return { sections, totalCount, truncated: false };
+  let remaining = EMAIL_PREVIEW_MAX;
+  const preview = [];
+  for (const sec of sections) {
+    if (remaining <= 0) break;
+    const items = sec.items.slice(0, remaining);
+    if (items.length) preview.push({ title: sec.title, items });
+    remaining -= items.length;
+  }
+  return { sections: preview, totalCount, truncated: true };
+}
 // sendToken identifies one particular digest send (email_sends.public_id) -
 // routed through the server so a click is logged before redirecting on to
 // the real post/editorial, same idea as the open-tracking pixel below.
@@ -169,8 +214,9 @@ function trackOpenUrl(sendToken) {
 
 // sendToken is optional - when a caller doesn't have one yet (e.g. a
 // preview), links just go straight to the real URLs with no tracking.
-function digestEmailHtml(sub, sections, sendToken) {
+function digestEmailHtml(sub, allSections, sendToken, window) {
   const linkFor = (url) => (sendToken ? trackClickUrl(sendToken, url) : url);
+  const { sections, totalCount, truncated } = truncateForPreview(allSections);
   const sectionsHtml = sections
     .map(
       (sec) => `
@@ -194,6 +240,11 @@ function digestEmailHtml(sub, sections, sendToken) {
     heading: "Here's what's new today",
     bodyHtml: `
       <p style="margin-top:0">In the topics you follow:</p>${sectionsHtml}
+      ${truncated ? `
+      <div style="text-align:center;margin-top:18px">
+        <p style="font-size:13px;color:#62666b">Showing ${EMAIL_PREVIEW_MAX} of ${totalCount} new posts.</p>
+        <a href="${viewAllUrl(sub, window.since, window.until)}" style="display:inline-block;padding:10px 22px;background:#1f3b57;color:#fff;text-decoration:none;font-size:13px;font-weight:700">View All ${totalCount}</a>
+      </div>` : ''}
       ${sendToken ? `<img src="${trackOpenUrl(sendToken)}" width="1" height="1" alt="" style="display:block;border:0">` : ''}
     `,
     footerNote: `
@@ -203,7 +254,8 @@ function digestEmailHtml(sub, sections, sendToken) {
   });
 }
 
-function digestEmailText(sub, sections) {
+function digestEmailText(sub, allSections, window) {
+  const { sections, totalCount, truncated } = truncateForPreview(allSections);
   const lines = [`${siteName()} - Your Daily Update`, ''];
   sections.forEach((sec) => {
     lines.push(sec.title.toUpperCase());
@@ -212,6 +264,10 @@ function digestEmailText(sub, sections) {
     });
     lines.push('');
   });
+  if (truncated) {
+    lines.push(`Showing ${EMAIL_PREVIEW_MAX} of ${totalCount} new posts. View all: ${viewAllUrl(sub, window.since, window.until)}`);
+    lines.push('');
+  }
   lines.push(`Manage preferences: ${manageUrl(sub)}`);
   lines.push(`Unsubscribe: ${unsubscribeUrl(sub)}`);
   return lines.join('\n');
@@ -250,6 +306,8 @@ module.exports = {
   digestEmailText,
   unsubscribeUrl,
   manageUrl,
+  viewAllUrl,
+  digestWindowFor,
   sendConfirmationEmail,
   siteName,
   escapeHtml,
