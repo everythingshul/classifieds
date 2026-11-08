@@ -4,6 +4,7 @@
 
 const db = require('../db');
 const { CLASSIFIED_CATEGORIES } = require('../utils/constants');
+const { generateCategoryIcon, generateSubcategories } = require('./aiAssist');
 
 function slugify(name) {
   return String(name)
@@ -80,6 +81,7 @@ function getAllListingCategories({ includeInactive = false } = {}) {
     taxonomyGroup: `lst:${row.key}`,
     id: row.id,
     active: !!row.active,
+    icon: row.icon_svg || null,
   }));
 }
 
@@ -112,7 +114,38 @@ function createListingCategory({ label, labelHe, hasImages, hasPrice, free } = {
        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
     )
     .run(key, trimmed, labelHe || null, hasImages ? 1 : 0, hasPrice ? 1 : 0, free ? 1 : 0, 100, Date.now());
+  queueCategoryAiExtras(key, trimmed);
   return db.prepare('SELECT * FROM listing_categories WHERE id = ?').get(info.lastInsertRowid);
+}
+
+// Fire-and-forget, mirrors services/postLifecycle.js's queueSearchKeywords -
+// runs once right after a listing category is created (by an admin or the
+// hidden category-manage tool), never blocks or fails the creation itself.
+// A missing API key or a failed call just leaves the category with no icon
+// (browseLists.js falls back to a keyword-matched/generic one) and no
+// starter sub-categories (an admin can still add them by hand as before).
+function queueCategoryAiExtras(key, label) {
+  setImmediate(async () => {
+    try {
+      const svg = await generateCategoryIcon({ label });
+      if (svg) db.prepare('UPDATE listing_categories SET icon_svg = ? WHERE key = ?').run(svg, key);
+    } catch (e) {
+      console.error('[taxonomy] category icon generation failed for', key, '-', e.message);
+    }
+  });
+  setImmediate(async () => {
+    try {
+      const names = await generateSubcategories({ label });
+      if (!names.length) return;
+      const grp = `lst:${key}`;
+      const now = Date.now();
+      const insert = db.prepare('INSERT INTO taxonomies (grp, parent_id, name, sort_order, active) VALUES (?, NULL, ?, ?, 1)');
+      const insertMany = db.transaction((rows) => { rows.forEach((name, i) => insert.run(grp, name, i)); });
+      insertMany(names);
+    } catch (e) {
+      console.error('[taxonomy] subcategory generation failed for', key, '-', e.message);
+    }
+  });
 }
 
 // -- Generic taxonomy tree ordering --

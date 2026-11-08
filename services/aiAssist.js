@@ -100,4 +100,107 @@ async function generateSearchKeywords({ title, description, category, type }) {
   }
 }
 
-module.exports = { polishText, generateSearchKeywords, stripDashes };
+// Strict allowlist sanitizer for an AI-generated icon - the result gets
+// dropped straight into innerHTML (see public/js/pages/browseLists.js), so
+// nothing outside a tiny set of shape tags/attributes survives. Anything
+// that doesn't parse into at least one allowed shape is treated as
+// untrustworthy and discarded; the caller then falls back to its own
+// keyword-matched/generic icon instead of showing nothing.
+const ICON_ALLOWED_TAGS = ['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse'];
+const ICON_ALLOWED_ATTRS = ['d', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'points'];
+function sanitizeIconSvg(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const svgMatch = raw.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i);
+  const inner = svgMatch ? svgMatch[1] : raw;
+  if (inner.length > 4000) return null;
+
+  const tagRe = /<\s*([a-zA-Z]+)((?:\s+[^<>]*?)?)\/?\s*>/g;
+  let match;
+  let out = '';
+  while ((match = tagRe.exec(inner))) {
+    const tag = match[1].toLowerCase();
+    if (!ICON_ALLOWED_TAGS.includes(tag)) continue;
+    const attrRe = /([a-zA-Z:-]+)\s*=\s*"([^"]*)"/g;
+    let attrMatch;
+    let attrsOut = '';
+    while ((attrMatch = attrRe.exec(match[2] || ''))) {
+      const name = attrMatch[1].toLowerCase();
+      const value = attrMatch[2];
+      if (!ICON_ALLOWED_ATTRS.includes(name)) continue;
+      if (/[<>&"']/.test(value)) continue;
+      attrsOut += ` ${name}="${value}"`;
+    }
+    if (attrsOut) out += `<${tag}${attrsOut}/>`;
+  }
+  return out || null;
+}
+
+const IconSchema = z.object({ svg: z.string() });
+
+// Runs once per listing category, right after an admin (or the hidden
+// category-manage tool) creates one - see services/taxonomy.js's
+// createListingCategory. Fire-and-forget like generateSearchKeywords:
+// never throws, returns null on no API key, a failed call, or a response
+// that doesn't sanitize into a usable icon. The chooser grid (browseLists.js)
+// falls back to its own keyword-matched/generic icon either way, so a
+// pre-existing category or a failed generation never shows nothing.
+async function generateCategoryIcon({ label }) {
+  const c = getClient();
+  if (!c) return null;
+  try {
+    const system = `Design a single minimal line-art icon representing the business category "${label}", for a classifieds website's category picker grid.
+
+Match this exact visual style: a 24x24 viewBox, fill="none", stroke="currentColor", stroke-width="2", stroke-linecap="round", stroke-linejoin="round" - the same look as Feather/outline-style icons. Use only <path>, <circle>, <rect>, <line>, <polyline>, <polygon>, or <ellipse> elements - no text, no images, no gradients, no filters, no groups, no nested <svg>.
+
+Return ONLY the inner shape elements, not the outer <svg> tag and not fill/stroke/viewBox attributes - those are added by the page. For example: <path d="M3 9.5 12 3l9 6.5"/><path d="M5 9.5V20h14V9.5"/>
+
+The icon should clearly and literally depict something associated with "${label}" (a wrench for plumbing, a tooth for a dentist, scissors for a barber) - never a generic or unrelated shape.`;
+    const response = await c.messages.parse({
+      model: model(),
+      max_tokens: 600,
+      system,
+      output_config: { effort: 'low', format: zodOutputFormat(IconSchema) },
+      messages: [{ role: 'user', content: `Category: ${label}` }],
+    });
+    return sanitizeIconSvg(response.parsed_output?.svg || '');
+  } catch (e) {
+    console.error('[aiAssist] category icon generation failed:', e.message);
+    return null;
+  }
+}
+
+const SubcategoriesSchema = z.object({ subcategories: z.array(z.string()).max(12) });
+
+// Runs once per listing category, same fire-and-forget pattern as the icon
+// above - gives a freshly created category (e.g. "Restaurants") a starter
+// set of sub-categories (e.g. Pizza, Sushi, Chinese) an admin would
+// otherwise have to type in one at a time via Admin -> Taxonomies. Returns
+// [] (never throws) on no API key or any failure.
+async function generateSubcategories({ label }) {
+  const c = getClient();
+  if (!c) return [];
+  try {
+    const system = `Give a short list of common, useful sub-categories for the business category "${label}" on a local classifieds website (e.g. for "Restaurants": Pizza, Sushi, Chinese, Kosher, Bakery). Pick ones a visitor would actually filter by. Short names (1-3 words), no numbering, no duplicates, no explanations. If "${label}" is too narrow to meaningfully split into sub-categories, return an empty list rather than forcing weak ones.`;
+    const response = await c.messages.parse({
+      model: model(),
+      max_tokens: 300,
+      system,
+      output_config: { effort: 'low', format: zodOutputFormat(SubcategoriesSchema) },
+      messages: [{ role: 'user', content: `Category: ${label}` }],
+    });
+    const names = response.parsed_output?.subcategories || [];
+    const cleaned = [];
+    const seen = new Set();
+    names.forEach((n) => {
+      const trimmed = stripDashes(String(n || '')).slice(0, 60);
+      const key = trimmed.toLowerCase();
+      if (trimmed && !seen.has(key)) { seen.add(key); cleaned.push(trimmed); }
+    });
+    return cleaned.slice(0, 12);
+  } catch (e) {
+    console.error('[aiAssist] subcategory generation failed:', e.message);
+    return [];
+  }
+}
+
+module.exports = { polishText, generateSearchKeywords, generateCategoryIcon, generateSubcategories, stripDashes };

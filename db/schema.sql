@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS listing_categories (
   free INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  -- AI-generated icon (inline SVG shape markup) for the chooser grid -
+  -- see createListingCategory in services/taxonomy.js.
+  icon_svg TEXT
 );
 
 CREATE TABLE IF NOT EXISTS promo_codes (
@@ -106,6 +109,11 @@ CREATE TABLE IF NOT EXISTS posts (
   public_id TEXT UNIQUE NOT NULL,
   type TEXT NOT NULL, -- 'classified' | 'simcha'
   category TEXT NOT NULL, -- one of 9 classifieds keys, or 'simcha'
+  -- Listings only: additional category keys beyond the primary `category`
+  -- above (JSON array of strings, e.g. '["plumbers","handymen"]') - a
+  -- business can belong to more than one category. NULL/empty for every
+  -- classified/simcha, and for a listing with only its one primary category.
+  extra_categories TEXT,
   taxonomy_id INTEGER REFERENCES taxonomies(id),
   title TEXT NOT NULL,
   description TEXT,

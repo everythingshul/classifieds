@@ -20,15 +20,24 @@ function imagesForPosts(postIds) {
 
 function categoryCounts() {
   const now = Date.now();
+  // A listing with extra categories counts toward each of them too, not
+  // just its primary - done in JS rather than SQL GROUP BY since a single
+  // row can now contribute to more than one category's count.
   const rows = db
     .prepare(
-      `SELECT category, COUNT(*) AS c FROM posts
-       WHERE type = 'listing' AND (status = 'live' OR status = 'expired') AND (status != 'live' OR expires_at IS NULL OR expires_at > ?)
-       GROUP BY category`
+      `SELECT category, extra_categories FROM posts
+       WHERE type = 'listing' AND (status = 'live' OR status = 'expired') AND (status != 'live' OR expires_at IS NULL OR expires_at > ?)`
     )
     .all(now);
   const map = Object.fromEntries(getListingCategoryKeys().map((k) => [k, 0]));
-  rows.forEach((r) => { map[r.category] = r.c; });
+  rows.forEach((r) => {
+    if (map[r.category] !== undefined) map[r.category] += 1;
+    if (r.extra_categories) {
+      let extras;
+      try { extras = JSON.parse(r.extra_categories); } catch (e) { extras = []; }
+      if (Array.isArray(extras)) extras.forEach((k) => { if (map[k] !== undefined) map[k] += 1; });
+    }
+  });
   return map;
 }
 

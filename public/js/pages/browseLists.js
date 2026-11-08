@@ -127,6 +127,13 @@ const LISTING_CAT_ICON_RULES = [
 const LISTING_CAT_ICON_FALLBACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4V4ZM4 10h16v10H4V10Z"/><path d="M9 14h6"/></svg>';
 
 function iconForListingCategory(cat) {
+  // Every category created from here on gets its own AI-generated icon
+  // (see services/taxonomy.js's createListingCategory) - the keyword rules
+  // below are only a fallback for a category whose icon hasn't generated
+  // yet, or failed to.
+  if (cat.icon) {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${cat.icon}</svg>`;
+  }
   const haystack = `${cat.key} ${cat.label}`.toLowerCase();
   const rule = LISTING_CAT_ICON_RULES.find((r) => r.words.some((w) => haystack.includes(w)));
   return rule ? rule.icon : LISTING_CAT_ICON_FALLBACK;
@@ -171,13 +178,89 @@ async function renderListingCategoryChooser() {
   setPageTitle('Listings', 'Browse community business listings on JListings, by category.');
 }
 
+// Only the geo filter params, pulled out of the current query so every
+// link on the page (category pills, pagination, the filters form) can
+// carry the visitor's chosen location forward instead of losing it the
+// moment they click anything else.
+function listingLocParams(query) {
+  if (query.lat && query.lng) {
+    return { lat: query.lat, lng: query.lng, radius: query.radius || 25, locLabel: query.locLabel || '' };
+  }
+  if (query.loc === 'all') return { loc: 'all' };
+  return {};
+}
+
+// Shown right after picking a category (and not yet again once a location
+// or "show me everywhere" has been chosen for it) - narrows results to
+// nearby businesses first, since "which plumber" usually means "which
+// plumber near me", not every plumber on the whole site.
+async function renderListingLocationChooser(catDef, category) {
+  const heb = I18N.get() === 'he';
+  const label = catDef ? (heb && catDef.labelHe ? catDef.labelHe : catDef.label) : '';
+
+  document.getElementById('app').innerHTML = `
+    <div class="container" style="max-width:520px;padding:40px 0">
+      <div class="page-header">
+        <a href="/listings" class="back-link">&larr; Choose a different category</a>
+        <h1>Where are you looking for ${escapeHtml(label)}?</h1>
+        <p class="sub" style="color:var(--ink-soft)">We'll show you the closest businesses first.</p>
+      </div>
+      <div class="loc-step-actions">
+        <button type="button" class="btn" id="locStepMyLoc">${LOCATION_PIN_ICON} Use my current location</button>
+        <form id="locStepForm" class="loc-step-form" autocomplete="off">
+          <input type="text" id="locStepInput" placeholder="Enter a city or zip code">
+          <button class="btn btn-outline" type="submit">Go</button>
+        </form>
+        <a href="/listings?${qs({ category, loc: 'all' })}" class="loc-step-skip">Show me everywhere</a>
+      </div>
+    </div>
+  `;
+  I18N.apply();
+  setPageTitle(label ? `${label} Listings` : 'Listings');
+
+  const goTo = (extra) => Router.navigate(`/listings?${qs({ category, ...extra })}`);
+
+  document.getElementById('locStepMyLoc').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Finding you…';
+    const loc = await getBrowserLocation();
+    if (!loc) {
+      toast("Couldn't get your location - try entering a city or zip code instead.");
+      btn.disabled = false;
+      btn.innerHTML = `${LOCATION_PIN_ICON} Use my current location`;
+      return;
+    }
+    goTo({ lat: loc.lat, lng: loc.lng, radius: 25, locLabel: 'your location' });
+  });
+
+  document.getElementById('locStepForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('locStepInput');
+    const q = input.value.trim();
+    if (!q) return;
+    const result = await geocodeZipOrCity(q);
+    if (!result) {
+      toast("Couldn't find that location - try a different city or zip code.");
+      return;
+    }
+    goTo({ lat: result.lat, lng: result.lng, radius: 25, locLabel: result.label });
+  });
+}
+
 async function renderListingsListPage({ query }) {
   if (!query.category && !query.all) return renderListingCategoryChooser();
 
   const cfg = window.SITE_CONFIG;
   const category = query.category || '';
-  const page = parseInt(query.page, 10) || 1;
   const catDef = cfg.listingCategories.find((c) => c.key === category);
+
+  if (category && !query.lat && query.loc !== 'all') {
+    return renderListingLocationChooser(catDef, category);
+  }
+
+  const page = parseInt(query.page, 10) || 1;
+  const locParams = listingLocParams(query);
 
   const params = { ...query, page };
   const [listData] = await Promise.all([Api.listings(params)]);
@@ -191,8 +274,14 @@ async function renderListingsListPage({ query }) {
         <h1>${catDef ? escapeHtml(I18N.get() === 'he' ? catDef.labelHe : catDef.label) : escapeHtml(I18N.t('view_all_listings'))}</h1>
         <div class="category-pills">
           <a href="/listings">&larr; Choose a different category</a>
-          ${pills.map((p) => `<a href="/listings${p.key ? `?category=${p.key}` : '?all=1'}" class="${p.key === category ? 'active' : ''}">${escapeHtml(p.label)} <span class="count">(${p.count})</span></a>`).join('')}
+          ${pills.map((p) => `<a href="/listings?${qs(p.key ? { category: p.key, ...locParams } : { all: 1, ...locParams })}" class="${p.key === category ? 'active' : ''}">${escapeHtml(p.label)} <span class="count">(${p.count})</span></a>`).join('')}
         </div>
+        ${locParams.lat ? `
+          <p class="loc-active-note">
+            ${LOCATION_PIN_ICON} Near ${escapeHtml(locParams.locLabel || 'your area')}
+            · <a href="/listings?${qs({ category })}">Change</a>
+            · <a href="/listings?${qs({ category, loc: 'all' })}">Show everywhere</a>
+          </p>` : ''}
       </div>
 
       <form class="filters-bar" id="filtersForm">
@@ -208,7 +297,7 @@ async function renderListingsListPage({ query }) {
 
       ${renderGrid(listData.posts)}
 
-      ${renderListingsPagination(listData.page, listData.totalPages, category)}
+      ${renderListingsPagination(listData.page, listData.totalPages, category, locParams)}
     </div>
   `;
   I18N.apply();
@@ -217,13 +306,13 @@ async function renderListingsListPage({ query }) {
   document.getElementById('filtersForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const next = category ? { category } : { all: 1 };
+    const next = category ? { category, ...locParams } : { all: 1, ...locParams };
     for (const [k, v] of fd.entries()) if (v) next[k] = v;
     Router.navigate(`/listings?${qs(next)}`);
   });
 }
 
-function renderListingsPagination(page, totalPages, category) {
+function renderListingsPagination(page, totalPages, category, locParams) {
   if (totalPages <= 1) return '';
   let html = '<div class="pagination">';
   for (let p = 1; p <= totalPages; p++) {
@@ -231,7 +320,7 @@ function renderListingsPagination(page, totalPages, category) {
       if (p === page - 3 || p === page + 3) html += '<span>…</span>';
       continue;
     }
-    html += `<a href="/listings?${qs(category ? { category, page: p } : { all: 1, page: p })}" class="${p === page ? 'active' : ''}">${p}</a>`;
+    html += `<a href="/listings?${qs(category ? { category, page: p, ...locParams } : { all: 1, page: p, ...locParams })}" class="${p === page ? 'active' : ''}">${p}</a>`;
   }
   html += '</div>';
   return html;

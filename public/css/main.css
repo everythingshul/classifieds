@@ -422,6 +422,19 @@ p { margin: 0 0 .7em; }
 .listing-cat-card .cat-count { font-size: .76rem; color: var(--ink-soft); }
 .listing-cat-viewall { border-style: dashed; }
 
+/* Listings - "where are you looking" location step, shown right after
+   picking a category, before the location has been chosen or skipped. */
+.back-link { display: inline-block; font-size: .8rem; margin-bottom: 10px; }
+.loc-step-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 10px; }
+.loc-step-actions .btn { display: inline-flex; align-items: center; gap: 8px; }
+.loc-step-actions .btn svg { width: 18px; height: 18px; }
+.loc-step-form { display: flex; gap: 8px; width: 100%; }
+.loc-step-form input { flex: 1; padding: 9px 12px; border: 1px solid var(--border); border-radius: 0; font-family: inherit; font-size: .9rem; }
+.loc-step-skip { font-size: .82rem; color: var(--ink-soft); text-decoration: underline; }
+.loc-active-note { font-size: .82rem; color: var(--ink-soft); display: flex; align-items: center; gap: 4px; margin: 2px 0 0; }
+.loc-active-note svg { width: 14px; height: 14px; }
+.loc-active-note a { color: var(--navy); }
+
 .filters-bar { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 13px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .field { display: flex; flex-direction: column; gap: 3px; font-size: .76rem; color: var(--ink-soft); }
 .field input, .field select, .field textarea {

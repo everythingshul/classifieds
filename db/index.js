@@ -43,6 +43,13 @@ addColumnIfMissing('addon_pricing', 'price_cents_gbp', 'price_cents_gbp INTEGER'
 addColumnIfMissing('post_payments', 'currency', "currency TEXT NOT NULL DEFAULT 'usd'");
 addColumnIfMissing('posts', 'contact_phone_methods', 'contact_phone_methods TEXT');
 addColumnIfMissing('posts', 'search_keywords', 'search_keywords TEXT');
+addColumnIfMissing('posts', 'extra_categories', 'extra_categories TEXT');
+// AI-generated icon (sanitized inline SVG shape markup, no outer <svg> tag)
+// for the listings category chooser grid - generated once per category at
+// creation time (see services/taxonomy.js's createListingCategory), so a
+// pre-existing category just has this null and falls back to a keyword-
+// matched/generic icon (see public/js/pages/browseLists.js).
+addColumnIfMissing('listing_categories', 'icon_svg', 'icon_svg TEXT');
 // Must run after the migrations above, not in schema.sql - CREATE INDEX IF NOT
 // EXISTS still fails with "no such column" on a pre-existing analytics_events
 // table where the column was just added by ALTER TABLE, not by the original
