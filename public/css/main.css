@@ -454,12 +454,35 @@ p { margin: 0 0 .7em; }
   font-size: .8rem; font-weight: 600; color: var(--cta); background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
 }
 .share-row a:hover, .share-row button:hover { text-decoration: underline; }
-.ai-polish-btn {
-  font-size: .78rem; font-weight: 600; color: var(--navy); background: #fff; border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 3px 10px; cursor: pointer; font-family: inherit; margin-inline-start: 8px;
+/* AI polish icon button, sitting inside the input/textarea itself. */
+.ai-field-wrap { position: relative; }
+.ai-field-wrap input, .ai-field-wrap textarea { display: block; width: 100%; box-sizing: border-box; padding-inline-end: 40px; }
+.ai-polish-icon-btn {
+  position: absolute; top: 7px; inset-inline-end: 6px; width: 28px; height: 28px; padding: 0;
+  display: flex; align-items: center; justify-content: center; border: none; border-radius: 50%;
+  background: transparent; color: var(--navy); cursor: pointer;
+  animation: ai-polish-nudge 1.3s ease-in-out 3;
 }
-.ai-polish-btn:hover:not(:disabled) { border-color: var(--navy); background: var(--paper); }
-.ai-polish-btn:disabled { opacity: .6; cursor: default; }
+.ai-polish-icon-btn svg { width: 18px; height: 18px; }
+.ai-polish-icon-btn:hover:not(:disabled) { background: var(--paper); animation-play-state: paused; opacity: 1; }
+.ai-polish-icon-btn:disabled { cursor: default; animation: ai-polish-spin 1s linear infinite; opacity: .85; }
+.ai-polish-icon-btn.is-applied { color: var(--cta); animation: none; opacity: 1; }
+/* Custom tooltip (not the native title attribute) so it matches the site's look and shows instantly. */
+.ai-polish-icon-btn::after {
+  content: attr(data-tooltip); position: absolute; bottom: 130%; inset-inline-end: 0; white-space: nowrap;
+  background: var(--ink); color: #fff; font-size: .72rem; font-weight: 600; line-height: 1.4;
+  padding: 4px 9px; border-radius: 4px; opacity: 0; transform: translateY(4px); pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.ai-polish-icon-btn:hover::after { opacity: 1; transform: translateY(0); }
+@keyframes ai-polish-nudge {
+  0%, 100% { opacity: .5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+@keyframes ai-polish-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .contact-card { background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--cta); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); position: sticky; top: 66px; }
 .contact-card .btn { width: 100%; margin-bottom: 6px; text-align: center; }
 .contact-phone-row { display: flex; gap: 6px; margin-bottom: 6px; }

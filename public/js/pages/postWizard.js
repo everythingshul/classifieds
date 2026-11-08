@@ -20,19 +20,39 @@ function renderPostWizard() {
     return formatCents(amount, currency);
   }
 
-  // Wires a "Polish with AI" button next to a title/description field.
-  // Toggles into an "Undo" button after a successful polish; typing again
-  // manually drops it back to a fresh "Polish" button, since there's
-  // nothing left to undo to once the poster's edited past it themselves.
+  const AI_SPARKLE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.6 4.9 4.9 1.6-4.9 1.6-1.6 4.9-1.6-4.9-4.9-1.6 4.9-1.6 1.6-4.9z"/><path d="M19 13.5l.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8 2.3-.8.8-2.3z"/></svg>';
+  const AI_UNDO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a8.5 8.5 0 1 0 2-8.5L3 7"/></svg>';
+
+  // Small icon button meant to sit inside an input/textarea (wrap the
+  // field in a .ai-field-wrap div) - just the icon plus a hover tooltip,
+  // a gentle pulse nudges a poster to notice it's there.
+  function aiPolishBtnHtml(id) {
+    return `<button type="button" class="ai-polish-icon-btn" id="${id}" aria-label="Polish with AI" data-tooltip="Polish with AI">${AI_SPARKLE_ICON}</button>`;
+  }
+
+  // Wires an in-field "Polish with AI" icon button (see aiPolishBtnHtml).
+  // Swaps to an "Undo" icon/tooltip after a successful polish; typing
+  // again manually drops it back to the fresh "Polish" icon, since
+  // there's nothing left to undo to once the poster's edited past it.
+  function setAiBtnIdle(btn) {
+    delete btn.dataset.applied;
+    btn.classList.remove('is-applied');
+    btn.innerHTML = AI_SPARKLE_ICON;
+    btn.setAttribute('aria-label', 'Polish with AI');
+    btn.setAttribute('data-tooltip', 'Polish with AI');
+  }
+  function setAiBtnApplied(btn) {
+    btn.dataset.applied = '1';
+    btn.classList.add('is-applied');
+    btn.innerHTML = AI_UNDO_ICON;
+    btn.setAttribute('aria-label', 'Undo AI polish');
+    btn.setAttribute('data-tooltip', 'Undo AI polish');
+  }
   function wireAiPolish(btn, input, field) {
     if (!btn || !input) return;
     let previousValue = null;
-    const idleLabel = '✨ Polish with AI';
     input.addEventListener('input', () => {
-      if (btn.dataset.applied) {
-        delete btn.dataset.applied;
-        btn.textContent = idleLabel;
-      }
+      if (btn.dataset.applied) setAiBtnIdle(btn);
     });
     btn.addEventListener('click', async () => {
       if (btn.dataset.applied) {
@@ -43,17 +63,15 @@ function renderPostWizard() {
       const current = input.value.trim();
       if (!current) { toast('Write something first'); return; }
       btn.disabled = true;
-      btn.textContent = 'Polishing…';
       try {
         const result = await Api.polishPost({ field, text: current, type: state.postType, category: state.category });
         previousValue = current;
         input.value = input.maxLength > 0 ? result.text.slice(0, input.maxLength) : result.text;
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        btn.dataset.applied = '1';
-        btn.textContent = '↺ Undo';
+        setAiBtnApplied(btn);
       } catch (e) {
         toast(e.message || 'AI polish failed, please try again');
-        btn.textContent = idleLabel;
+        setAiBtnIdle(btn);
       } finally {
         btn.disabled = false;
       }
@@ -256,14 +274,20 @@ function renderPostWizard() {
     shell(`
       <h3 style="margin-top:0">${escapeHtml(catDef.label)}</h3>
       <div class="form-row">
-        <label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}<button type="button" class="ai-polish-btn" id="polishTitleBtn">&#10024; Polish with AI</button></label>
-        <input type="text" id="f_title" value="${escapeHtml(initialTitle)}" required>
+        <label>${state.postType === 'listing' ? 'Business/Organization Name' : 'Title'}</label>
+        <div class="ai-field-wrap">
+          <input type="text" id="f_title" value="${escapeHtml(initialTitle)}" required>
+          ${aiPolishBtnHtml('polishTitleBtn')}
+        </div>
         <div class="char-counter" id="titleCounter"></div>
         <div class="field-limit-warning error-list" id="titleLimitWarning" style="display:none"></div>
       </div>
       <div class="form-row">
-        <label>Description<button type="button" class="ai-polish-btn" id="polishDescBtn">&#10024; Polish with AI</button></label>
-        <textarea id="f_description" rows="5">${escapeHtml(initialDescription)}</textarea>
+        <label>Description</label>
+        <div class="ai-field-wrap">
+          <textarea id="f_description" rows="5">${escapeHtml(initialDescription)}</textarea>
+          ${aiPolishBtnHtml('polishDescBtn')}
+        </div>
         <div class="char-counter" id="descCounter"></div>
         <div class="field-limit-warning error-list" id="descriptionLimitWarning" style="display:none"></div>
       </div>
@@ -453,7 +477,13 @@ function renderPostWizard() {
 
   function renderSimchaDetailsStep() {
     shell(`
-      <div class="form-row"><label>Details <span class="hint">(optional)</span><button type="button" class="ai-polish-btn" id="polishDescBtn">&#10024; Polish with AI</button></label><textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea></div>
+      <div class="form-row">
+        <label>Details <span class="hint">(optional)</span></label>
+        <div class="ai-field-wrap">
+          <textarea id="f_description" rows="4" maxlength="${cfg.simchaCharLimits.description}" placeholder="Any details you'd like to share">${escapeHtml(state.data.description || '')}</textarea>
+          ${aiPolishBtnHtml('polishDescBtn')}
+        </div>
+      </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <h3>Your Info <span class="hint">(never shown publicly - for our records only)</span></h3>
       <div class="form-cols">
