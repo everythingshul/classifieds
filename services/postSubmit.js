@@ -17,6 +17,31 @@ const { formatPostPublic } = require('./postFormat');
 const { createCheckoutSession } = require('./checkout');
 const { currencyForHost } = require('./currency');
 const { appUrl } = require('./appUrl');
+const { geocodeLocation } = require('./geocode');
+
+// A poster's lat/lng only ever get set client-side when they click a
+// suggestion in the location autocomplete dropdown - typing and moving on
+// (common) leaves them null, which silently shut that post out of every
+// "find near me" search (services/geo.js can't compute a distance without
+// both ends having coordinates). Best-effort fills them in here instead, so
+// "near me" works regardless of whether the poster interacted with the
+// dropdown. Never blocks or fails the submission - on no match, a timeout,
+// or any error, the post is created exactly as it would have been before
+// this existed (no coordinates, same as today for posts outside the US or
+// wherever the free geocoder draws a blank).
+async function fillMissingCoordinates(payload) {
+  if (payload.locationLat != null && payload.locationLng != null) return;
+  if (!payload.locationText) return;
+  try {
+    const hit = await geocodeLocation(payload.locationText);
+    if (hit) {
+      payload.locationLat = hit.lat;
+      payload.locationLng = hit.lng;
+    }
+  } catch (e) {
+    console.error('[postSubmit] geocode fallback failed:', e.message);
+  }
+}
 
 const SECTION_LABELS = { classified: 'classifieds', listing: 'listings', simcha: 'simchas' };
 
@@ -106,6 +131,7 @@ async function submitPost({ type: rawType, body, files, hostname }) {
   if (type === 'classified') {
     const charLimits = wantsOversized ? getOversizedCharLimits() : getClassifiedCharLimits();
     const payload = validateClassifiedPayload({ ...body, fields: parsedFields, wantsOversized }, charLimits);
+    await fillMissingCoordinates(payload);
     const catDef = findCategory(payload.category);
     const uploaded = await processUploadedImages(files);
     if (uploaded.length && !catDef.hasImages) {
@@ -139,6 +165,7 @@ async function submitPost({ type: rawType, body, files, hostname }) {
   if (type === 'listing') {
     const charLimits = wantsOversized ? getOversizedCharLimits() : getListingCharLimits();
     const payload = validateListingPayload({ ...body, fields: parsedFields, wantsOversized }, charLimits);
+    await fillMissingCoordinates(payload);
     const catDef = findListingCategory(payload.category);
     const uploaded = await processUploadedImages(files);
     if (uploaded.length && !catDef.hasImages) {

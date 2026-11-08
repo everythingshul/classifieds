@@ -265,17 +265,11 @@ async function renderListingsListPage({ query }) {
   const params = { ...query, page };
   const [listData] = await Promise.all([Api.listings(params)]);
 
-  const pills = [{ key: '', label: I18N.t('view_all'), count: Object.values(listData.categoryCounts).reduce((a, b) => a + b, 0) }]
-    .concat(cfg.listingCategories.map((c) => ({ key: c.key, label: I18N.get() === 'he' ? c.labelHe : c.label, count: listData.categoryCounts[c.key] || 0 })));
-
   document.getElementById('app').innerHTML = `
     <div class="container">
       <div class="page-header">
         <h1>${catDef ? escapeHtml(I18N.get() === 'he' ? catDef.labelHe : catDef.label) : escapeHtml(I18N.t('view_all_listings'))}</h1>
-        <div class="category-pills">
-          <a href="/listings">&larr; Choose a different category</a>
-          ${pills.map((p) => `<a href="/listings?${qs(p.key ? { category: p.key, ...locParams } : { all: 1, ...locParams })}" class="${p.key === category ? 'active' : ''}">${escapeHtml(p.label)} <span class="count">(${p.count})</span></a>`).join('')}
-        </div>
+        <a href="/listings" class="back-link">&larr; Choose a different category</a>
         ${locParams.lat ? `
           <p class="loc-active-note">
             ${LOCATION_PIN_ICON} Near ${escapeHtml(locParams.locLabel || 'your area')}

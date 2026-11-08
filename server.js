@@ -166,4 +166,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`JListings listening on port ${PORT}`);
   require('./utils/cron').start();
+  // Fire-and-forget - makes real network calls (one per post missing
+  // coordinates), so it must never hold up startup or a health check.
+  require('./services/geoBackfill').backfillMissingCoordinates()
+    .catch((e) => console.error('[geo-backfill] Unexpected failure:', e.message));
 });
