@@ -80,16 +80,15 @@ async function renderSubscribePage(params) {
 
 // The "View All" link a digest email shows once there's more than fits in
 // its own preview (see services/emailDigest.js's EMAIL_PREVIEW_MAX) lands
-// here - same token plus the exact since/until that email's window used,
-// so this reproduces precisely what it was built from, not whatever is
-// "new" by the time it's clicked.
+// here - same token plus the exact ids that email listed, read straight off
+// the link, so this reproduces precisely what it was built from rather than
+// whatever happens to be "new" by the time it's clicked.
 async function renderDigestAllPage(params) {
   const token = params.query.token || '';
-  const since = params.query.since;
-  const until = params.query.until;
+  const ids = params.query.ids || '';
   let sections = [];
   try {
-    const result = await Api.subscriptionDigestAll(token, since, until);
+    const result = await Api.subscriptionDigestAll(token, ids);
     sections = result.sections || [];
   } catch (e) {
     document.getElementById('app').innerHTML = `<div class="container" style="padding:40px 0;max-width:560px"><p class="error-list">This link is invalid or has expired. <a href="/subscribe">Manage your email updates</a> instead.</p></div>`;

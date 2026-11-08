@@ -3,7 +3,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../../db');
 const { isValidEmail } = require('../../utils/validate');
 const { newPublicId } = require('../../utils/ids');
-const { validTopicValues, sendConfirmationEmail, escapeHtml, siteName, collectDigestSections } = require('../../services/emailDigest');
+const { validTopicValues, sendConfirmationEmail, escapeHtml, siteName, sectionsFromRefs } = require('../../services/emailDigest');
 const { appUrl } = require('../../services/appUrl');
 
 const router = express.Router();
@@ -31,13 +31,13 @@ router.get('/manage', (req, res) => {
 
 // Backs the "View All" link a digest email shows once there's more than
 // fits in the preview (see services/emailDigest.js's EMAIL_PREVIEW_MAX) -
-// the complete, un-truncated list of everything that email was built from.
+// reads the exact list of what that email contained straight off the
+// link's `ids` (no re-querying by category/date, nothing saved per-send).
 router.get('/digest-all', (req, res) => {
   const sub = findByToken(String(req.query.token || ''));
   if (!sub || sub.status === 'unsubscribed') return res.status(404).json({ error: 'Not found' });
-  const since = Number(req.query.since) || undefined;
-  const until = Number(req.query.until) || undefined;
-  res.json({ sections: collectDigestSections(sub, { since, until }) });
+  const ids = String(req.query.ids || '').split(',').filter(Boolean);
+  res.json({ sections: sectionsFromRefs(ids) });
 });
 
 router.post('/', subscribeLimiter, async (req, res, next) => {

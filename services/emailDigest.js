@@ -81,15 +81,38 @@ const SECTION_QUERY_SAFETY_LIMIT = 500;
 // a page with the complete list instead of growing the email endlessly.
 const EMAIL_PREVIEW_MAX = 25;
 
+// A short "type letter + internal id" reference (e.g. "c482"), never
+// exposed anywhere except the "View all" link - what lets that link
+// reconstruct exactly which posts/editorials an email listed by reading
+// the link itself, with nothing saved server-side for it (see
+// sectionsFromRefs below).
+function refCode(type, id) {
+  const prefix = type === 'simcha' ? 's' : type === 'editorial' ? 'e' : 'c';
+  return `${prefix}${id}`;
+}
+
 function toDigestItem(post) {
   const pub = formatPostPublic(post);
   return {
+    refKey: refCode(post.type, post.id),
     title: pub.title,
     url: `${appUrl()}/${post.type === 'simcha' ? 'simchas' : post.type === 'listing' ? 'listings' : 'classifieds'}/${pub.id}`,
     categoryLabel: pub.categoryLabel,
     location: pub.location.text,
     price: priceLine(pub.fields),
     excerpt: pub.description ? pub.description.slice(0, 140) : '',
+  };
+}
+
+function editorialToDigestItem(ed) {
+  return {
+    refKey: refCode('editorial', ed.id),
+    title: ed.title,
+    url: `${appUrl()}/editorials/${ed.public_id}`,
+    categoryLabel: null,
+    location: null,
+    price: null,
+    excerpt: stripHtml(ed.body).slice(0, 140),
   };
 }
 
@@ -145,21 +168,38 @@ function collectDigestSections(sub, { since, until } = {}) {
          ORDER BY published_at DESC LIMIT ?`
       )
       .all(since, now, SECTION_QUERY_SAFETY_LIMIT);
-    if (eds.length) {
-      sections.push({
-        title: 'Editorials',
-        items: eds.map((ed) => ({
-          title: ed.title,
-          url: `${appUrl()}/editorials/${ed.public_id}`,
-          categoryLabel: null,
-          location: null,
-          price: null,
-          excerpt: stripHtml(ed.body).slice(0, 140),
-        })),
-      });
-    }
+    if (eds.length) sections.push({ title: 'Editorials', items: eds.map(editorialToDigestItem) });
   }
 
+  return sections;
+}
+
+// Rebuilds the exact sections an email listed, reading only the ids
+// encoded in its "View all" link (see viewAllUrl) - no re-querying by
+// category/date, so it can never show something different from what
+// that email actually contained, and nothing about the send itself needs
+// to be saved anywhere to make this page work.
+function sectionsFromRefs(refKeys) {
+  const byType = { c: [], s: [], e: [] };
+  (refKeys || []).forEach((code) => {
+    const m = /^([cse])(\d+)$/.exec(String(code || ''));
+    if (m) byType[m[1]].push(Number(m[2]));
+  });
+
+  const sections = [];
+  function postsSection(prefix, type, title) {
+    if (!byType[prefix].length) return;
+    const placeholders = byType[prefix].map(() => '?').join(',');
+    const rows = db.prepare(`SELECT * FROM posts WHERE type = ? AND id IN (${placeholders}) AND status != 'removed'`).all(type, ...byType[prefix]);
+    if (rows.length) sections.push({ title, items: rows.map(toDigestItem) });
+  }
+  postsSection('c', 'classified', 'Classifieds');
+  postsSection('s', 'simcha', 'Simchas');
+  if (byType.e.length) {
+    const placeholders = byType.e.map(() => '?').join(',');
+    const rows = db.prepare(`SELECT * FROM editorials WHERE id IN (${placeholders}) AND status != 'removed'`).all(...byType.e);
+    if (rows.length) sections.push({ title: 'Editorials', items: rows.map(editorialToDigestItem) });
+  }
   return sections;
 }
 
@@ -179,11 +219,17 @@ function digestWindowFor(sub) {
   return { since: sub.last_sent_at || Date.now() - DAY_MS, until: Date.now() };
 }
 
-// Same token plus the send's exact since/until, a plain "show me
-// everything" page instead of an action - linked from the email whenever
-// there's more than fits in the preview.
-function viewAllUrl(sub, since, until) {
-  return `${appUrl()}/digest-all?token=${sub.public_id}&since=${since}&until=${until}`;
+// Same token plus every item's refKey, comma-joined - a plain "show me
+// everything" page instead of an action, linked from the email whenever
+// there's more than fits in the preview. Reading the exact ids back off
+// the link (see sectionsFromRefs) means this never needs to re-derive
+// "what was new" from a timestamp, which could drift from what the email
+// actually listed. Capped defensively so an extreme digest (months of a
+// paused subscription) can't blow out the link's length.
+const VIEW_ALL_LINK_MAX_ITEMS = 300;
+function viewAllUrl(sub, allSections) {
+  const ids = allSections.flatMap((s) => s.items.map((it) => it.refKey)).filter(Boolean).slice(0, VIEW_ALL_LINK_MAX_ITEMS);
+  return `${appUrl()}/digest-all?token=${sub.public_id}&ids=${ids.join(',')}`;
 }
 
 // Caps how many items actually get listed in the email body (EMAIL_PREVIEW_MAX
@@ -214,7 +260,7 @@ function trackOpenUrl(sendToken) {
 
 // sendToken is optional - when a caller doesn't have one yet (e.g. a
 // preview), links just go straight to the real URLs with no tracking.
-function digestEmailHtml(sub, allSections, sendToken, window) {
+function digestEmailHtml(sub, allSections, sendToken) {
   const linkFor = (url) => (sendToken ? trackClickUrl(sendToken, url) : url);
   const { sections, totalCount, truncated } = truncateForPreview(allSections);
   const sectionsHtml = sections
@@ -243,7 +289,7 @@ function digestEmailHtml(sub, allSections, sendToken, window) {
       ${truncated ? `
       <div style="text-align:center;margin-top:18px">
         <p style="font-size:13px;color:#62666b">Showing ${EMAIL_PREVIEW_MAX} of ${totalCount} new posts.</p>
-        <a href="${viewAllUrl(sub, window.since, window.until)}" style="display:inline-block;padding:10px 22px;background:#1f3b57;color:#fff;text-decoration:none;font-size:13px;font-weight:700">View All ${totalCount}</a>
+        <a href="${viewAllUrl(sub, allSections)}" style="display:inline-block;padding:10px 22px;background:#1f3b57;color:#fff;text-decoration:none;font-size:13px;font-weight:700">View All ${totalCount}</a>
       </div>` : ''}
       ${sendToken ? `<img src="${trackOpenUrl(sendToken)}" width="1" height="1" alt="" style="display:block;border:0">` : ''}
     `,
@@ -254,7 +300,7 @@ function digestEmailHtml(sub, allSections, sendToken, window) {
   });
 }
 
-function digestEmailText(sub, allSections, window) {
+function digestEmailText(sub, allSections) {
   const { sections, totalCount, truncated } = truncateForPreview(allSections);
   const lines = [`${siteName()} - Your Daily Update`, ''];
   sections.forEach((sec) => {
@@ -265,7 +311,7 @@ function digestEmailText(sub, allSections, window) {
     lines.push('');
   });
   if (truncated) {
-    lines.push(`Showing ${EMAIL_PREVIEW_MAX} of ${totalCount} new posts. View all: ${viewAllUrl(sub, window.since, window.until)}`);
+    lines.push(`Showing ${EMAIL_PREVIEW_MAX} of ${totalCount} new posts. View all: ${viewAllUrl(sub, allSections)}`);
     lines.push('');
   }
   lines.push(`Manage preferences: ${manageUrl(sub)}`);
@@ -302,6 +348,7 @@ module.exports = {
   currentHourInSiteTz,
   parseTopics,
   collectDigestSections,
+  sectionsFromRefs,
   digestEmailHtml,
   digestEmailText,
   unsubscribeUrl,

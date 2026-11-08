@@ -50,7 +50,7 @@ const Api = (() => {
     registerEditorialClicks: (ids) => trackingOk() ? req('/editorials/clicks', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),
     likeEditorial: (id) => req(`/editorials/${id}/like`, { method: 'POST' }),
     subscriptionManage: (token) => req(`/subscriptions/manage?token=${encodeURIComponent(token)}`),
-    subscriptionDigestAll: (token, since, until) => req(`/subscriptions/digest-all?${qs({ token, since, until })}`),
+    subscriptionDigestAll: (token, ids) => req(`/subscriptions/digest-all?${qs({ token, ids })}`),
     subscribe: (body) => req('/subscriptions', { method: 'POST', body }),
     banners: (zone) => req(`/banners?zone=${encodeURIComponent(zone)}`),
     registerBannerImpressions: (ids) => trackingOk() ? req('/banners/impressions', { method: 'POST', body: { ids, visitorId: typeof Analytics !== 'undefined' ? Analytics.visitorId() : undefined } }).catch(() => {}) : Promise.resolve(),

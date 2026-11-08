@@ -69,13 +69,9 @@ function sendDueDigests() {
   if (!subs.length) return;
   console.log(`[cron] processing ${subs.length} digest(s) due this hour`);
   subs.forEach((sub) => {
-    // Computed once and reused for both the query and the email's "View
-    // all" link, so that link reproduces exactly this send's window even
-    // after last_sent_at (its default "since") moves forward below.
-    const window = digestWindowFor(sub);
     let sections;
     try {
-      sections = collectDigestSections(sub, window);
+      sections = collectDigestSections(sub, digestWindowFor(sub));
     } catch (e) {
       console.error('[cron] Error building digest for', sub.email, '-', e.message);
       return;
@@ -97,8 +93,8 @@ function sendDueDigests() {
     sendMail({
       to: sub.email,
       subject: `${siteName()}: ${itemCount} new post${itemCount === 1 ? '' : 's'} today`,
-      html: digestEmailHtml(sub, sections, sendToken, window),
-      text: digestEmailText(sub, sections, window),
+      html: digestEmailHtml(sub, sections, sendToken),
+      text: digestEmailText(sub, sections),
       headers: {
         'List-Unsubscribe': `<${unsubscribeUrl(sub)}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
