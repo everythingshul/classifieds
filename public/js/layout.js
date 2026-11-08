@@ -48,6 +48,7 @@ function renderLayout(siteName) {
             <a href="/subscribe" data-i18n="subscribe_nav">Email Updates</a>
             <a href="/pricing" data-i18n="pricing_nav">Pricing</a>
             <a href="/contact" data-i18n="contact_us">Contact Us</a>
+            <a href="/contact" data-i18n="feature_request_nav">Any feature you want us to add?</a>
             <a href="/terms" data-i18n="terms">Terms &amp; Conditions</a>
             <a href="/refund-policy" data-i18n="refund_policy">Refund Policy</a>
             <a href="/privacy-policy" data-i18n="privacy_policy">Privacy Policy</a>
