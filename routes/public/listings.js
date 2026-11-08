@@ -20,24 +20,15 @@ function imagesForPosts(postIds) {
 
 function categoryCounts() {
   const now = Date.now();
-  // A listing with extra categories counts toward each of them too, not
-  // just its primary - done in JS rather than SQL GROUP BY since a single
-  // row can now contribute to more than one category's count.
   const rows = db
     .prepare(
-      `SELECT category, extra_categories FROM posts
-       WHERE type = 'listing' AND (status = 'live' OR status = 'expired') AND (status != 'live' OR expires_at IS NULL OR expires_at > ?)`
+      `SELECT category, COUNT(*) AS c FROM posts
+       WHERE type = 'listing' AND (status = 'live' OR status = 'expired') AND (status != 'live' OR expires_at IS NULL OR expires_at > ?)
+       GROUP BY category`
     )
     .all(now);
   const map = Object.fromEntries(getListingCategoryKeys().map((k) => [k, 0]));
-  rows.forEach((r) => {
-    if (map[r.category] !== undefined) map[r.category] += 1;
-    if (r.extra_categories) {
-      let extras;
-      try { extras = JSON.parse(r.extra_categories); } catch (e) { extras = []; }
-      if (Array.isArray(extras)) extras.forEach((k) => { if (map[k] !== undefined) map[k] += 1; });
-    }
-  });
+  rows.forEach((r) => { map[r.category] = r.c; });
   return map;
 }
 
@@ -61,13 +52,8 @@ router.get('/', (req, res, next) => {
       if (!getListingCategoryKeys().includes(req.query.category)) {
         return res.status(400).json({ error: 'Unknown category' });
       }
-      // Matches on the primary category OR one of the listing's extra
-      // categories (stored as a JSON array string - see extra_categories in
-      // db/schema.sql) - the quoted-string LIKE is exact since category keys
-      // never contain a literal quote, so "plumbers" can't false-match
-      // "plumbers2".
-      where.push("(category = ? OR extra_categories LIKE ?)");
-      params.push(req.query.category, `%"${req.query.category}"%`);
+      where.push('category = ?');
+      params.push(req.query.category);
     }
     if (req.query.q) {
       // search_keywords is an AI-generated, hidden list of synonyms/related

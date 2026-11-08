@@ -43,7 +43,6 @@ addColumnIfMissing('addon_pricing', 'price_cents_gbp', 'price_cents_gbp INTEGER'
 addColumnIfMissing('post_payments', 'currency', "currency TEXT NOT NULL DEFAULT 'usd'");
 addColumnIfMissing('posts', 'contact_phone_methods', 'contact_phone_methods TEXT');
 addColumnIfMissing('posts', 'search_keywords', 'search_keywords TEXT');
-addColumnIfMissing('posts', 'extra_categories', 'extra_categories TEXT');
 // AI-generated icon (sanitized inline SVG shape markup, no outer <svg> tag)
 // for the listings category chooser grid - generated once per category at
 // creation time (see services/taxonomy.js's createListingCategory), so a

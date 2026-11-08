@@ -44,21 +44,20 @@ function insertPost({ type, category, payload, hasImages }) {
       contact_phone, contact_phone_ext, contact_phone_methods, contact_email, contact_url, contact_url_approved,
       poster_first_name, poster_last_name, poster_email, poster_phone,
       pricing_tier_id, price_cents_paid, is_featured_strike, is_oversized,
-      status, has_images, view_count, created_at, updated_at, extra_categories
+      status, has_images, view_count, created_at, updated_at
     ) VALUES (
       @public_id, @type, @category, @taxonomy_id, @title, @description, @fields,
       @location_text, @location_city, @location_state, @location_lat, @location_lng, @location_place_id,
       @contact_phone, @contact_phone_ext, @contact_phone_methods, @contact_email, @contact_url, 0,
       @poster_first_name, @poster_last_name, @poster_email, @poster_phone,
       @pricing_tier_id, 0, @is_featured_strike, @is_oversized,
-      'pending_payment', @has_images, 0, @created_at, @updated_at, @extra_categories
+      'pending_payment', @has_images, 0, @created_at, @updated_at
     )
   `);
   const info = stmt.run({
     public_id: publicId,
     type,
     category,
-    extra_categories: payload.extraCategories && payload.extraCategories.length ? JSON.stringify(payload.extraCategories) : null,
     taxonomy_id: payload.taxonomyId || null,
     title: payload.title,
     description: payload.description || '',

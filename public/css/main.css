@@ -670,9 +670,6 @@ p { margin: 0 0 .7em; }
 
 /* ---------- Misc ---------- */
 .tag { display: inline-block; padding: 2px 7px; border-radius: 0; background: var(--gold-light); color: var(--navy-dark); font-size: .7rem; font-weight: 700; }
-/* A listing's extra categories (beyond its primary one) - same shape as
-   .tag but visually secondary, so the primary category still reads first. */
-.tag-outline { background: transparent; border: 1px solid var(--border); color: var(--ink-soft); }
 .spinner { text-align: center; padding: 30px; color: var(--ink-soft); font-size: .88rem; }
 .toast {
   position: fixed; bottom: 16px; inset-inline: 0; margin: 0 auto; max-width: 340px; background: var(--navy); color: #fff;

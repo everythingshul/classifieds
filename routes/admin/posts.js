@@ -137,27 +137,9 @@ router.put('/:id', (req, res) => {
     if (!validKeys.includes(b.category)) return res.status(400).json({ error: 'Invalid category' });
   }
 
-  // Listings only - same "primary drives pricing, extras are just extra
-  // visibility" model as the public wizard (services/postValidation.js).
-  let extraCategoriesJson;
-  if (b.extraCategories !== undefined) {
-    if (post.type !== 'listing') return res.status(400).json({ error: 'Only listings can have additional categories' });
-    if (!Array.isArray(b.extraCategories)) return res.status(400).json({ error: 'extraCategories must be an array' });
-    const primary = b.category !== undefined ? b.category : post.category;
-    const validKeys = new Set(getListingCategoryKeys());
-    const seen = new Set([primary]);
-    const extras = [];
-    b.extraCategories.forEach((key) => {
-      if (seen.has(key) || !validKeys.has(key)) return;
-      seen.add(key);
-      extras.push(key);
-    });
-    extraCategoriesJson = extras.slice(0, 4).length ? JSON.stringify(extras.slice(0, 4)) : null;
-  }
-
   db.prepare(
     `UPDATE posts SET
-      title = ?, description = ?, fields = ?, category = ?, extra_categories = ?,
+      title = ?, description = ?, fields = ?, category = ?,
       location_text = ?, location_city = ?, location_state = ?, location_lat = ?, location_lng = ?,
       contact_phone = ?, contact_phone_ext = ?, contact_email = ?, contact_url = ?, contact_url_approved = ?,
       taxonomy_id = ?, status = ?, admin_notes = ?, is_featured_strike = ?, scheduled_at = ?, updated_at = ?
@@ -167,7 +149,6 @@ router.put('/:id', (req, res) => {
     b.description ?? post.description,
     b.fields !== undefined ? JSON.stringify(b.fields) : post.fields,
     (b.category !== undefined && post.type !== 'simcha') ? b.category : post.category,
-    extraCategoriesJson !== undefined ? extraCategoriesJson : post.extra_categories,
     b.locationText ?? post.location_text,
     b.locationCity ?? post.location_city,
     b.locationState ?? post.location_state,

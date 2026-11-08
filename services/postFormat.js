@@ -52,18 +52,6 @@ function parseFields(post) {
   }
 }
 
-// Listings only - the extra category keys beyond the primary `category`.
-// Always [] for classifieds/simchas, and for a listing with just its one.
-function parseExtraCategories(post) {
-  if (!post.extra_categories) return [];
-  try {
-    const arr = JSON.parse(post.extra_categories);
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) {
-    return [];
-  }
-}
-
 function formatPostPublic(post, images = []) {
   return {
     id: post.public_id,
@@ -71,8 +59,6 @@ function formatPostPublic(post, images = []) {
     status: post.status,
     category: post.category,
     categoryLabel: categoryLabel(post.category, post.type),
-    extraCategories: parseExtraCategories(post),
-    extraCategoryLabels: parseExtraCategories(post).map((c) => categoryLabel(c, post.type)),
     taxonomyId: post.taxonomy_id || null,
     title: post.title,
     description: post.description,
@@ -109,8 +95,6 @@ function formatPostAdmin(post, images = []) {
     type: post.type,
     category: post.category,
     categoryLabel: categoryLabel(post.category, post.type),
-    extraCategories: parseExtraCategories(post),
-    extraCategoryLabels: parseExtraCategories(post).map((c) => categoryLabel(c, post.type)),
     taxonomyId: post.taxonomy_id || null,
     title: post.title,
     description: post.description,
@@ -157,4 +141,4 @@ function formatPostAdmin(post, images = []) {
   };
 }
 
-module.exports = { formatPostPublic, formatPostAdmin, buildContactLinks, categoryLabel, parseFields, parseExtraCategories };
+module.exports = { formatPostPublic, formatPostAdmin, buildContactLinks, categoryLabel, parseFields };

@@ -169,16 +169,8 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
     }
 
     if (type === 'listing') {
-      let categoriesInput = [];
-      if (req.body.categories) {
-        try {
-          categoriesInput = JSON.parse(req.body.categories);
-        } catch (e) {
-          return res.status(400).json({ error: 'categories must be valid JSON' });
-        }
-      }
       const charLimits = wantsOversized ? getOversizedCharLimits() : getListingCharLimits();
-      const payload = validateListingPayload({ ...req.body, fields: parsedFields, wantsOversized, categories: categoriesInput }, charLimits);
+      const payload = validateListingPayload({ ...req.body, fields: parsedFields, wantsOversized }, charLimits);
       const catDef = findListingCategory(payload.category);
       const uploaded = await processUploadedImages(req.files);
       if (uploaded.length && !catDef.hasImages) {

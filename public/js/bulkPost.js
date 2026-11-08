@@ -146,10 +146,6 @@
             <select data-field="category"></select>
           </div>
         </div>
-        <div class="form-row" data-role="extraCategoriesRow" style="display:none">
-          <label>Additional Categories <span class="hint">(optional - up to 4 more, hold Ctrl/Cmd to select multiple)</span></label>
-          <select data-field="extraCategories" multiple size="4"></select>
-        </div>
         <div class="form-row" data-role="titleRow"><label>Title</label><input type="text" data-field="title"></div>
         <div class="form-row"><label>Description</label><textarea data-field="description"></textarea></div>
         <div class="form-row" data-role="simchaCategory" style="display:none"></div>
@@ -190,24 +186,6 @@
     const categorySelect = blockEl.querySelector('[data-field="category"]');
     const cats = currentCategories(type);
     categorySelect.innerHTML = cats.map((c) => `<option value="${c.key}">${escapeHtml(c.label)}${c.free ? ' (Free)' : ''}</option>`).join('');
-    applyExtraCategoryOptions(blockEl, type);
-  }
-
-  // Listings only - every other category besides whichever is currently
-  // picked as the primary one, so a business can also show up under
-  // related trades (e.g. a caterer who's also a baker).
-  function applyExtraCategoryOptions(blockEl, type) {
-    const row = blockEl.querySelector('[data-role="extraCategoriesRow"]');
-    const select = blockEl.querySelector('[data-field="extraCategories"]');
-    if (type !== 'listing') {
-      row.style.display = 'none';
-      select.innerHTML = '';
-      return;
-    }
-    const primary = blockEl.querySelector('[data-field="category"]')?.value;
-    const cats = currentCategories(type).filter((c) => c.key !== primary);
-    row.style.display = cats.length ? '' : 'none';
-    select.innerHTML = cats.map((c) => `<option value="${c.key}">${escapeHtml(c.label)}</option>`).join('');
   }
 
   function renderCategoryFields(blockEl, type) {
@@ -262,7 +240,6 @@
       if (e.target.matches('[data-field="category"]')) {
         const type = blockEl.querySelector('[data-field="type"]').value;
         renderCategoryFields(blockEl, type);
-        applyExtraCategoryOptions(blockEl, type);
       }
     });
   }
@@ -314,10 +291,6 @@
     const fd = new FormData();
     fd.set('type', type);
     if (type !== 'simcha') fd.set('category', categoryKey || '');
-    if (type === 'listing') {
-      const extras = Array.from(blockEl.querySelector('[data-field="extraCategories"]')?.selectedOptions || []).map((o) => o.value);
-      if (extras.length) fd.set('categories', JSON.stringify([categoryKey, ...extras]));
-    }
     fd.set('title', val('title'));
     fd.set('description', val('description'));
     fd.set('fields', JSON.stringify(fields));

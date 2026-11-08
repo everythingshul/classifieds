@@ -235,36 +235,12 @@ function validateContact(body, errors) {
 
 // Listings is a fully separate section from Classifieds - every category is
 // admin-defined and generic (no specialized fields like job type/lost-found).
-// A listing's primary category drives pricing (buildListingCharges matches
-// on it) and stays mandatory; this caps how many extra categories on top of
-// it a business can claim, so the category filters/chooser can't be gamed
-// into one business showing up under every category on the site.
-const EXTRA_LISTING_CATEGORIES_MAX = 4;
-
 function validateListingPayload(body, charLimits) {
   const errors = [];
   const category = body.category;
   const categoryDef = findListingCategory(category);
   if (!categoryDef) {
     throw new ValidationError([`category must be one of ${getListingCategoryKeys().join(', ')}`]);
-  }
-
-  let extraCategories = [];
-  if (Array.isArray(body.categories)) {
-    const seen = new Set([category]);
-    for (const key of body.categories) {
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (!findListingCategory(key)) {
-        errors.push(`"${key}" is not a valid category`);
-      } else {
-        extraCategories.push(key);
-      }
-    }
-    if (extraCategories.length > EXTRA_LISTING_CATEGORIES_MAX) {
-      errors.push(`choose at most ${EXTRA_LISTING_CATEGORIES_MAX} additional categories`);
-      extraCategories = extraCategories.slice(0, EXTRA_LISTING_CATEGORIES_MAX);
-    }
   }
 
   const title = requireString(body.title, 'title', errors, { max: charLimits.title });
@@ -304,7 +280,6 @@ function validateListingPayload(body, charLimits) {
 
   return {
     category,
-    extraCategories,
     taxonomyId,
     title,
     description,
