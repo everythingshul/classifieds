@@ -85,9 +85,31 @@ async function createAdminPost(body, files, creatorEmail, { autoApprove = true }
   if (body.contactEmail) contact.email = body.contactEmail;
   if (body.contactUrl) contact.url = normalizeUrl(body.contactUrl);
 
+  // Listings only - same "primary category drives pricing, extras are just
+  // extra visibility" model as the public wizard (services/postValidation.js).
+  let extraCategories = [];
+  if (type === 'listing' && body.categories) {
+    let rawCategories;
+    try {
+      rawCategories = JSON.parse(body.categories);
+    } catch (e) {
+      throw new AdminPostCreateError(400, 'categories must be valid JSON');
+    }
+    if (Array.isArray(rawCategories)) {
+      const seen = new Set([body.category]);
+      rawCategories.forEach((key) => {
+        if (seen.has(key)) return;
+        seen.add(key);
+        if (findListingCategory(key)) extraCategories.push(key);
+      });
+      extraCategories = extraCategories.slice(0, 4);
+    }
+  }
+
   const taxonomyId = body.taxonomyId ? Number(body.taxonomyId) : null;
   const payload = {
     category: type === 'simcha' ? 'simcha' : body.category,
+    extraCategories,
     taxonomyId,
     title,
     description: body.description || '',

@@ -80,6 +80,13 @@ async function renderCreatePostPage() {
             <label>Category</label>
             ${categoriesForType().length ? `<select id="categorySelect">${categoriesForType().map((c) => `<option value="${c.key}" ${category === c.key ? 'selected' : ''}>${escapeHtml(c.label)}</option>`).join('')}</select>` : `<p class="hint">No ${type} categories exist yet - add one under Categories first.</p>`}
           </div>
+          ${type === 'listing' && categoriesForType().length > 1 ? `
+            <div class="form-row">
+              <label>Additional Categories <span class="hint">(optional - up to 4 more, hold Ctrl/Cmd to select multiple)</span></label>
+              <select id="extraCategoriesSelect" multiple size="5">
+                ${categoriesForType().filter((c) => c.key !== category).map((c) => `<option value="${c.key}">${escapeHtml(c.label)}</option>`).join('')}
+              </select>
+            </div>` : ''}
           <div class="form-row"><label>${type === 'listing' ? 'Business/Organization Name' : 'Title'}</label><input type="text" id="f_title" maxlength="${limits.title}"><div class="char-counter" id="titleCounter"></div></div>
           <div class="form-row"><label>Description</label><textarea id="f_description" rows="3" maxlength="${limits.description}"></textarea><div class="char-counter" id="descCounter"></div></div>
           <div id="catFields">${categoryFieldsHtml()}</div>
@@ -174,6 +181,11 @@ async function renderCreatePostPage() {
       if (type === 'classified' || type === 'listing') {
         if (!category) throw new Error(`No ${type} categories exist yet - add one under Categories first.`);
         fd.set('category', category);
+        const extraSelect = document.getElementById('extraCategoriesSelect');
+        if (extraSelect) {
+          const extras = Array.from(extraSelect.selectedOptions).map((o) => o.value);
+          if (extras.length) fd.set('categories', JSON.stringify([category, ...extras]));
+        }
         fd.set('title', document.getElementById('f_title').value.trim());
         fd.set('description', document.getElementById('f_description').value.trim());
         const fields = {};

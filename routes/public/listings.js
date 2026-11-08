@@ -61,8 +61,13 @@ router.get('/', (req, res, next) => {
       if (!getListingCategoryKeys().includes(req.query.category)) {
         return res.status(400).json({ error: 'Unknown category' });
       }
-      where.push('category = ?');
-      params.push(req.query.category);
+      // Matches on the primary category OR one of the listing's extra
+      // categories (stored as a JSON array string - see extra_categories in
+      // db/schema.sql) - the quoted-string LIKE is exact since category keys
+      // never contain a literal quote, so "plumbers" can't false-match
+      // "plumbers2".
+      where.push("(category = ? OR extra_categories LIKE ?)");
+      params.push(req.query.category, `%"${req.query.category}"%`);
     }
     if (req.query.q) {
       // search_keywords is an AI-generated, hidden list of synonyms/related

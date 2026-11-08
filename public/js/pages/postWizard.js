@@ -142,22 +142,58 @@ function renderPostWizard() {
     document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => {
       state.postType = btn.dataset.v;
       state.category = null;
+      state.categories = [];
       go(1);
     }));
   }
 
+  // The maximum additional categories a listing can pick on top of its
+  // primary one - must match EXTRA_LISTING_CATEGORIES_MAX in
+  // services/postValidation.js (server re-checks this regardless).
+  const EXTRA_LISTING_CATEGORIES_MAX = 4;
+
   function renderCategoryStep() {
     const categories = currentCategories();
+    const isListing = state.postType === 'listing';
+    if (isListing && !Array.isArray(state.categories)) state.categories = state.category ? [state.category] : [];
+
     shell(`
       ${categories.length ? `<div class="category-grid">
-        ${categories.map((c) => `<button type="button" class="category-tile ${state.category === c.key ? 'selected' : ''}" data-v="${c.key}">${escapeHtml(I18N.get() === 'he' ? c.labelHe : c.label)}${c.free ? ' <span class="tag">Free</span>' : ''}</button>`).join('')}
+        ${categories.map((c) => {
+          const selected = isListing ? state.categories.includes(c.key) : state.category === c.key;
+          return `<button type="button" class="category-tile ${selected ? 'selected' : ''}" data-v="${c.key}">${escapeHtml(I18N.get() === 'he' ? c.labelHe : c.label)}${c.free ? ' <span class="tag">Free</span>' : ''}</button>`;
+        }).join('')}
       </div>` : `<p class="hint">No categories are available for this section yet. Please check back soon.</p>`}
-      <div style="margin-top:20px"><button class="btn btn-outline" id="backBtn">Back</button></div>
+      ${isListing ? `
+        <p class="hint" style="margin-top:12px">Select every category your business fits in - pricing is the same no matter which, or how many, you pick.</p>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="btn btn-outline" id="backBtn">Back</button>
+          <button class="btn" id="catNextBtn" ${state.categories.length ? '' : 'disabled'}>Next</button>
+        </div>
+      ` : `<div style="margin-top:20px"><button class="btn btn-outline" id="backBtn">Back</button></div>`}
     `);
-    // Picking a category is the whole point of this step - advance right
-    // away instead of making the poster click a separate Next.
-    document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => { state.category = btn.dataset.v; go(2); }));
     document.getElementById('backBtn').addEventListener('click', () => go(0));
+
+    if (isListing) {
+      document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => {
+        const key = btn.dataset.v;
+        const i = state.categories.indexOf(key);
+        if (i === -1) {
+          if (state.categories.length > EXTRA_LISTING_CATEGORIES_MAX) { toast(`Choose up to ${EXTRA_LISTING_CATEGORIES_MAX + 1} categories`); return; }
+          state.categories.push(key);
+        } else {
+          state.categories.splice(i, 1);
+        }
+        state.category = state.categories[0] || null;
+        renderCategoryStep();
+      }));
+      const nextBtn = document.getElementById('catNextBtn');
+      if (nextBtn) nextBtn.addEventListener('click', () => go(2));
+    } else {
+      // Picking a category is the whole point of this step for classifieds -
+      // advance right away instead of making the poster click a separate Next.
+      document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => { state.category = btn.dataset.v; go(2); }));
+    }
   }
 
   function renderSimchaCategoryStep() {
@@ -733,6 +769,7 @@ function renderPostWizard() {
       fd.set('type', state.postType);
       if (state.postType === 'classified' || state.postType === 'listing') {
         fd.set('category', state.category);
+        if (state.postType === 'listing' && state.categories?.length > 1) fd.set('categories', JSON.stringify(state.categories));
         fd.set('title', state.data.title);
         fd.set('description', state.data.description || '');
         fd.set('locationText', state.data.locationText);

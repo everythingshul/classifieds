@@ -85,6 +85,7 @@ async function renderDetailPage(id, type) {
         <div class="detail-main">
           <div class="detail-topline">
             <span class="tag tag-lg">${escapeHtml(post.categoryLabel)}</span>
+            ${(post.extraCategoryLabels || []).map((l) => `<span class="tag tag-lg tag-outline">${escapeHtml(l)}</span>`).join('')}
             ${post.isFeatured ? '<span class="badge-featured" style="position:static">Featured</span>' : ''}
             <span class="detail-posted">${I18N.t('posted')} ${escapeHtml(formatRelativeTime(post.publishedAt))}</span>
           </div>
