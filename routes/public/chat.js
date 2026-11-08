@@ -113,7 +113,13 @@ async function answerQuestion(question, transcript, page) {
     }
   }
   if (result.forwardToTeam) await forwardMessageToTeam(question, page);
-  return { reply: result.reply, offTopic: !!result.offTopic, entryId: 'ai' };
+  return {
+    reply: result.reply,
+    offTopic: !!result.offTopic,
+    entryId: 'ai',
+    postCreated: result.postCreated || null,
+    checkout: result.checkout || null,
+  };
 }
 
 router.post('/ask', askLimiter, async (req, res, next) => {

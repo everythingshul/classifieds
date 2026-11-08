@@ -134,6 +134,11 @@
 }
 #cheskyFoot { flex-shrink: 0; max-height: 60vh; overflow-y: auto; }
 .chesky-msg { display: flex; flex-direction: column; max-width: 86%; animation: chesky-pop 0.22s ease; }
+/* Chesky's create_post tool needing payment - Stripe's own Embedded
+   Checkout mounts here (see mountEmbeddedCheckout in utils.js), full log
+   width rather than a chat bubble since it's a real form, not a message.
+   min-height avoids a layout jump while the iframe itself loads in. */
+.chesky-checkout { width: 100%; min-height: 220px; animation: chesky-pop 0.22s ease; }
 @keyframes chesky-pop { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
 .chesky-msg.from-visitor { align-self: flex-end; align-items: flex-end; }
 .chesky-msg.from-bot, .chesky-msg.from-admin { align-self: flex-start; align-items: flex-start; }

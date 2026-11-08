@@ -178,12 +178,38 @@ const Chesky = (() => {
     wireFeedbackRow(node, question, result.entryId);
     transcript.push({ role: 'assistant', text: result.reply });
     saveTranscript();
+    if (result.postCreated) showPostCreated(result.postCreated);
+    if (result.checkout?.clientSecret) showCheckout(result.checkout.clientSecret);
     if (result.offTopic) {
       const log = document.getElementById('cheskyLog');
       log.appendChild(el(`<div style="text-align:center"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanInline">Talk to a real person &rarr;</button></div>`));
       document.getElementById('cheskyTalkHumanInline').addEventListener('click', showHandoffForm);
       scrollLog();
     }
+  }
+
+  // Chesky created a free post for the visitor right here in chat - a
+  // simple link to it, same bubble style as everything else.
+  function showPostCreated(post) {
+    const log = document.getElementById('cheskyLog');
+    if (!log) return;
+    log.appendChild(el(`<div style="text-align:center;margin:4px 0"><a href="${post.postUrl}" class="btn btn-sm">View your post</a></div>`));
+    scrollLog();
+  }
+
+  // Chesky's create_post tool needed payment - mount Stripe's own Embedded
+  // Checkout (see mountEmbeddedCheckout in utils.js, already used by the
+  // regular post wizard) right in the chat log. Card details only ever go
+  // to Stripe's iframe, never to this page's JS or this site's server.
+  function showCheckout(clientSecret) {
+    const log = document.getElementById('cheskyLog');
+    if (!log) return;
+    const node = el('<div class="chesky-checkout"></div>');
+    log.appendChild(node);
+    scrollLog();
+    mountEmbeddedCheckout(node, clientSecret).catch(() => {
+      node.innerHTML = '<p class="error-list">The payment form could not be loaded. Please try again, or talk to our team below.</p>';
+    });
   }
 
   async function ask(question) {
