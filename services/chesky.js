@@ -16,7 +16,7 @@ const runtimeConfig = require('../services/runtimeConfig');
 const { siteName, appUrl } = require('./emailLayout');
 const { getAllClassifiedCategories, findCategory } = require('./taxonomy');
 const { getAllListingCategories, findListingCategory } = require('./listingCategories');
-const { getTiersForCategory, getListingTiersForCategory } = require('./pricing');
+const { getTiersForCategory, getListingTiersForCategory, getClassifiedCharLimits, getListingCharLimits, getOversizedCharLimits } = require('./pricing');
 const { currencyForHost } = require('./currency');
 const { currentOrigin } = require('./requestContext');
 const { CURRENCIES } = require('../utils/constants');
@@ -178,18 +178,31 @@ function buildSiteContext() {
     if (isGbp && gbpCents !== null && gbpCents !== undefined) return `£${(gbpCents / 100).toFixed(2)}`;
     return `$${(usdCents / 100).toFixed(2)}`;
   };
+  // Split by when each add-on actually applies - strike/oversized are
+  // chosen WHILE creating a post (wantsStrike/wantsOversized on
+  // create_post), boost is a separate purchase on a post that already
+  // exists. Conflating these (as this used to) told Chesky every add-on
+  // only exists after posting, which is wrong for two of the three.
   const addons = db.prepare('SELECT key, price_cents, price_cents_gbp, config FROM addon_pricing').all();
-  const addonLines = addons.map((a) => {
-    const cfg = a.config ? JSON.parse(a.config) : {};
-    const label = cfg.label || a.key;
-    return `- ${label}: ${price(a.price_cents, a.price_cents_gbp)}`;
-  });
+  const addonLabel = (a) => (a.config ? JSON.parse(a.config) : {}).label || a.key;
+  const addonSection = (a) => (a.key.startsWith('listing_') ? 'listing' : 'classified');
+  const atPostingLines = addons
+    .filter((a) => a.key.endsWith('_strike') || a.key.endsWith('_oversized'))
+    .map((a) => `- ${addonLabel(a)} (${addonSection(a)}s): ${price(a.price_cents, a.price_cents_gbp)}`);
+  const boostLines = addons
+    .filter((a) => a.key.endsWith('_boost'))
+    .map((a) => `- ${addonLabel(a)} (${addonSection(a)}s): ${price(a.price_cents, a.price_cents_gbp)}`);
+
   const tiers = db.prepare("SELECT category, post_type, name, duration_days, price_cents, price_cents_gbp FROM pricing_tiers WHERE active = 1 ORDER BY post_type, sort_order").all();
   const tierLines = tiers.map((t) => `- ${t.post_type === 'listing' ? 'Listing' : t.post_type === 'simcha' ? 'Simcha' : 'Classified'}${t.category ? ` (${t.category})` : ''}: ${t.name}, ${t.duration_days} days, ${t.price_cents ? price(t.price_cents, t.price_cents_gbp) : 'free'}`);
 
   const classifiedKeys = getAllClassifiedCategories().map((c) => `${c.key} (${c.label})`);
   const listingKeys = getAllListingCategories().map((c) => `${c.key} (${c.label})`);
   const simchaTax = db.prepare("SELECT name FROM taxonomies WHERE grp = 'simcha' AND active = 1 ORDER BY sort_order").all().map((t) => t.name);
+
+  const classifiedLimits = getClassifiedCharLimits();
+  const listingLimits = getListingCharLimits();
+  const oversizedLimits = getOversizedCharLimits();
 
   const text = `
 Site name: ${name}
@@ -204,15 +217,18 @@ Simcha categories (use the exact name, not a key, as simchaCategory when calling
 Posting durations & prices (exact tier names/prices/durations can change - these are what's configured right now, already converted to this visitor's own currency):
 ${tierLines.join('\n') || '(none configured)'}
 
-Boost / Feature add-ons (make a post appear higher or with a highlighted style - paid for separately, after a post already exists, from that post's own page):
-${addonLines.join('\n') || '(none configured)'}
+Optional add-ons you can offer WHILE creating a post, via create_post's wantsStrike/wantsOversized - always mention these as options, don't wait to be asked:
+${atPostingLines.join('\n') || '(none configured)'}
+- Normal length limits: classifieds ${classifiedLimits.title} chars title / ${classifiedLimits.description} chars description, listings ${listingLimits.title} chars title / ${listingLimits.description} chars description. Oversized raises both to ${oversizedLimits.title} chars title / ${oversizedLimits.description} chars description - if what they've told you clearly won't fit the normal limit, proactively suggest Oversized rather than silently truncating it.
+
+Boost (a separate purchase, only for a post that ALREADY EXISTS and is NOT something create_post can do - the poster goes to that post's own page and uses "Boost or Feature this listing" with the email they posted under):
+${boostLines.join('\n') || '(none configured)'}
 
 Policies to know:
-- Lost & Found and any category marked "free" don't cost anything to post.
-- Every photo is reviewed by a human before it appears - this is mainly to keep photos of people off the site, a hard rule here. You cannot attach photos yourself (text chat only) - if a visitor wants photos on their post, they add those afterward from their invoice/management link, or use the regular "+ Post" page instead.
+- Lost & Found and any category marked "free" don't cost anything to post. A post's total price is its duration tier plus any add-ons chosen - always add them up and state the real total, in this visitor's own currency, before they confirm.
+- Every photo is reviewed by a human before it appears - this is mainly to keep photos of people off the site, a hard rule here.
 - Posts expire after their duration and stay on the site with an "Expired" stamp and no contact info shown, rather than disappearing - visitors can still see what was posted, just can't reach the poster anymore. The original poster can ask us to renew/repost.
-- To boost or feature an existing post, the poster opens their post's page and uses the "Boost or Feature this listing" section with the email they posted under.
-- Simchas (celebrations like a birth, bar/bat mitzvah, wedding) are a separate free-text section from Classifieds/Listings, and are always free.
+- Simchas (celebrations like a birth, bar/bat mitzvah, wedding) are a separate free-text section from Classifieds/Listings, and are always free (no tier/add-on choices apply to them).
 - Banner ad placements on the site are sold separately, outside any self-serve flow - if someone asks about advertising/banners (not boosting their own post), offer to pass their request to the team (forwardToTeam), don't quote a price for it.
 `.trim();
   contextCache.set(currency, { text, at: Date.now() });
@@ -247,8 +263,8 @@ const CREATE_POST_TOOL = {
       locationText: { type: 'string', description: 'City/area - not used for simcha.' },
       price: { type: 'string', description: 'Optional - only for a category that takes a price. A plain number, or text like "Call for price".' },
       tierName: { type: 'string', description: 'Optional - the posting plan/duration name the visitor asked for, exactly as listed in the site facts. Defaults to the standard plan for the category if omitted.' },
-      wantsStrike: { type: 'boolean', description: 'Optional add-on to feature/highlight the post, if they asked for it and it was mentioned as available.' },
-      wantsOversized: { type: 'boolean' },
+      wantsStrike: { type: 'boolean', description: 'Optional add-on to feature/highlight the post (price in site facts). Proactively offer this while gathering details, in this visitor\'s own currency - don\'t wait to be asked.' },
+      wantsOversized: { type: 'boolean', description: 'Optional add-on that raises the title/description length limits (price in site facts). Proactively offer it if what they described clearly won\'t fit the normal limit, rather than silently truncating it.' },
       attachPhoto: { type: 'boolean', description: 'Whether to attach the photo the visitor most recently sent in this conversation to the post. Defaults to true whenever a photo was sent and hasn\'t already been used for a different post - set it to false if the photo clearly isn\'t for this post.' },
       posterFirstName: { type: 'string' },
       posterLastName: { type: 'string' },
@@ -411,11 +427,11 @@ PERSONALITY - this matters a lot: talk like a kind, down-to-earth staff member t
 
 SCOPE: you only help with ${name} itself - how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, advertising (see below), email updates (see below), general site navigation, and (per the live posts below) what's currently posted on the site. If someone asks about something unrelated to ${name} - general knowledge, other websites/companies, personal advice - don't answer it; warmly say that's outside what you can help with here, and set offTopic to true.
 
-POSTING FOR SOMEONE, RIGHT HERE IN CHAT: you can actually create a post for a visitor using the create_post tool, including handling payment for a paid category - but you can NEVER ask for or accept card/payment details yourself (you have no way to charge anyone). Here's the flow: gather everything you need through normal conversation (what they're posting, which category it fits - match it to an exact category key from the site facts, a short description, their location if relevant, and an email to send their invoice/confirmation to), confirm with them what you're about to post, then call create_post. If it comes back needing payment, tell them warmly that a secure payment form just opened right here in the chat (Stripe's own form - you never see or touch their card details) and that their post goes live the moment they complete it. If it's free, tell them it's live now and share the link. If it comes back with an error, explain what's missing or wrong in plain language and ask for a fix - never retry blindly with guessed values.
+POSTING FOR SOMEONE, RIGHT HERE IN CHAT: you can actually create a post for a visitor using the create_post tool, including handling payment for a paid category - but you can NEVER ask for or accept card/payment details yourself (you have no way to charge anyone). Here's the flow: gather everything you need through normal conversation (what they're posting, which category it fits - match it to an exact category key from the site facts, a short description, their location if relevant, and an email to send their invoice/confirmation to). While you're gathering that, also mention the optional add-ons from the site facts (Featured/Striking via wantsStrike, Oversized via wantsOversized) with their real price - don't wait for them to ask, and proactively suggest Oversized if what they've described clearly won't fit the normal length limit. Confirm with them what you're about to post - including the real total price (tier plus any add-ons, in their own currency) - then call create_post. If it comes back needing payment, tell them warmly that a secure payment form just opened right here in the chat (Stripe's own form - you never see or touch their card details) and that their post goes live the moment they complete it. If it's free, tell them it's live now and share the link. If it comes back with an error, explain what's missing or wrong in plain language and ask for a fix - never retry blindly with guessed values.
 
 PHOTOS & VOICE NOTES: a visitor can attach a photo and/or record a voice note right in this chat (camera and mic buttons next to the message box), together or separately, with or without typing anything. When a photo comes in, you actually see the image. When a voice note comes in, it's already been transcribed into the text you're reading - treat it exactly like something they typed (you can acknowledge it came in as a voice note, naturally, without making a big deal of it). Use whatever they send to help write a good title/description, and when you call create_post for that item, any photo from this message is attached to it automatically (the tool result tells you whether it actually got attached - mention it only if something unexpected happened, like the category not supporting photos). Every photo still goes through the normal human moderation queue before it's publicly visible, same as any other post's photo - mention that if it's relevant, but don't over-explain it. Only one photo per post through chat; if they want more, point them to the invoice/management link after their post is live, or the regular "+ Post" page.${hasImage ? '\n\nThe visitor just sent a photo with this message - look at it.' : ''}${hasVoice ? '\n\nSome or all of this message came in as a voice note, already transcribed below.' : ''}
 
-ADVERTISING: boosting/featuring an existing post (making it jump to the top or stand out) is self-serve from that post's own page, using the email it was posted under - mention this when relevant, and the price from the site facts. Banner ad placements on the site itself are a separate, bigger arrangement handled by the team, not something you can set up or price here - if someone asks about that, offer warmly to pass their interest along to the team (set forwardToTeam to true) rather than guessing at pricing or availability.
+ADVERTISING: Boost (bumping an existing, already-live post back to the top) is different from Featured/Oversized - Boost only applies to a post that already exists and is self-serve from that post's own page, using the email it was posted under; it's not something create_post can do. Featured and Oversized, by contrast, are chosen WHILE creating a post via create_post (see POSTING above) - don't tell someone they have to wait until after posting for those two. Mention the right price for whichever one actually applies, from the site facts. Banner ad placements on the site itself are a separate, bigger arrangement handled by the team, not something you can set up or price here - if someone asks about that, offer warmly to pass their interest along to the team (set forwardToTeam to true) rather than guessing at pricing or availability.
 
 EMAIL UPDATES: the site has a daily email digest of new posts in whatever topics someone picks. When it's natural - someone's browsing, asks about staying in the loop, or you just helped them find something - mention it and offer to sign them up right here if they give you an email, using the subscribe_to_updates tool. Don't be pushy about it or bring it up more than once in a conversation.
 
