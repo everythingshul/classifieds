@@ -21,6 +21,7 @@ const { currencyForHost } = require('./currency');
 const { currentOrigin } = require('./requestContext');
 const { CURRENCIES } = require('../utils/constants');
 const { submitPost, ValidationError } = require('./postSubmit');
+const { buildContactLinks } = require('./postFormat');
 const { isValidEmail } = require('../utils/validate');
 const { newPublicId } = require('../utils/ids');
 const { validTopicValues, sendConfirmationEmail } = require('./emailDigest');
@@ -127,19 +128,31 @@ function postPublicPath(p) {
   return `${appUrl()}/${segment}/${p.public_id}`;
 }
 
-// A quick keyword search over live posts, so Chesky can point to real
-// inventory ("yes, here's one") instead of only speaking in generalities.
-// Not exhaustive - just a few keywords from the question, best-effort.
-function searchRelevantPosts(question, limit = 5) {
-  const words = extractKeywords(question);
-  if (!words.length) return [];
+// Full search over live posts for Chesky's search_posts tool - not a
+// one-shot guess at the opening message, a real tool the model can call
+// (and re-call with different terms/filters) whenever it needs to check
+// what's actually posted, so it can point to real inventory instead of
+// speaking in generalities.
+function queryPosts({ query, type, category } = {}, limit = 8) {
   const now = Date.now();
-  const where = words.map(() => '(title LIKE ? OR description LIKE ? OR category LIKE ?)').join(' OR ');
-  const params = [];
-  words.forEach((w) => { const like = `%${w}%`; params.push(like, like, like); });
+  const clauses = ["status = 'live'", '(expires_at IS NULL OR expires_at > ?)'];
+  const params = [now];
+  if (['classified', 'listing', 'simcha'].includes(type)) {
+    clauses.push('type = ?');
+    params.push(type);
+  }
+  if (category) {
+    clauses.push('category = ?');
+    params.push(category);
+  }
+  const words = extractKeywords(query);
+  if (words.length) {
+    clauses.push(`(${words.map(() => '(title LIKE ? OR description LIKE ? OR category LIKE ?)').join(' OR ')})`);
+    words.forEach((w) => { const like = `%${w}%`; params.push(like, like, like); });
+  }
   const rows = db
-    .prepare(`SELECT * FROM posts WHERE status = 'live' AND (expires_at IS NULL OR expires_at > ?) AND (${where}) ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT ?`)
-    .all(now, ...params, limit);
+    .prepare(`SELECT * FROM posts WHERE ${clauses.join(' AND ')} ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT ?`)
+    .all(...params, limit);
   return rows.map((p) => {
     let fields = {};
     try { fields = JSON.parse(p.fields || '{}'); } catch (e) { /* ignore */ }
@@ -149,8 +162,40 @@ function searchRelevantPosts(question, limit = 5) {
     const symbol = CURRENCY_SYMBOLS[fields.currency] || '$';
     const price = fields.price !== undefined && fields.price !== null ? `${symbol}${fields.price}` : fields.priceText || null;
     const loc = [p.location_city, p.location_state].filter(Boolean).join(', ');
-    return { title: p.title, category: p.category, location: loc, price, url: postPublicPath(p) };
+    return { id: p.public_id, title: p.title, type: p.type, category: p.category, location: loc, price, url: postPublicPath(p) };
   });
+}
+
+// A Google Maps deep link for a listing's real address - mirrors public/js/
+// pages/detail.js's mapsLinksForLocation, server-side. Only listings (real
+// places - stores, offices, venues) get one, same as the detail page:
+// classifieds/simchas only ever have a general area, not an exact address.
+function directionsFor(p) {
+  if (p.type !== 'listing') return null;
+  const hasCoords = typeof p.location_lat === 'number' && typeof p.location_lng === 'number';
+  if (!hasCoords && !p.location_text) return null;
+  const google = hasCoords
+    ? `https://www.google.com/maps/search/?api=1&query=${p.location_lat},${p.location_lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.location_text)}`;
+  return { google };
+}
+
+// Resolves the postIds Chesky named in its respond call into full
+// button-ready data - deliberately only for the handful of posts it's
+// actually pointing the visitor to, never a whole search result page, so
+// contact info never goes further than what's actually being shown.
+function resolvePostRefs(postIds) {
+  if (!postIds?.length) return [];
+  const rows = db
+    .prepare(`SELECT * FROM posts WHERE status = 'live' AND public_id IN (${postIds.map(() => '?').join(',')})`)
+    .all(...postIds);
+  return rows.map((p) => ({
+    id: p.public_id,
+    title: p.title,
+    url: postPublicPath(p),
+    contact: p.type === 'simcha' ? {} : buildContactLinks(p),
+    directions: directionsFor(p),
+  }));
 }
 
 // Keyed by currency ('usd'/'gbp') - a .co.uk visitor and a .com visitor
@@ -244,8 +289,23 @@ const RESPOND_TOOL = {
       reply: { type: 'string', description: 'What to say to the visitor. Short (1-4 sentences), conversational, plain text.' },
       offTopic: { type: 'boolean', description: "true when the question is outside what you can help with here, or you genuinely don't know the answer." },
       forwardToTeam: { type: 'boolean', description: 'true only when the visitor explicitly asked you to pass something along/forward a message/report something to the team.' },
+      postIds: { type: 'array', items: { type: 'string' }, description: "The id of each post (from search_posts results) that you're specifically pointing the visitor to in this reply. The chat shows a button under your message for each one - to view it, and if it has contact info or a real address, to contact the poster or get directions - so only include a post here when you're actually naming/recommending it, not every result you saw." },
     },
     required: ['reply', 'offTopic', 'forwardToTeam'],
+  },
+};
+
+const SEARCH_POSTS_TOOL = {
+  name: 'search_posts',
+  description: "Search everything actually live on the site right now - classifieds, listings, or simchas - so you can point to real inventory instead of speaking in generalities, or confirm something truly isn't posted before saying so. Call this whenever a visitor asks what's available, wants to browse a category, or you need to check if something exists - never guess or rely only on memory of earlier results. You can call it again with different terms or filters if the first search misses.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Keywords to search titles/descriptions for. Omit to just browse a type/category.' },
+      type: { type: 'string', enum: ['classified', 'listing', 'simcha'], description: 'Restrict to one section. Omit to search classifieds and listings both.' },
+      category: { type: 'string', description: 'Exact category KEY (not the label) from the site facts, to restrict to one category.' },
+    },
+    required: [],
   },
 };
 
@@ -291,7 +351,7 @@ const SUBSCRIBE_TOOL = {
   },
 };
 
-const TOOLS = [CREATE_POST_TOOL, SUBSCRIBE_TOOL, RESPOND_TOOL];
+const TOOLS = [CREATE_POST_TOOL, SUBSCRIBE_TOOL, SEARCH_POSTS_TOOL, RESPOND_TOOL];
 
 function resolveTierId(tiers, categoryDef, tierName) {
   if (categoryDef.free) return null;
@@ -408,24 +468,32 @@ async function execSubscribe(input) {
   }
 }
 
+function execSearchPosts(input) {
+  try {
+    return { status: 'ok', posts: queryPosts(input || {}) };
+  } catch (e) {
+    console.error('[chesky] search_posts tool failed:', e.message);
+    return { status: 'error', errors: ['Could not search posts right now.'] };
+  }
+}
+
 async function executeTool(name, input, image) {
   if (name === 'create_post') return execCreatePost(input || {}, image);
   if (name === 'subscribe_to_updates') return execSubscribe(input || {});
+  if (name === 'search_posts') return execSearchPosts(input || {});
   return { status: 'error', errors: ['Unknown tool'] };
 }
 
-function buildSystemPrompt(question, hasImage, hasVoice) {
+function buildSystemPrompt(hasImage, hasVoice) {
   const name = siteName();
-  const posts = searchRelevantPosts(question);
-  const postsBlock = posts.length
-    ? `Live posts that might be relevant to this question right now (a quick keyword search, not the full inventory - treat it as "here's one I found," never as "this is everything available"):\n${posts.map((p) => `- ${p.title} (${p.category}${p.location ? `, ${p.location}` : ''}${p.price ? `, ${p.price}` : ''}) - ${p.url}`).join('\n')}`
-    : `No live posts matched a quick keyword search for this question. That does NOT mean nothing exists - just that this search missed it. Never tell someone "there are none" or "nothing is available" - instead say you're not sure / didn't find a match, and point them to browsing or searching the site themselves.`;
 
   return `You are Chesky, the warm and genuinely helpful assistant for ${name}, a Jewish community classifieds, listings, and simchas (celebrations) website.
 
 PERSONALITY - this matters a lot: talk like a kind, down-to-earth staff member texting a customer, not like a corporate bot. Use contractions (I'm, you'll, that's), vary your sentence openers, and let a little warmth and personality show. Never sound stiff, robotic, or like you're reading from a script. If someone seems confused, frustrated, or new to the site, be extra patient and reassuring - never curt, never cold. Treat every visitor like a valued member of the community, not a support ticket. You genuinely want to see people post - when it's natural (someone describes something they're selling, renting out, giving away, hiring for, or celebrating, or asks "can I post X"), warmly encourage them to post it. Make it easy: offer to just take a photo and/or a voice note describing it right here in chat and you'll take care of the rest (write it up, pick the category, handle payment if needed) - that's often the fastest way for them, especially for an item for sale/rent, a job offer, or a real estate listing. Don't be pushy about it - read the room, and never repeat the nudge if they've already said no or changed the subject.
 
-SCOPE: you only help with ${name} itself - how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, advertising (see below), email updates (see below), general site navigation, and (per the live posts below) what's currently posted on the site. If someone asks about something unrelated to ${name} - general knowledge, other websites/companies, personal advice - don't answer it; warmly say that's outside what you can help with here, and set offTopic to true.
+CLASSIFIEDS VS LISTINGS: this site is primarily a classifieds community - individual people posting what they're selling, renting out, giving away, hiring for, or looking for. Listings (the business directory) is a smaller, secondary feature. When you're the one bringing up posting, or the situation is ambiguous, default to talking about posting a classified (or a simcha, if that fits) - that's the far more natural thing for most visitors. Only steer toward Listings when someone is clearly describing an actual business, store, or company they run, not an individual item, job, or service.
+
+SCOPE: you only help with ${name} itself - how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, advertising (see below), email updates (see below), general site navigation, and (via search_posts, see below) what's currently posted on the site. If someone asks about something unrelated to ${name} - general knowledge, other websites/companies, personal advice - don't answer it; warmly say that's outside what you can help with here, and set offTopic to true.
 
 POSTING FOR SOMEONE, RIGHT HERE IN CHAT: you can actually create a post for a visitor using the create_post tool, including handling payment for a paid category - but you can NEVER ask for or accept card/payment details yourself (you have no way to charge anyone). Here's the flow: gather everything you need through normal conversation (what they're posting, which category it fits - match it to an exact category key from the site facts, a short description, their location if relevant, and an email to send their invoice/confirmation to). While you're gathering that, also mention the optional add-ons from the site facts (Featured/Striking via wantsStrike, Oversized via wantsOversized) with their real price - don't wait for them to ask, and proactively suggest Oversized if what they've described clearly won't fit the normal length limit. Confirm with them what you're about to post - including the real total price (tier plus any add-ons, in their own currency) - then call create_post. If it comes back needing payment, tell them warmly that a secure payment form just opened right here in the chat (Stripe's own form - you never see or touch their card details) and that their post goes live the moment they complete it. If it's free, tell them it's live now and share the link. If it comes back with an error, explain what's missing or wrong in plain language and ask for a fix - never retry blindly with guessed values.
 
@@ -435,16 +503,16 @@ ADVERTISING: Boost (bumping an existing, already-live post back to the top) is d
 
 EMAIL UPDATES: the site has a daily email digest of new posts in whatever topics someone picks. When it's natural - someone's browsing, asks about staying in the loop, or you just helped them find something - mention it and offer to sign them up right here if they give you an email, using the subscribe_to_updates tool. Don't be pushy about it or bring it up more than once in a conversation.
 
-Ground every factual claim (prices, categories, policies, what's posted) ONLY in the facts given below - never invent a price, category, policy, or listing. If a question is about ${name} but you genuinely don't know the answer from what's given, say so honestly and warmly, offer to connect them with a person on the team, and set offTopic to true. Don't mention that you searched or that something is "a quick keyword search" - just answer naturally.
+FINDING WHAT'S ACTUALLY POSTED: you have full access to every live post via the search_posts tool - use it whenever a visitor asks what's available, wants to browse, or you need to confirm something exists, rather than guessing or speaking only in generalities. It's not exhaustive on a single call (try different keywords or a category if your first search misses), but never tell someone "there's nothing" or "none available" without actually having searched - say you're not sure / didn't find a match instead, and point them to browsing or searching the site themselves. When your reply names or recommends a specific post, include its id in respond's postIds so the chat can show a button for it - but only posts you're actually pointing to, not every result you saw. Don't mention that you searched - just answer naturally.
+
+Ground every factual claim (prices, categories, policies, what's posted) ONLY in the facts given below or what search_posts actually returns - never invent a price, category, policy, or listing. If a question is about ${name} but you genuinely don't know the answer from what's given, say so honestly and warmly, offer to connect them with a person on the team, and set offTopic to true.
 
 FORWARDING: if a visitor explicitly asks you to pass something along, forward a message, let the team/company know something, or send a complaint/request/report to the people who run the site - set forwardToTeam to true, and reply confirming warmly that you've passed it along (e.g. "Done - I let our team know!"). Only do this when they're clearly asking you to relay something, not for an ordinary question you can just answer yourself. Note in your reply that since they haven't given an email, the team can read it but can't write back unless they start a real conversation with "Talk to a real person."
 
-You have three tools: create_post, subscribe_to_updates, and respond. Use create_post/subscribe_to_updates only when you actually have what's needed and the visitor has agreed to the action - then ALWAYS call respond next, after seeing that tool's real result, to tell the visitor what happened. respond is the only way to actually say something to the visitor - call it exactly once, last, every single turn, even if you didn't need either other tool. Keep replies short (1-4 sentences), conversational, and plain text - no markdown, no bullet lists, no tables. Never say you're Claude, an AI, a language model, or name any AI company - you're just Chesky.
+You have four tools: create_post, subscribe_to_updates, search_posts, and respond. Use create_post/subscribe_to_updates only when you actually have what's needed and the visitor has agreed to the action; use search_posts freely, as often as you need. Then ALWAYS call respond next, after seeing any other tool's real result, to tell the visitor what happened. respond is the only way to actually say something to the visitor - call it exactly once, last, every single turn, even if you didn't need another tool. Keep replies short (1-4 sentences), conversational, and plain text - no markdown, no bullet lists, no tables. Never say you're Claude, an AI, a language model, or name any AI company - you're just Chesky.
 
 Site facts:
-${buildSiteContext()}
-
-${postsBlock}`;
+${buildSiteContext()}`;
 }
 
 const MODEL_FALLBACK = 'claude-opus-5-5';
@@ -455,6 +523,7 @@ function shapeFinal(input) {
     reply: typeof input?.reply === 'string' && input.reply ? input.reply : "Sorry, I didn't quite catch that - could you rephrase?",
     offTopic: !!input?.offTopic,
     forwardToTeam: !!input?.forwardToTeam,
+    postIds: Array.isArray(input?.postIds) ? input.postIds.filter((x) => typeof x === 'string').slice(0, 5) : [],
   };
 }
 
@@ -471,7 +540,7 @@ async function ask(question, transcript = [], image = null, hasVoice = false) {
   if (!c) return { reply: "I'm not quite set up yet - please use the \"talk to our team\" option below.", offTopic: true, unavailable: true };
 
   const model = runtimeConfig.get('chesky_model') || MODEL_FALLBACK;
-  const system = buildSystemPrompt(question, !!image, !!hasVoice);
+  const system = buildSystemPrompt(!!image, !!hasVoice);
   const questionContent = image
     ? [
         { type: 'text', text: String(question).slice(0, 1500) },
@@ -541,7 +610,7 @@ async function ask(question, transcript = [], image = null, hasVoice = false) {
     else if (checkout) final = { reply: "Almost there - just complete the payment form that opened here in the chat and your post will go live.", offTopic: false, forwardToTeam: false };
     else final = { reply: "Sorry, I didn't quite catch that - could you rephrase?", offTopic: true, forwardToTeam: false };
   }
-  return { ...final, postCreated, checkout };
+  return { reply: final.reply, offTopic: final.offTopic, forwardToTeam: final.forwardToTeam, postCreated, checkout, posts: resolvePostRefs(final.postIds) };
 }
 
-module.exports = { ask, findLearnedMatch, normQ, buildSiteContext, buildSystemPrompt, searchRelevantPosts };
+module.exports = { ask, findLearnedMatch, normQ, buildSiteContext, buildSystemPrompt };

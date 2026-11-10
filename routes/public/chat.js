@@ -142,6 +142,7 @@ async function answerQuestion(question, transcript, page, image, hadVoice) {
     entryId: 'ai',
     postCreated: result.postCreated || null,
     checkout: result.checkout || null,
+    posts: result.posts || [],
   };
 }
 

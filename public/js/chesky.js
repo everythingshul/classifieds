@@ -195,12 +195,31 @@ const Chesky = (() => {
     saveTranscript();
     if (result.postCreated) showPostCreated(result.postCreated);
     if (result.checkout?.clientSecret) showCheckout(result.checkout.clientSecret);
+    if (result.posts?.length) showPostRefs(result.posts);
     if (result.offTopic) {
       const log = document.getElementById('cheskyLog');
       log.appendChild(el(`<div style="text-align:center"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanInline">Talk to a real person &rarr;</button></div>`));
       document.getElementById('cheskyTalkHumanInline').addEventListener('click', showHandoffForm);
       scrollLog();
     }
+  }
+
+  // Chesky named specific live posts in its reply (search_posts results it
+  // actually pointed to, via respond's postIds) - a small button row per
+  // post: view it, reach the poster directly, and get directions if it's a
+  // real address (listings only), so a visitor can act without leaving chat.
+  function showPostRefs(posts) {
+    const log = document.getElementById('cheskyLog');
+    if (!log) return;
+    posts.forEach((post) => {
+      const buttons = [`<a href="${escapeHtml(post.url)}" class="btn btn-sm">${escapeHtml(post.title)}</a>`];
+      if (post.contact?.phone?.tel) buttons.push(`<a href="${escapeHtml(post.contact.phone.tel)}" class="btn btn-sm btn-outline">Call</a>`);
+      if (post.contact?.email?.mailto) buttons.push(`<a href="${escapeHtml(post.contact.email.mailto)}" class="btn btn-sm btn-outline">Email</a>`);
+      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="btn btn-sm btn-outline" target="_blank" rel="noopener">Website</a>`);
+      if (post.directions?.google) buttons.push(`<a href="${escapeHtml(post.directions.google)}" class="btn btn-sm btn-outline" target="_blank" rel="noopener">Directions</a>`);
+      log.appendChild(el(`<div class="chesky-post-actions">${buttons.join('')}</div>`));
+    });
+    scrollLog();
   }
 
   // Chesky created a free post for the visitor right here in chat - a
@@ -232,7 +251,7 @@ const Chesky = (() => {
     const voice = pendingVoice;
     if (busy || (!question.trim() && !image && !voice)) return;
     busy = true;
-    document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
+    document.querySelectorAll('.chesky-chip, .chesky-start-actions').forEach((c) => c.remove());
     clearPendingAttachments();
     renderPendingAttachments();
 
@@ -604,7 +623,16 @@ const Chesky = (() => {
       <div id="cheskyFoot"></div>
     `;
     bubble('bot', "Hi, I'm Chesky! Ask me anything about posting, pricing, or how the site works.");
-    document.getElementById('cheskyLog').appendChild(el(chipsHtml()));
+    const log = document.getElementById('cheskyLog');
+    log.appendChild(el(`
+      <div class="chesky-start-actions">
+        <button type="button" class="btn btn-sm" id="cheskyStartClassified">Post a classified</button>
+        <button type="button" class="btn btn-sm btn-outline" id="cheskyStartSimcha">Post a simcha</button>
+      </div>
+    `));
+    document.getElementById('cheskyStartClassified').addEventListener('click', () => ask('I want to post a classified'));
+    document.getElementById('cheskyStartSimcha').addEventListener('click', () => ask('I want to post a simcha'));
+    log.appendChild(el(chipsHtml()));
     document.querySelectorAll('.chesky-chip').forEach((chip) => chip.addEventListener('click', () => ask(chip.textContent)));
     if (convId) enterHandoffMode();
     else renderAskFooter();
