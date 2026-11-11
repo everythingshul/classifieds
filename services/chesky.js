@@ -22,6 +22,10 @@ const { currentOrigin } = require('./requestContext');
 const { CURRENCIES } = require('../utils/constants');
 const { submitPost, ValidationError } = require('./postSubmit');
 const { buildContactLinks } = require('./postFormat');
+const { tokenWhere, fuzzyFilter, TEXT_COLUMNS } = require('./searchQuery');
+const { geocodeLocation } = require('./geocode');
+const { distanceMiles } = require('../utils/geo');
+const { lev } = require('../utils/fuzzy');
 const { isValidEmail } = require('../utils/validate');
 const { newPublicId } = require('../utils/ids');
 const { validTopicValues, sendConfirmationEmail } = require('./emailDigest');
@@ -64,26 +68,6 @@ function getClient() {
   return client;
 }
 
-// Levenshtein distance, used to fuzzy-match a visitor's question against the
-// phrasings the team taught - small typos/rewording shouldn't miss a taught answer.
-function lev(a, b) {
-  a = a.toLowerCase(); b = b.toLowerCase();
-  const m = a.length, n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  const row = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    let prev = row[0];
-    row[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const tmp = row[j];
-      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
-      prev = tmp;
-    }
-  }
-  return row[n];
-}
-
 function normQ(q) {
   return String(q || '').toLowerCase().replace(/[^a-z0-9'\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -112,48 +96,63 @@ function findLearnedMatch(question) {
   return best ? { entry: best, distance: bestDist } : null;
 }
 
-const STOPWORDS = new Set(['the', 'a', 'an', 'is', 'are', 'do', 'does', 'how', 'what', 'whats', 'where', 'when', 'why', 'who', 'i', 'my', 'me', 'to', 'for', 'of', 'on', 'in', 'with', 'and', 'or', 'have', 'has', 'you', 'your', 'it', 'this', 'that', 'there', 'any', 'about', 'can', 'will', 'im', 'ive', 'want', 'need', 'looking', 'post', 'posting']);
-
-function extractKeywords(text) {
-  return String(text || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
-    .slice(0, 8);
-}
-
 function postPublicPath(p) {
   const segment = p.type === 'simcha' ? 'simchas' : p.type === 'listing' ? 'listings' : 'classifieds';
   return `${appUrl()}/${segment}/${p.public_id}`;
 }
 
+const NEAR_RADIUS_MILES = 25;
+const SEARCH_CANDIDATE_LIMIT = 5000;
+
 // Full search over live posts for Chesky's search_posts tool - not a
 // one-shot guess at the opening message, a real tool the model can call
 // (and re-call with different terms/filters) whenever it needs to check
 // what's actually posted, so it can point to real inventory instead of
-// speaking in generalities.
-function queryPosts({ query, type, category } = {}, limit = 8) {
+// speaking in generalities. Same word-by-word + typo-tolerant matching as
+// the site's own search (services/searchQuery.js). `near` (a typed city/
+// zip/neighbourhood, spelling forgiven - services/geocode.js) sorts
+// results closest-first with the distance, which is what "a plumber near
+// me" actually means.
+async function queryPosts({ query, type, category, near } = {}, limit = 8) {
   const now = Date.now();
-  const clauses = ["status = 'live'", '(expires_at IS NULL OR expires_at > ?)'];
+  const where = ["status = 'live'", '(expires_at IS NULL OR expires_at > ?)'];
   const params = [now];
   if (['classified', 'listing', 'simcha'].includes(type)) {
-    clauses.push('type = ?');
+    where.push('type = ?');
     params.push(type);
   }
   if (category) {
-    clauses.push('category = ?');
+    where.push('category = ?');
     params.push(category);
   }
-  const words = extractKeywords(query);
-  if (words.length) {
-    clauses.push(`(${words.map(() => '(title LIKE ? OR description LIKE ? OR category LIKE ?)').join(' OR ')})`);
-    words.forEach((w) => { const like = `%${w}%`; params.push(like, like, like); });
+
+  const load = (extra) => {
+    const sql = [...where, ...(extra ? [`(${extra.sql})`] : [])].join(' AND ');
+    return db
+      .prepare(`SELECT * FROM posts WHERE ${sql} ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT ${SEARCH_CANDIDATE_LIMIT}`)
+      .all(...params, ...(extra ? extra.params : []));
+  };
+  const text = query ? tokenWhere(query, TEXT_COLUMNS) : null;
+  let rows = load(text);
+  if (text && !rows.length) rows = fuzzyFilter(load(null), query);
+
+  const origin = near ? await geocodeLocation(near) : null;
+  let note = null;
+  let picked;
+  if (origin) {
+    const located = rows
+      .map((p) => ({ p, dist: distanceMiles(origin.lat, origin.lng, p.location_lat, p.location_lng) }))
+      .filter((x) => x.dist !== null)
+      .sort((a, b) => a.dist - b.dist);
+    const close = located.filter((x) => x.dist <= NEAR_RADIUS_MILES);
+    picked = (close.length ? close : located).slice(0, limit);
+    if (!close.length && located.length) note = `Nothing within ${NEAR_RADIUS_MILES} miles of ${origin.label} - these are the nearest, with distances.`;
+  } else {
+    if (near) note = `Couldn't place "${near}" on a map - ask for a nearby city or zip code instead of guessing.`;
+    picked = rows.slice(0, limit).map((p) => ({ p, dist: null }));
   }
-  const rows = db
-    .prepare(`SELECT * FROM posts WHERE ${clauses.join(' AND ')} ORDER BY is_featured_strike DESC, boosted_at DESC LIMIT ?`)
-    .all(...params, limit);
-  return rows.map((p) => {
+
+  const posts = picked.map(({ p, dist }) => {
     let fields = {};
     try { fields = JSON.parse(p.fields || '{}'); } catch (e) { /* ignore */ }
     // An item's own asking price is whatever currency the poster chose for
@@ -161,9 +160,12 @@ function queryPosts({ query, type, category } = {}, limit = 8) {
     // price is a fact about the post, never converted.
     const symbol = CURRENCY_SYMBOLS[fields.currency] || '$';
     const price = fields.price !== undefined && fields.price !== null ? `${symbol}${fields.price}` : fields.priceText || null;
-    const loc = [p.location_city, p.location_state].filter(Boolean).join(', ');
-    return { id: p.public_id, title: p.title, type: p.type, category: p.category, location: loc, price, url: postPublicPath(p) };
+    const loc = [p.location_city, p.location_state].filter(Boolean).join(', ') || p.location_text || '';
+    const out = { id: p.public_id, title: p.title, type: p.type, category: p.category, location: loc, price, url: postPublicPath(p) };
+    if (dist !== null) out.milesAway = Math.round(dist * 10) / 10;
+    return out;
   });
+  return { posts, near: origin ? origin.label : null, note };
 }
 
 // A Google Maps deep link for a listing's real address - mirrors public/js/
@@ -305,6 +307,7 @@ const SEARCH_POSTS_TOOL = {
       query: { type: 'string', description: 'Keywords to search titles/descriptions for. Omit to just browse a type/category.' },
       type: { type: 'string', enum: ['classified', 'listing', 'simcha'], description: 'Restrict to one section. Omit to search classifieds and listings both.' },
       category: { type: 'string', description: 'Exact category KEY (not the label) from the site facts, to restrict to one category.' },
+      near: { type: 'string', description: "Where the visitor is - a city, neighborhood, or zip code, exactly as they said it (spelling doesn't have to be perfect). Results come back closest-first with milesAway on each. Use this for any business/service request (type: \"listing\") once you know where they are." },
     },
     required: [],
   },
@@ -469,9 +472,9 @@ async function execSubscribe(input) {
   }
 }
 
-function execSearchPosts(input) {
+async function execSearchPosts(input) {
   try {
-    return { status: 'ok', posts: queryPosts(input || {}) };
+    return { status: 'ok', ...(await queryPosts(input || {})) };
   } catch (e) {
     console.error('[chesky] search_posts tool failed:', e.message);
     return { status: 'error', errors: ['Could not search posts right now.'] };
@@ -505,6 +508,8 @@ ADVERTISING: Boost (bumping an existing, already-live post back to the top) is d
 EMAIL UPDATES: the site has a daily email digest of new posts in whatever topics someone picks. When it's natural - someone's browsing, asks about staying in the loop, or you just helped them find something - mention it and offer to sign them up right here if they give you an email, using the subscribe_to_updates tool. Don't be pushy about it or bring it up more than once in a conversation.
 
 FINDING WHAT'S ACTUALLY POSTED: you have full access to every live post via the search_posts tool - use it whenever a visitor asks what's available, wants to browse, or you need to confirm something exists, rather than guessing or speaking only in generalities. It's not exhaustive on a single call (try different keywords or a category if your first search misses), but never tell someone "there's nothing" or "none available" without actually having searched - say you're not sure / didn't find a match instead, and point them to browsing or searching the site themselves. When your reply names or recommends a specific post, include its id in respond's postIds so the chat can show a button for it - but only posts you're actually pointing to, not every result you saw. Don't mention that you searched - just answer naturally.
+
+NEAREST BUSINESSES: when someone wants a business or service (a plumber, a restaurant, a shul, a doctor, a caterer...), what they almost always mean is one near them. If they've said where they are - a city, neighborhood, or zip, however they spelled it - pass it as search_posts' near (with type "listing"): results come back closest-first with milesAway on each, so lead with the nearest and mention roughly how far it is. If they haven't said where they are, ask for their city or zip first (one quick question - you can't see their location yourself), then search. If the result's note says the place couldn't be found, ask for a nearby city or zip instead of guessing.
 
 Ground every factual claim (prices, categories, policies, what's posted) ONLY in the facts given below or what search_posts actually returns - never invent a price, category, policy, or listing. If a question is about ${name} but you genuinely don't know the answer from what's given, say so honestly and warmly, offer to connect them with a person on the team, and set offTopic to true.
 

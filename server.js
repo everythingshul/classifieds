@@ -102,6 +102,7 @@ app.use('/api/banners', require('./routes/public/banners'));
 app.use('/api/bulk-post', require('./routes/public/bulkPost'));
 app.use('/api/category-manage', require('./routes/public/categoryManage'));
 app.use('/api/chat', require('./routes/public/chat'));
+app.use('/api/geocode', require('./routes/public/geocode'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
 app.use('/api/admin/taxonomies', require('./routes/admin/taxonomies'));
@@ -172,6 +173,8 @@ app.listen(PORT, () => {
   require('./utils/cron').start();
   // Fire-and-forget - makes real network calls (one per post missing
   // coordinates), so it must never hold up startup or a health check.
-  require('./services/geoBackfill').backfillMissingCoordinates()
+  const geoBackfill = require('./services/geoBackfill');
+  geoBackfill.backfillMissingCoordinates()
+    .then(() => geoBackfill.backfillMissingCities())
     .catch((e) => console.error('[geo-backfill] Unexpected failure:', e.message));
 });

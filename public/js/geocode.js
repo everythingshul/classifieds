@@ -1,47 +1,24 @@
 // Turns a typed zip code or city name into a list of {lat, lng, label}
-// candidates for the zmanim and weather widgets. Primary path is Google
-// Places (New) via the same attachLocationAutocomplete() used on
-// post-wizard location fields - see initLocationPicker() below. When no
-// Google Maps API key is configured, or the key can't actually use Places
-// (not enabled, no billing, wrong referrer restriction...), this is used
-// as the fallback suggestion source instead - so the picker always has a
-// real list to choose from either way. US zip codes go through
-// Zippopotam.us, anything else through Open-Meteo's free geocoding API -
-// no key needed for either.
+// candidates - for the listings "where are you?" step, and the zmanim and
+// weather widgets' pickers. Primary path for the pickers is Google Places
+// (New) via the same attachLocationAutocomplete() used on post-wizard
+// location fields - see initLocationPicker() below; this is the fallback
+// suggestion source when that isn't available, and the Enter/Go path
+// everywhere. It asks the server (GET /api/geocode, services/geocode.js),
+// which forgives typos and nicknames ("bruklyn", "boro park", "lkwd") via
+// a community gazetteer and the site's own posts before trying the free
+// network geocoders - none of which this browser code could do alone.
 async function searchLocations(query) {
   const q = String(query || '').trim();
   if (!q) return [];
-  const results = [];
-
-  if (/^\d{5}$/.test(q)) {
-    try {
-      const res = await fetch(`https://api.zippopotam.us/us/${q}`);
-      if (res.ok) {
-        const data = await res.json();
-        const place = data.places && data.places[0];
-        if (place) {
-          results.push({
-            lat: parseFloat(place.latitude),
-            lng: parseFloat(place.longitude),
-            label: `${place['place name']}, ${place['state abbreviation']}`,
-          });
-        }
-      }
-    } catch (e) { /* fall through to the city-name lookup below */ }
-  }
-
   try {
-    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=en&format=json`);
-    if (res.ok) {
-      const data = await res.json();
-      (data.results || []).forEach((r) => {
-        const region = r.admin1 || r.country;
-        results.push({ lat: r.latitude, lng: r.longitude, label: region ? `${r.name}, ${region}` : r.name });
-      });
-    }
-  } catch (e) { /* ignore - results may still have the zip match above */ }
-
-  return results;
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.results) ? data.results : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 // Convenience for a single best match (used by the picker's Enter/Go

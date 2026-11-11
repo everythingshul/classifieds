@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { formatPostPublic } = require('../../services/postFormat');
-const { distanceMiles } = require('../../utils/geo');
+const { runBrowseQuery, parseGeo } = require('../../services/searchQuery');
 
 const router = express.Router();
 
@@ -20,18 +20,6 @@ router.get('/', (req, res, next) => {
       where.push('taxonomy_id = ?');
       params.push(Number(req.query.taxonomyId));
     }
-    if (req.query.q) {
-      // search_keywords is an AI-generated, hidden list of synonyms/related
-      // terms (see services/aiAssist.js) - never shown to visitors, just
-      // widens what a search can match beyond the literal title/description.
-      where.push('(title LIKE ? OR description LIKE ? OR search_keywords LIKE ?)');
-      const like = `%${req.query.q}%`;
-      params.push(like, like, like);
-    }
-    if (req.query.city) {
-      where.push('location_city LIKE ?');
-      params.push(`%${req.query.city}%`);
-    }
     if (req.query.dateFrom) {
       where.push("json_extract(fields, '$.simchaDate') >= ?");
       params.push(req.query.dateFrom);
@@ -41,27 +29,9 @@ router.get('/', (req, res, next) => {
       params.push(req.query.dateTo);
     }
 
-    const whereSql = where.join(' AND ');
-    const lat = req.query.lat !== undefined ? Number(req.query.lat) : null;
-    const lng = req.query.lng !== undefined ? Number(req.query.lng) : null;
-    const radius = req.query.radius ? Number(req.query.radius) : null;
-    const useGeo = lat !== null && lng !== null && radius;
-
-    let posts, total;
-    if (useGeo) {
-      const all = db.prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY (status = 'expired') ASC, boosted_at DESC LIMIT 5000`).all(...params);
-      const withDist = all
-        .map((p) => ({ post: p, dist: distanceMiles(lat, lng, p.location_lat, p.location_lng) }))
-        .filter((x) => x.dist !== null && x.dist <= radius)
-        .sort((a, b) => a.dist - b.dist);
-      total = withDist.length;
-      posts = withDist.slice((page - 1) * pageSize, page * pageSize).map((x) => x.post);
-    } else {
-      total = db.prepare(`SELECT COUNT(*) AS c FROM posts WHERE ${whereSql}`).get(...params).c;
-      posts = db
-        .prepare(`SELECT * FROM posts WHERE ${whereSql} ORDER BY (status = 'expired') ASC, boosted_at DESC LIMIT ? OFFSET ?`)
-        .all(...params, pageSize, (page - 1) * pageSize);
-    }
+    // Text search (q), the City filter and "near me" all live in
+    // services/searchQuery.js - shared with classifieds, listings and Chesky.
+    const { posts, total } = runBrowseQuery({ where, params, q: req.query.q, city: req.query.city, geo: parseGeo(req.query), orderBy: 'boosted_at DESC', page, pageSize });
 
     res.json({
       posts: posts.map((p) => formatPostPublic(p)),

@@ -54,4 +54,48 @@ async function backfillMissingCoordinates() {
   if (rows.length) console.log(`[geo-backfill] Done - filled in coordinates for ${filled}/${rows.length} post(s).`);
 }
 
-module.exports = { backfillMissingCoordinates };
+// Second one-time pass: location_city/location_state for posts that only
+// have the free-text location. The City filter on the browse pages matched
+// location_city alone, which was only ever set by an autocomplete click -
+// so for most posts it matched nothing. Also fills coordinates where the
+// first pass drew a blank (the geocoder is far more forgiving now).
+const CITY_FLAG_KEY = 'migration_geo_city_backfill_done';
+
+async function backfillMissingCities() {
+  const already = db.prepare('SELECT value FROM site_settings WHERE key = ?').get(CITY_FLAG_KEY);
+  if (already) return;
+
+  const rows = db
+    .prepare(
+      `SELECT id, location_text, location_lat, location_lng FROM posts
+       WHERE status != 'removed' AND location_text IS NOT NULL AND location_text != ''
+       AND (location_city IS NULL OR location_city = '' OR location_lat IS NULL)`
+    )
+    .all();
+
+  if (rows.length) console.log(`[geo-backfill] Filling in city/state for ${rows.length} existing post(s)...`);
+  let filled = 0;
+  for (const row of rows) {
+    try {
+      const hit = await geocodeLocation(row.location_text);
+      if (hit) {
+        const lat = row.location_lat ?? hit.lat;
+        const lng = row.location_lng ?? hit.lng;
+        db.prepare('UPDATE posts SET location_city = COALESCE(NULLIF(location_city, \'\'), ?), location_state = COALESCE(location_state, ?), location_lat = ?, location_lng = ? WHERE id = ?')
+          .run(hit.city || null, hit.state || null, lat, lng, row.id);
+        filled++;
+      }
+    } catch (e) {
+      console.error('[geo-backfill] City fill failed for post', row.id, '-', e.message);
+    }
+    await sleep(DELAY_MS);
+  }
+
+  db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
+    CITY_FLAG_KEY,
+    JSON.stringify({ ranAt: Date.now(), total: rows.length, filled })
+  );
+  if (rows.length) console.log(`[geo-backfill] Done - filled in city/state for ${filled}/${rows.length} post(s).`);
+}
+
+module.exports = { backfillMissingCoordinates, backfillMissingCities };

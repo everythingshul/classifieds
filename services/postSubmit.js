@@ -30,13 +30,22 @@ const { geocodeLocation } = require('./geocode');
 // this existed (no coordinates, same as today for posts outside the US or
 // wherever the free geocoder draws a blank).
 async function fillMissingCoordinates(payload) {
-  if (payload.locationLat != null && payload.locationLng != null) return;
+  const hasCoords = payload.locationLat != null && payload.locationLng != null;
+  // location_city is what the browse pages' City filter used to match on,
+  // and it was only ever set by an autocomplete click - fill it too.
+  if (hasCoords && payload.locationCity) return;
   if (!payload.locationText) return;
   try {
     const hit = await geocodeLocation(payload.locationText);
     if (hit) {
-      payload.locationLat = hit.lat;
-      payload.locationLng = hit.lng;
+      if (!hasCoords) {
+        payload.locationLat = hit.lat;
+        payload.locationLng = hit.lng;
+      }
+      if (!payload.locationCity && hit.city) {
+        payload.locationCity = hit.city;
+        payload.locationState = payload.locationState || hit.state || null;
+      }
     }
   } catch (e) {
     console.error('[postSubmit] geocode fallback failed:', e.message);
