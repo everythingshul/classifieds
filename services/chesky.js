@@ -177,7 +177,8 @@ function directionsFor(p) {
   const google = hasCoords
     ? `https://www.google.com/maps/search/?api=1&query=${p.location_lat},${p.location_lng}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.location_text)}`;
-  return { google };
+  const location = [p.location_city, p.location_state].filter(Boolean).join(', ') || p.location_text || null;
+  return { google, location };
 }
 
 // Resolves the postIds Chesky named in its respond call into full

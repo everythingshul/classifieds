@@ -183,7 +183,12 @@
 .chesky-fb button[data-fb="down"].picked { opacity: 1; color: var(--navy); border-color: var(--navy); background: #eef1f5; }
 
 .chesky-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+/* Shared round, unfilled "pill" look - used for the starter/quick-action
+   chips (<button>) and, so every action in the chat reads as one visual
+   language, the post-reference and post-created action links (<a>) too. */
 .chesky-chip {
+  display: inline-block;
+  text-decoration: none;
   border: 1px solid var(--gold);
   border-radius: 999px;
   background: #fff;
@@ -194,6 +199,24 @@
   transition: background 0.15s, transform 0.15s;
 }
 .chesky-chip:hover { background: var(--gold-light); transform: translateY(-1px); }
+
+.chesky-restart-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+.chesky-restart-btn svg { width: 16px; height: 16px; }
+.chesky-restart-btn:hover { background: rgba(255,255,255,0.26); transform: rotate(-35deg); }
 
 .chesky-typing {
   display: inline-flex;

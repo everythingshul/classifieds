@@ -36,6 +36,7 @@ const Chesky = (() => {
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
   const MIC_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 11z"/></svg>';
   const CAMERA_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+  const RESTART_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
   const REMOVE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
   const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
   const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -185,9 +186,13 @@ const Chesky = (() => {
     });
   }
 
+  // chesky-starter-row (on top of chesky-chips, which just styles the row)
+  // marks this specific row as the one-time opening suggestions, so ask()
+  // can clear it on first use without also wiping later chip rows
+  // (post-reference/post-created buttons) that are meant to stay in the log.
   function chipsHtml() {
     const items = [...QUICK_ACTIONS, ...STARTERS];
-    return `<div class="chesky-chips">${items.map((s) => `<button type="button" class="chesky-chip">${escapeHtml(s)}</button>`).join('')}</div>`;
+    return `<div class="chesky-chips chesky-starter-row">${items.map((s) => `<button type="button" class="chesky-chip">${escapeHtml(s)}</button>`).join('')}</div>`;
   }
 
   function displayBotReply(question, result) {
@@ -214,12 +219,12 @@ const Chesky = (() => {
     const log = document.getElementById('cheskyLog');
     if (!log) return;
     posts.forEach((post) => {
-      const buttons = [`<a href="${escapeHtml(post.url)}" class="btn btn-sm">${escapeHtml(post.title)}</a>`];
-      if (post.contact?.phone?.tel) buttons.push(`<a href="${escapeHtml(post.contact.phone.tel)}" class="btn btn-sm">Call</a>`);
-      if (post.contact?.email?.mailto) buttons.push(`<a href="${escapeHtml(post.contact.email.mailto)}" class="btn btn-sm">Email</a>`);
-      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="btn btn-sm" target="_blank" rel="noopener">Website</a>`);
-      if (post.directions?.google) buttons.push(`<a href="${escapeHtml(post.directions.google)}" class="btn btn-sm" target="_blank" rel="noopener">Directions</a>`);
-      log.appendChild(el(`<div style="text-align:center;margin:4px 0">${buttons.join(' ')}</div>`));
+      const buttons = [`<a href="${escapeHtml(post.url)}" class="chesky-chip">${escapeHtml(post.title)}</a>`];
+      if (post.contact?.phone?.tel) buttons.push(`<a href="${escapeHtml(post.contact.phone.tel)}" class="chesky-chip">Call: ${escapeHtml(post.contact.phone.display)}</a>`);
+      if (post.contact?.email?.mailto) buttons.push(`<a href="${escapeHtml(post.contact.email.mailto)}" class="chesky-chip">Email: ${escapeHtml(post.contact.email.display)}</a>`);
+      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="chesky-chip" target="_blank" rel="noopener">Website: ${escapeHtml(post.contact.url.display)}</a>`);
+      if (post.directions?.google) buttons.push(`<a href="${escapeHtml(post.directions.google)}" class="chesky-chip" target="_blank" rel="noopener">Directions${post.directions.location ? `: ${escapeHtml(post.directions.location)}` : ''}</a>`);
+      log.appendChild(el(`<div class="chesky-chips">${buttons.join('')}</div>`));
     });
     scrollLog();
   }
@@ -229,7 +234,7 @@ const Chesky = (() => {
   function showPostCreated(post) {
     const log = document.getElementById('cheskyLog');
     if (!log) return;
-    log.appendChild(el(`<div style="text-align:center;margin:4px 0"><a href="${post.postUrl}" class="btn btn-sm">View your post</a></div>`));
+    log.appendChild(el(`<div class="chesky-chips"><a href="${post.postUrl}" class="chesky-chip">View your post</a></div>`));
     scrollLog();
   }
 
@@ -253,7 +258,7 @@ const Chesky = (() => {
     const voice = pendingVoice;
     if (busy || (!question.trim() && !image && !voice)) return;
     busy = true;
-    document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
+    document.querySelectorAll('.chesky-starter-row').forEach((c) => c.remove());
     clearPendingAttachments();
     renderPendingAttachments();
 
@@ -614,16 +619,33 @@ const Chesky = (() => {
     badge.textContent = n > 9 ? '9+' : String(n);
   }
 
+  // Forgets the current conversation (AI chat and any human handoff alike)
+  // and rebuilds the panel fresh, same as a first-time visitor would see it.
+  function startOver() {
+    stopPolling();
+    activeAudio?.pause();
+    clearPendingAttachments();
+    transcript = [];
+    saveTranscript();
+    convId = null;
+    convStatus = 'open';
+    lastMsgId = 0;
+    localStorage.removeItem(STORAGE_CONV);
+    renderPanel();
+  }
+
   function renderPanel() {
     const panel = document.getElementById('cheskyPanel');
     panel.innerHTML = `
       <div class="chesky-head">
         <img src="/img/chesky.svg" alt="">
         <div><strong>Chesky</strong><span>${window.SITE_CONFIG?.siteName || 'Here to help'}</span></div>
+        <button type="button" class="chesky-restart-btn" id="cheskyRestartBtn" title="Start over" aria-label="Start over">${RESTART_ICON}</button>
       </div>
       <div class="chesky-log" id="cheskyLog"></div>
       <div id="cheskyFoot"></div>
     `;
+    document.getElementById('cheskyRestartBtn').addEventListener('click', startOver);
     bubble('bot', "Hi, I'm Chesky! Ask me anything about posting, pricing, or how the site works.");
     document.getElementById('cheskyLog').appendChild(el(chipsHtml()));
     document.querySelectorAll('.chesky-chip').forEach((chip) => chip.addEventListener('click', () => ask(chip.textContent)));
