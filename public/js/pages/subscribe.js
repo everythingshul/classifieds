@@ -136,6 +136,7 @@ function wireSubscribeForm(existing, manageToken) {
     btn.textContent = '…';
     try {
       const result = await Api.subscribe(body);
+      Analytics.track('sb', existing ? 'update' : 'signup', { v: topics.length });
       successBox.style.display = 'block';
       document.getElementById('subSuccessMsg').textContent = result.status === 'pending'
         ? "Almost done - check your email and click the confirmation link to start receiving updates."

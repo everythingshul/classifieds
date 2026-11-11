@@ -2,6 +2,15 @@
 // per type, grouped into a single file since each is a small, similar
 // filter-form + grid + pagination pattern.
 
+// Reports a typed search (the Search and City boxes on the browse pages) to
+// the admin Analytics page - first page of results only, so paging through
+// them doesn't count as searching again.
+function trackFilterSearch(section, query, page, total) {
+  if (page !== 1 || typeof Analytics === 'undefined') return;
+  const q = [query.q, query.city].filter(Boolean).join(' in ').trim().toLowerCase().slice(0, 60);
+  if (q) Analytics.track('se', section, { v: total, p: location.pathname, x: { q, c: query.category || '' } });
+}
+
 async function renderClassifiedsListPage({ query }) {
   const cfg = window.SITE_CONFIG;
   const category = query.category || '';
@@ -10,6 +19,7 @@ async function renderClassifiedsListPage({ query }) {
 
   const params = { ...query, page };
   const [listData] = await Promise.all([Api.classifieds(params)]);
+  trackFilterSearch('classifieds', query, page, listData.total);
 
   const pills = [{ key: '', label: I18N.t('view_all'), count: Object.values(listData.categoryCounts).reduce((a, b) => a + b, 0) }]
     .concat(cfg.categories.map((c) => ({ key: c.key, label: I18N.get() === 'he' ? c.labelHe : c.label, count: listData.categoryCounts[c.key] || 0 })));
@@ -218,7 +228,10 @@ async function renderListingLocationChooser(catDef, category) {
   I18N.apply();
   setPageTitle(label ? `${label} Listings` : 'Listings');
 
-  const goTo = (extra) => Router.navigate(`/listings?${qs({ category, ...extra })}`);
+  const goTo = (extra) => {
+    if (typeof Analytics !== 'undefined') Analytics.track('lc', 'listings', { x: { l: String(extra.locLabel || '').slice(0, 60), c: category } });
+    Router.navigate(`/listings?${qs({ category, ...extra })}`);
+  };
 
   document.getElementById('locStepMyLoc').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
@@ -264,6 +277,7 @@ async function renderListingsListPage({ query }) {
 
   const params = { ...query, page };
   const [listData] = await Promise.all([Api.listings(params)]);
+  trackFilterSearch('listings', query, page, listData.total);
 
   document.getElementById('app').innerHTML = `
     <div class="container">
@@ -326,6 +340,7 @@ async function renderSimchasListPage({ query }) {
   const simchaTaxonomies = cfg.taxonomies.filter((t) => t.grp === 'simcha');
 
   const listData = await Api.simchas({ ...query, page });
+  trackFilterSearch('simchas', query, page, listData.total);
 
   document.getElementById('app').innerHTML = `
     <div class="container">

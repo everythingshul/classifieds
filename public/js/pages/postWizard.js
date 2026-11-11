@@ -119,7 +119,20 @@ function renderPostWizard() {
     return cfg.addons?.[state.postType];
   }
 
+  // Posting funnel for the admin Analytics page: each step is reported the
+  // first time this visit reaches it (going back and forth doesn't recount).
+  const reached = new Set();
+  function mark(name, x) {
+    if (reached.has(name) || typeof Analytics === 'undefined') return;
+    reached.add(name);
+    Analytics.track('pw', name, x ? { x } : undefined);
+  }
+
   function render() {
+    if (state.step >= 1) mark('type', { t: state.postType });
+    if (state.step >= 2) mark('category', { t: state.postType, c: state.category || '' });
+    if (state.step >= 3) mark('details');
+    if (state.step === (state.postType === 'simcha' ? 3 : 4)) mark('review');
     if (state.step === 0) return renderTypeStep();
     if (state.step === 1) return state.postType === 'simcha' ? renderSimchaCategoryStep() : renderCategoryStep();
     if (state.step === 2) return state.postType === 'simcha' ? renderSimchaDetailsStep() : renderClassifiedDetailsStep();
@@ -770,7 +783,12 @@ function renderPostWizard() {
         if (state.data.promo) fd.set('promoCode', state.data.promo.code);
       }
 
+      if (typeof Analytics !== 'undefined') Analytics.track('pw', 'submit', { x: { t: state.postType } });
       const result = await Api.createPost(fd);
+      if (typeof Analytics !== 'undefined') {
+        if (result.requiresPayment) Analytics.track('pw', 'checkout', { x: { t: state.postType } });
+        else Analytics.track('pw', 'done', { j: result.post?.id, x: { t: state.postType, free: 1 } });
+      }
       if (result.requiresPayment) {
         if (result.checkoutUrl) {
           window.location.href = result.checkoutUrl;
@@ -791,6 +809,7 @@ function renderPostWizard() {
         document.getElementById('app').innerHTML = postSubmittedHtml(result.post);
       }
     } catch (e) {
+      if (typeof Analytics !== 'undefined') Analytics.track('pw', 'error', { x: { m: String((e.data?.details || [e.message])[0] || 'error').slice(0, 100) } });
       const box = document.getElementById('stepError');
       box.style.display = 'block';
       box.innerHTML = `<ul>${(e.data?.details || [e.message]).map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`;

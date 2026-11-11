@@ -29,6 +29,16 @@ const AdminApi = (() => {
     me: () => req('/auth/me'),
     stats: () => req('/stats'),
     analytics: (params) => req(`/analytics?${new URLSearchParams(params)}`),
+    analyticsLive: () => req('/analytics/live'),
+    analyticsSessions: (params) => req(`/analytics/sessions?${new URLSearchParams(params)}`),
+    analyticsSession: (sid) => req(`/analytics/session?sid=${encodeURIComponent(sid)}`),
+    analyticsReset: () => req('/analytics/reset', { method: 'POST' }),
+    // A file download, so it can't go through req() (which parses JSON).
+    analyticsExport: async (params) => {
+      const res = await fetch(`/api/admin/analytics/export?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token()}` } });
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    },
     posts: (params) => req(`/posts?${new URLSearchParams(params)}`),
     post: (id) => req(`/posts/${id}`),
     postStats: (id, params) => req(`/posts/${id}/stats?${new URLSearchParams(params)}`),

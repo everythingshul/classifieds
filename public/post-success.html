@@ -12,8 +12,22 @@
   <h1>Finishing up…</h1>
   <p>Please wait a moment while we confirm your payment.</p>
 </div>
+<script src="/js/analytics.js"></script>
 <script>
 (function () {
+  // Same tab as the visit that paid, so this lands in that visit: lets the
+  // admin Analytics page tie revenue to where the visitor came from. Once
+  // per checkout session - a refresh of this page must not count twice.
+  function reportPaid(sessionId, data) {
+    try {
+      if (sessionStorage.getItem('esc_paid_' + sessionId)) return;
+      sessionStorage.setItem('esc_paid_' + sessionId, '1');
+      Analytics.track('pw', 'paid', { v: data.amountCents || 0, j: data.post && data.post.id, x: { k: data.kind || 'post', cur: data.currency || 'usd' } });
+      if (data.kind !== 'boost' && data.kind !== 'strike') Analytics.track('pw', 'done', { j: data.post && data.post.id });
+    } catch (e) { /* analytics must never break this page */ }
+  }
+  try { Analytics.trackPageview('/post-success'); } catch (e) { /* ignore */ }
+
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,6 +68,8 @@
       `);
       return;
     }
+
+    reportPaid(sessionId, data);
 
     if (data.kind === 'boost') {
       render(`

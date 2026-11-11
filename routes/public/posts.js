@@ -108,6 +108,9 @@ router.get('/verify-session', async (req, res, next) => {
     res.json({
       paid: true,
       kind: meta.kind || null,
+      // For the return page's analytics hit (revenue by traffic source).
+      amountCents: session.amount_total || 0,
+      currency: session.currency || 'usd',
       post: result && result.public_id ? formatPostPublic(result) : null,
     });
   } catch (e) {

@@ -430,3 +430,46 @@ CREATE TABLE IF NOT EXISTS email_subscriptions (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_email_subscriptions_status_hour ON email_subscriptions(status, send_hour);
+
+-- Visit-level analytics (services/analyticsIngest.js, public/js/analytics.js).
+-- One row per visit (a browser tab's session, 30 minutes idle ends it), plus
+-- one row per thing that happened in it. No IP address, name, email or
+-- cookie is ever stored; `visitor_id` is the same anonymous localStorage id
+-- analytics_events uses. Search terms and Chesky topics are stored; what a
+-- visitor types to Chesky or into a form is not.
+CREATE TABLE IF NOT EXISTS analytics_sessions (
+  sid TEXT PRIMARY KEY,            -- random id made in the visitor's tab (sessionStorage)
+  ts INTEGER NOT NULL,             -- visit start (ms)
+  last_ts INTEGER NOT NULL,        -- last activity
+  visitor_id TEXT NOT NULL,
+  is_new INTEGER NOT NULL DEFAULT 0, -- 1 when this visitor had never been seen before this visit
+  domain TEXT,
+  landing TEXT, exit_path TEXT,
+  ref_host TEXT, ref_url TEXT,
+  utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_term TEXT, utm_content TEXT,
+  channel TEXT,                    -- Direct / Search / Social / Email / Referral / Campaign / Paid; '' for visits rebuilt from older data
+  country TEXT, tz TEXT,
+  device TEXT, os TEXT, browser TEXT, lang TEXT, screen TEXT,
+  pages INTEGER NOT NULL DEFAULT 0,
+  events INTEGER NOT NULL DEFAULT 0,
+  interact INTEGER NOT NULL DEFAULT 0, -- clicks, searches, contact taps, posting, chat...
+  active_s REAL NOT NULL DEFAULT 0     -- seconds the page was in view and being used
+);
+CREATE INDEX IF NOT EXISTS idx_asessions_ts ON analytics_sessions(ts);
+CREATE INDEX IF NOT EXISTS idx_asessions_last ON analytics_sessions(last_ts);
+CREATE INDEX IF NOT EXISTS idx_asessions_visitor ON analytics_sessions(visitor_id);
+
+CREATE TABLE IF NOT EXISTS analytics_hits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sid TEXT NOT NULL,
+  ts INTEGER NOT NULL,
+  type TEXT NOT NULL,              -- pageview pageend click contact search post chat bookmark share subscribe form location error vital
+  name TEXT,
+  value REAL,
+  path TEXT,
+  ref TEXT,                        -- the post's public id when the hit is about one post
+  extra TEXT                       -- small JSON
+);
+CREATE INDEX IF NOT EXISTS idx_ahits_ts ON analytics_hits(ts);
+CREATE INDEX IF NOT EXISTS idx_ahits_type ON analytics_hits(type, ts);
+CREATE INDEX IF NOT EXISTS idx_ahits_sid ON analytics_hits(sid, ts);

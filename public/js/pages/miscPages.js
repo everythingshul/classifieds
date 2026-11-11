@@ -41,6 +41,7 @@ function renderContactPage() {
   I18N.apply();
   setPageTitle('Contact Us');
 
+  document.getElementById('contactForm').addEventListener('focusin', () => Analytics.track('fm', 'start'), { once: true });
   document.getElementById('contactForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('contactSubmitBtn');
@@ -50,6 +51,7 @@ function renderContactPage() {
     successBox.style.display = 'none';
     btn.disabled = true;
     btn.textContent = 'Sending…';
+    Analytics.track('fm', 'submit');
     try {
       await Api.contact({
         name: document.getElementById('c_name').value.trim(),
@@ -58,6 +60,7 @@ function renderContactPage() {
         message: document.getElementById('c_message').value.trim(),
       });
       document.getElementById('contactForm').reset();
+      Analytics.track('fm', 'ok');
       successBox.style.display = 'block';
     } catch (e2) {
       errBox.style.display = 'block';
@@ -168,7 +171,7 @@ function renderPrivacyPolicyPage() {
       <p><strong>When you chat with Chesky (our AI assistant) or hand off to a real person:</strong> the messages and, if you send one, the voice note and its transcript; if you start a conversation with our team, also your name and email.</p>
       <p><strong>When you submit an editorial or comment:</strong> the pen name you choose (shown publicly on the Site) plus your real name, email, and phone number, which are kept for our internal records only and are never displayed publicly.</p>
       <p><strong>When you subscribe to email updates:</strong> your email address and the categories you choose to follow.</p>
-      <p><strong>Automatically, as you browse:</strong> an anonymous identifier stored in your browser's local storage (not a cookie) used only to tell a unique visit from a recurring one, plus which pages and listings you view or click. This is never tied to your name unless you separately give it to us (e.g. by posting or messaging us), and it is not shared with or sold to anyone outside the Site.</p>
+      <p><strong>Automatically, as you browse:</strong> an anonymous random identifier stored in your browser's local storage (not a cookie), used to tell a first visit from a return visit; which pages and listings you view, how long a page is open, what you search for on the Site, and which buttons you use (for example, tapping "call" on a listing); the website that linked you here; and general, non-identifying details about your device (phone or computer, browser, screen size, language and time zone - your country is inferred from the time zone). We do not store your IP address, and none of this is tied to your name unless you separately give it to us (e.g. by posting or messaging us). It is never shared with or sold to anyone outside the Site, and is deleted after 13 months. If your browser sends a "Do Not Track" or "Global Privacy Control" signal, none of this is collected.</p>
 
       <h3>3. How We Use It</h3>
       <p>To publish and manage the listings, editorials, and comments you submit; to let other users and our team contact you where you've chosen to be reachable; to process payments and send receipts/invoices; to operate Chesky and route conversations to our team when you ask to talk to one; to send the email updates and digests you've asked for; to moderate content against our <a href="/terms">Terms &amp; Conditions</a>; and to understand overall Site usage so we can keep it running well.</p>

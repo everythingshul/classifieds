@@ -1,183 +1,57 @@
 const express = require('express');
-const db = require('../../db');
 const { requireAdmin } = require('../../middleware/adminAuth');
+const report = require('../../services/analyticsReport');
 
 const router = express.Router();
 router.use(requireAdmin);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// SQLite day bucket from a millisecond epoch column, shifted by the viewer's
-// timezone offset (passed from the client via getTimezoneOffset(), in
-// minutes) before bucketing - otherwise SQLite's date() operates in UTC and
-// a day's activity gets split across two bars for anyone not on UTC.
-const DAY_EXPR = "date((created_at / 1000) - ?, 'unixepoch')";
-
-function computeTotals(from, to) {
-  return {
-    pageviews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'pageview' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    postViews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'post_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    postClicks: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'post_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    // Unique = distinct visitors, alongside (not replacing) the raw counts
-    // above - a visitor who views/clicks 5 posts still only counts once here.
-    uniquePostViews: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'post_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    uniquePostClicks: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'post_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    editorialViews: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'editorial_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    editorialClicks: db.prepare("SELECT COUNT(*) AS c FROM analytics_events WHERE type = 'editorial_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    uniqueEditorialViews: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'editorial_view' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    uniqueEditorialClicks: db.prepare("SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE type = 'editorial_click' AND created_at BETWEEN ? AND ?").get(from, to).c,
-    uniqueVisitors: db.prepare('SELECT COUNT(DISTINCT visitor_id) AS c FROM analytics_events WHERE created_at BETWEEN ? AND ?').get(from, to).c,
-    // Net of refunds, windowed by the payment's own created_at (a refund
-    // issued later still nets out of the period the charge happened in,
-    // matching the lifetime figure on the dashboard). USD only - kept
-    // separate from GBP rather than blended into one misleading total, same
-    // reasoning as the dashboard's revenue stat.
-    revenueCents: (
-      (db.prepare("SELECT SUM(amount_cents) AS total FROM post_payments WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
-      - (db.prepare("SELECT SUM(refunded_cents) AS total FROM post_payments WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?").get(from, to).total || 0)
-    ),
-    // A visitor counts as recurring the moment they've been seen more than
-    // once - either multiple events within this window (they came back,
-    // even the same day/session), or they have history from before this
-    // window started. The old "2+ distinct calendar days within the window"
-    // definition meant a same-day repeat visit (or the "Today" range at all)
-    // could never show any recurring visitors.
-    recurringVisitors: db.prepare(`
-      SELECT COUNT(*) AS c FROM (
-        SELECT ae.visitor_id,
-          COUNT(*) AS cnt,
-          MAX(CASE WHEN EXISTS (SELECT 1 FROM analytics_events e2 WHERE e2.visitor_id = ae.visitor_id AND e2.created_at < ?) THEN 1 ELSE 0 END) AS had_prior
-        FROM analytics_events ae
-        WHERE ae.created_at BETWEEN ? AND ?
-        GROUP BY ae.visitor_id
-      ) t
-      WHERE cnt > 1 OR had_prior = 1
-    `).get(from, from, to).c,
-  };
+function range(req) {
+  const to = Number(req.query.to) || Date.now() + 1;
+  const from = req.query.from !== undefined && req.query.from !== '' ? Number(req.query.from) : to - 7 * DAY_MS;
+  return { from: Number.isFinite(from) ? from : to - 7 * DAY_MS, to };
 }
 
-router.get('/', (req, res) => {
-  const to = req.query.to ? Number(req.query.to) : Date.now();
-  const from = req.query.from ? Number(req.query.from) : to - 30 * DAY_MS;
-  const tzOffsetSec = (Number(req.query.tzOffsetMinutes) || 0) * 60;
+// GET /api/admin/analytics?from&to&tz&b&cmp - everything the dashboard's
+// range-based tabs show. tz is minutes east of UTC; b is the comma-separated
+// list of chart bucket start times, chosen by the browser.
+router.get('/', (req, res, next) => {
+  try {
+    const { from, to } = range(req);
+    const bounds = String(req.query.b || '').split(',').filter(Boolean).map(Number);
+    res.json(report.computeStats({ from, to, tz: Number(req.query.tz) || 0, compare: req.query.cmp !== '0', bounds }));
+  } catch (e) { next(e); }
+});
 
-  const totals = computeTotals(from, to);
+router.get('/live', (req, res, next) => {
+  try { res.json(report.liveStats()); } catch (e) { next(e); }
+});
 
-  // Same-length window immediately preceding this one, so each stat card
-  // can show a "vs previous period" delta rather than a bare number with
-  // no sense of whether that's trending up or down.
-  const spanMs = Math.max(1, to - from);
-  const prevTo = from - 1;
-  const prevFrom = prevTo - spanMs;
-  const previousTotals = computeTotals(prevFrom, prevTo);
+router.get('/sessions', (req, res, next) => {
+  try { const { from, to } = range(req); res.json({ sessions: report.recentSessions(from, to) }); } catch (e) { next(e); }
+});
 
-  // New = this is the first time we've ever seen this visitor_id at all.
-  // Returning = they had at least one event before this period started.
-  // "returning" is a reserved SQLite keyword (RETURNING clause), so the SQL
-  // aliases avoid it even though the JS/JSON field name is fine.
-  const newVsReturningRow = db.prepare(`
-    SELECT
-      SUM(CASE WHEN EXISTS (SELECT 1 FROM analytics_events e2 WHERE e2.visitor_id = v.visitor_id AND e2.created_at < ?) THEN 1 ELSE 0 END) AS returning_count,
-      SUM(CASE WHEN NOT EXISTS (SELECT 1 FROM analytics_events e2 WHERE e2.visitor_id = v.visitor_id AND e2.created_at < ?) THEN 1 ELSE 0 END) AS new_count
-    FROM (SELECT DISTINCT visitor_id FROM analytics_events WHERE created_at BETWEEN ? AND ?) v
-  `).get(from, from, from, to);
-  const newVsReturning = { returning: newVsReturningRow.returning_count, new: newVsReturningRow.new_count };
+router.get('/session', (req, res, next) => {
+  try {
+    const t = report.sessionTimeline(String(req.query.sid || ''));
+    if (!t) return res.status(404).json({ error: 'Visit not found' });
+    res.json(t);
+  } catch (e) { next(e); }
+});
 
-  const timeseries = db.prepare(`
-    SELECT ${DAY_EXPR} AS date,
-      SUM(CASE WHEN type = 'pageview' THEN 1 ELSE 0 END) AS pageviews,
-      SUM(CASE WHEN type = 'post_view' THEN 1 ELSE 0 END) AS postViews,
-      SUM(CASE WHEN type = 'post_click' THEN 1 ELSE 0 END) AS postClicks,
-      SUM(CASE WHEN type = 'editorial_view' THEN 1 ELSE 0 END) AS editorialViews,
-      SUM(CASE WHEN type = 'editorial_click' THEN 1 ELSE 0 END) AS editorialClicks,
-      COUNT(DISTINCT visitor_id) AS uniqueVisitors
-    FROM analytics_events
-    WHERE created_at BETWEEN ? AND ?
-    GROUP BY date
-    ORDER BY date
-  `).all(tzOffsetSec, from, to);
+router.get('/export', (req, res, next) => {
+  try {
+    const { from, to } = range(req);
+    const kind = req.query.kind === 'events' ? 'events' : 'sessions';
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="jlistings-${kind === 'events' ? 'events' : 'visits'}.csv"`);
+    res.send(report.exportCsv(kind, from, to));
+  } catch (e) { next(e); }
+});
 
-  // USD only, same reasoning as computeTotals() above.
-  const revenueTimeseries = db.prepare(`
-    SELECT ${DAY_EXPR} AS date, SUM(amount_cents) - SUM(refunded_cents) AS revenueCents
-    FROM post_payments
-    WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?
-    GROUP BY date
-    ORDER BY date
-  `).all(tzOffsetSec, from, to);
-
-  const revenueByKind = db.prepare(`
-    SELECT kind, SUM(amount_cents) - SUM(refunded_cents) AS c
-    FROM post_payments
-    WHERE status = 'paid' AND currency = 'usd' AND created_at BETWEEN ? AND ?
-    GROUP BY kind ORDER BY c DESC
-  `).all(from, to);
-
-  const byPostType = db.prepare(`
-    SELECT post_type AS type, COUNT(*) AS c FROM analytics_events
-    WHERE type = 'post_view' AND created_at BETWEEN ? AND ? AND post_type IS NOT NULL
-    GROUP BY post_type ORDER BY c DESC
-  `).all(from, to);
-
-  const byCategory = db.prepare(`
-    SELECT category, COUNT(*) AS c FROM analytics_events
-    WHERE type = 'post_view' AND created_at BETWEEN ? AND ? AND category IS NOT NULL
-    GROUP BY category ORDER BY c DESC LIMIT 8
-  `).all(from, to);
-
-  // Only meaningful once more than one domain points at this site (see
-  // services/appUrl.js) - a single-domain site just gets one row here.
-  const byDomain = db.prepare(`
-    SELECT COALESCE(NULLIF(domain, ''), '(unknown)') AS domain,
-      COUNT(*) AS events,
-      COUNT(DISTINCT visitor_id) AS uniqueVisitors
-    FROM analytics_events
-    WHERE created_at BETWEEN ? AND ?
-    GROUP BY domain ORDER BY events DESC
-  `).all(from, to);
-
-  const topPages = db.prepare(`
-    SELECT path, COUNT(*) AS c FROM analytics_events
-    WHERE type = 'pageview' AND created_at BETWEEN ? AND ?
-    GROUP BY path ORDER BY c DESC LIMIT 10
-  `).all(from, to);
-
-  const topPosts = db.prepare(`
-    SELECT p.id, p.public_id AS publicId, p.title, p.type, p.category,
-      SUM(CASE WHEN e.type = 'post_view' THEN 1 ELSE 0 END) AS views,
-      SUM(CASE WHEN e.type = 'post_click' THEN 1 ELSE 0 END) AS clicks,
-      COUNT(DISTINCT CASE WHEN e.type = 'post_view' THEN e.visitor_id END) AS uniqueViews,
-      COUNT(DISTINCT CASE WHEN e.type = 'post_click' THEN e.visitor_id END) AS uniqueClicks
-    FROM analytics_events e
-    JOIN posts p ON p.id = e.post_id
-    WHERE e.type IN ('post_view', 'post_click') AND e.created_at BETWEEN ? AND ?
-    GROUP BY p.id ORDER BY views DESC LIMIT 10
-  `).all(from, to);
-
-  const topEditorials = db.prepare(`
-    SELECT ed.id, ed.public_id AS publicId, ed.title, ed.like_count AS likeCount,
-      SUM(CASE WHEN e.type = 'editorial_view' THEN 1 ELSE 0 END) AS views,
-      SUM(CASE WHEN e.type = 'editorial_click' THEN 1 ELSE 0 END) AS clicks,
-      COUNT(DISTINCT CASE WHEN e.type = 'editorial_view' THEN e.visitor_id END) AS uniqueViews,
-      COUNT(DISTINCT CASE WHEN e.type = 'editorial_click' THEN e.visitor_id END) AS uniqueClicks
-    FROM analytics_events e
-    JOIN editorials ed ON ed.id = e.editorial_id
-    WHERE e.type IN ('editorial_view', 'editorial_click') AND e.created_at BETWEEN ? AND ?
-    GROUP BY ed.id ORDER BY views DESC LIMIT 10
-  `).all(from, to);
-
-  const editorialsByStatus = db.prepare('SELECT status, COUNT(*) AS c FROM editorials GROUP BY status').all();
-  const editorialTotals = {
-    total: db.prepare('SELECT COUNT(*) AS c FROM editorials').get().c,
-    totalLikes: db.prepare('SELECT SUM(like_count) AS c FROM editorials').get().c || 0,
-    pendingApproval: db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'pending_approval'").get().c,
-    pendingComments: db.prepare("SELECT COUNT(*) AS c FROM editorial_comments WHERE status = 'pending_approval'").get().c,
-  };
-
-  res.json({
-    from, to, totals, previousTotals, newVsReturning, timeseries, revenueTimeseries, revenueByKind,
-    byPostType, byCategory, byDomain, topPages, topPosts, topEditorials, editorialsByStatus, editorialTotals,
-  });
+router.post('/reset', (req, res, next) => {
+  try { report.resetStats(); res.json({ ok: true }); } catch (e) { next(e); }
 });
 
 module.exports = router;

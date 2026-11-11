@@ -43,6 +43,12 @@ const Chesky = (() => {
   const THUMB_UP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3zm0 0 4.5-8a2 2 0 0 1 2.3 2.8L12.5 10H18a2 2 0 0 1 1.94 2.5l-1.5 6A2 2 0 0 1 16.5 20H9a2 2 0 0 1-2-2"/></svg>';
   const THUMB_DOWN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 13V4h3a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-3zm0 0-4.5 8a2 2 0 0 1-2.3-2.8L11.5 14H6a2 2 0 0 1-1.94-2.5l1.5-6A2 2 0 0 1 7.5 4H15a2 2 0 0 1 2 2"/></svg>';
 
+  // Chat activity for the admin Analytics page - what happened (opened,
+  // asked, got a post made...), never what was typed or said.
+  function report(name, o) {
+    if (typeof Analytics !== 'undefined') Analytics.track('ch', name, o);
+  }
+
   function saveTranscript() {
     try { sessionStorage.setItem(STORAGE_TRANSCRIPT, JSON.stringify(transcript.slice(-16))); } catch (e) { /* ignore */ }
   }
@@ -181,6 +187,7 @@ const Chesky = (() => {
       btn.addEventListener('click', () => {
         row.querySelectorAll('button').forEach((b) => b.classList.remove('picked'));
         btn.classList.add('picked');
+        report(btn.dataset.fb);
         Api.cheskyLog({ type: btn.dataset.fb, q: question, entry: entryId });
       });
     });
@@ -200,9 +207,10 @@ const Chesky = (() => {
     wireFeedbackRow(node, question, result.entryId);
     transcript.push({ role: 'assistant', text: result.reply });
     saveTranscript();
-    if (result.postCreated) showPostCreated(result.postCreated);
-    if (result.checkout?.clientSecret) showCheckout(result.checkout.clientSecret);
-    if (result.posts?.length) showPostRefs(result.posts);
+    if (result.postCreated) { report('posted'); showPostCreated(result.postCreated); }
+    if (result.checkout?.clientSecret) { report('checkout'); showCheckout(result.checkout.clientSecret); }
+    if (result.posts?.length) { report('found', { v: result.posts.length }); showPostRefs(result.posts); }
+    if (result.offTopic) report('miss');
     if (result.offTopic) {
       const log = document.getElementById('cheskyLog');
       log.appendChild(el(`<div style="text-align:center"><button type="button" class="chesky-talk-human" id="cheskyTalkHumanInline">Talk to a real person &rarr;</button></div>`));
@@ -222,9 +230,9 @@ const Chesky = (() => {
       const buttons = [`<a href="${escapeHtml(post.url)}" class="chesky-chip">${escapeHtml(post.title)}</a>`];
       if (post.contact?.phone?.tel) buttons.push(`<a href="${escapeHtml(post.contact.phone.tel)}" class="chesky-chip">Call: ${escapeHtml(post.contact.phone.display)}</a>`);
       if (post.contact?.email?.mailto) buttons.push(`<a href="${escapeHtml(post.contact.email.mailto)}" class="chesky-chip">Email: ${escapeHtml(post.contact.email.display)}</a>`);
-      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="chesky-chip" target="_blank" rel="noopener">Website: ${escapeHtml(post.contact.url.display)}</a>`);
+      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="chesky-chip" data-contact="website" target="_blank" rel="noopener">Website: ${escapeHtml(post.contact.url.display)}</a>`);
       if (post.directions?.google) buttons.push(`<a href="${escapeHtml(post.directions.google)}" class="chesky-chip" target="_blank" rel="noopener">Directions${post.directions.location ? `: ${escapeHtml(post.directions.location)}` : ''}</a>`);
-      log.appendChild(el(`<div class="chesky-chips">${buttons.join('')}</div>`));
+      log.appendChild(el(`<div class="chesky-chips" data-post="${escapeHtml(post.id)}">${buttons.join('')}</div>`));
     });
     scrollLog();
   }
@@ -258,6 +266,7 @@ const Chesky = (() => {
     const voice = pendingVoice;
     if (busy || (!question.trim() && !image && !voice)) return;
     busy = true;
+    report('send', { x: { photo: image ? 1 : 0, voice: voice ? 1 : 0 } });
     document.querySelectorAll('.chesky-starter-row').forEach((c) => c.remove());
     clearPendingAttachments();
     renderPendingAttachments();
@@ -400,6 +409,7 @@ const Chesky = (() => {
         });
         convId = result.id;
         localStorage.setItem(STORAGE_CONV, convId);
+        report('handoff');
         bubble('bot', "Thanks! A real person on our team will reply here soon - feel free to keep chatting.");
         lastMsgId = result.baselineId || 0;
         enterHandoffMode();
@@ -622,6 +632,7 @@ const Chesky = (() => {
   // Forgets the current conversation (AI chat and any human handoff alike)
   // and rebuilds the panel fresh, same as a first-time visitor would see it.
   function startOver() {
+    report('restart');
     stopPolling();
     activeAudio?.pause();
     clearPendingAttachments();
@@ -665,6 +676,7 @@ const Chesky = (() => {
     // lastMsgId update lands, double-appending the whole history.
     const logExisted = !!document.getElementById('cheskyLog');
     if (open) {
+      report('open');
       if (!logExisted) renderPanel();
       document.getElementById('cheskyFab').querySelector('.chesky-unread')?.remove();
       scrollLog();

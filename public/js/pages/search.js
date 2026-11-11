@@ -15,6 +15,7 @@ async function renderSearchPage({ query }) {
   ]);
 
   const totalResults = classifieds.total + listings.total + simchas.total;
+  Analytics.track('se', 'search', { v: totalResults, p: location.pathname, x: { q: q.trim().toLowerCase().slice(0, 60) } });
 
   document.getElementById('app').innerHTML = `
     <div class="container">

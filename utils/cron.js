@@ -118,6 +118,11 @@ function start() {
   publishScheduledEditorials();
   sendDueDigests();
   sendDueAdminDigest();
+  // Visit analytics: rebuild past visits from older page view data once,
+  // then drop anything past the retention window every night.
+  const analytics = require('../services/analyticsIngest');
+  try { analytics.backfillFromLegacy(); analytics.purgeOld(); } catch (e) { console.error('[analytics] startup maintenance failed:', e.message); }
+  cron.schedule('20 3 * * *', () => { try { analytics.purgeOld(); } catch (e) { console.error('[analytics] purge failed:', e.message); } });
   cron.schedule('*/15 * * * *', expireStalePosts);
   cron.schedule('0 * * * *', deleteAbandonedCheckouts);
   cron.schedule('*/5 * * * *', publishScheduledPosts);

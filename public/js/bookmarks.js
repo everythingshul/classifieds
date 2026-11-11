@@ -12,6 +12,7 @@ const Bookmarks = (() => {
     const idx = list.indexOf(key);
     if (idx === -1) list.push(key); else list.splice(idx, 1);
     localStorage.setItem(KEY, JSON.stringify(list));
+    if (typeof Analytics !== 'undefined') Analytics.track('bm', idx === -1 ? 'add' : 'remove', { j: String(id), x: { t: type } });
     return idx === -1;
   }
   function grouped() {
