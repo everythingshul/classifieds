@@ -147,3 +147,24 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/settings', renderSettingsPage);
   AdminRouter.init();
 });
+
+// Phone layout for tables: admin.css turns each row of an .admin-table into
+// a stacked card below 700px, and needs to know each cell's column name to
+// print beside it. This copies the header text onto every cell (data-label)
+// whenever a table appears or re-renders, on any admin page or in a popup.
+(function labelTablesForPhones() {
+  function label(table) {
+    const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+    if (!heads.length) return;
+    table.querySelectorAll('tbody tr').forEach((tr) => {
+      [...tr.children].forEach((td, i) => {
+        const text = td.colSpan > 1 ? '' : heads[i] || '';
+        if (td.dataset.label !== text) td.dataset.label = text;
+      });
+    });
+  }
+  let queued = false;
+  const run = () => { queued = false; document.querySelectorAll('table.admin-table').forEach(label); };
+  new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(run); } })
+    .observe(document.body, { childList: true, subtree: true });
+})();

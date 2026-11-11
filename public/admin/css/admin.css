@@ -361,3 +361,68 @@ table.admin-table tr:last-child td { border-bottom: none; }
   .an-grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .an-grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* ── Phones ──
+   Everything below is for narrow screens only; wider layouts are untouched.
+   Tables become stacked cards (labels come from data-label, set by
+   labelTablesForPhones in adminApp.js) so no column is ever cut off; form
+   fields use the full width at a size iOS won't zoom into; controls are
+   big enough to tap. */
+@media (max-width: 700px) {
+  .admin-page { padding: 16px 12px 70px; }
+  .admin-page h1 { font-size: 21px; }
+  .admin-card { padding: 14px; }
+  .app-header { padding: 0 12px; gap: 10px; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat-card { padding: 12px 14px; }
+  .stat-card .num { font-size: 21px; overflow-wrap: anywhere; }
+
+  /* Side-by-side blocks laid out with inline grid styles stack instead. */
+  #adminContent [style*="grid-template-columns"], #modal-body [style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
+
+  #adminRoot input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+  #adminRoot select, #adminRoot textarea, #modal-body input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+  #modal-body select, #modal-body textarea {
+    width: 100%; max-width: 100%; min-height: 44px; font-size: 16px; box-sizing: border-box;
+  }
+  #adminRoot input[type="checkbox"], #adminRoot input[type="radio"] { width: 20px; height: 20px; flex-shrink: 0; }
+  #adminRoot .btn, #modal-body .btn { min-height: 42px; padding-top: 9px; padding-bottom: 9px; }
+  #adminRoot .btn-sm, #modal-body .btn-sm { min-height: 38px; }
+  .btn-icon { min-width: 40px; min-height: 40px; }
+  .tabs button { padding: 12px 14px; }
+
+  #adminRoot .filters-bar, #adminRoot form[style*="display:flex"], #adminRoot form[style*="display: flex"] { display: flex; flex-direction: column; align-items: stretch !important; gap: 10px; }
+  #adminRoot .filters-bar .field, #adminRoot form .field { width: 100%; min-width: 0; margin: 0 !important; }
+  #adminRoot .form-cols { grid-template-columns: minmax(0, 1fr); }
+
+  table.admin-table, table.admin-table tbody { display: block; width: 100%; border: none; background: none; }
+  table.admin-table thead { display: none; }
+  table.admin-table tr { display: block; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; padding: 6px 12px; box-shadow: var(--shadow); }
+  table.admin-table tr:hover td { background: none; }
+  table.admin-table td {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0;
+    border-bottom: 1px solid #eef2f7; text-align: end; min-width: 0; overflow-wrap: anywhere;
+  }
+  table.admin-table tr td:last-child { border-bottom: none; }
+  table.admin-table td:empty { display: none; }
+  table.admin-table td::before {
+    content: attr(data-label); flex-shrink: 0; max-width: 42%; text-align: start;
+    font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft);
+  }
+  table.admin-table td[data-label=""]::before, table.admin-table td:not([data-label])::before { content: none; }
+  table.admin-table td[data-label=""] { justify-content: flex-start; text-align: start; }
+  /* The first cell is the row's title: full width, no label beside it. */
+  table.admin-table td:first-child { display: block; text-align: start; font-weight: 600; color: var(--navy); }
+  table.admin-table td:first-child::before { display: block; max-width: none; margin-bottom: 2px; }
+  table.admin-table td > input, table.admin-table td > select { flex: 1; min-width: 0; max-width: 62%; }
+  .admin-table .actions { justify-content: flex-end; }
+  .admin-table .actions .btn { flex: 1 1 auto; text-align: center; justify-content: center; }
+
+  .modal-hdr { padding: 14px 16px 12px; }
+  #modal-body { padding: 16px; }
+  #toast-wrap { left: 12px; right: 12px; bottom: 12px; align-items: stretch; }
+  .chat-detail-head { flex-direction: column; }
+  .chat-teach-row { flex-direction: column; align-items: stretch; }
+  .chat-bubble-col { max-width: 92%; }
+  .pagination { flex-wrap: wrap; }
+}
