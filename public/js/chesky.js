@@ -32,6 +32,7 @@ const Chesky = (() => {
   let recordCancelled = false;
   let recordMode = 'ask'; // 'ask' | 'handoff' - which footer to restore when done
 
+  const QUICK_ACTIONS = ['Post a classified', 'Post a simcha'];
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
   const MIC_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 11z"/></svg>';
   const CAMERA_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>';
@@ -185,7 +186,8 @@ const Chesky = (() => {
   }
 
   function chipsHtml() {
-    return `<div class="chesky-chips">${STARTERS.map((s) => `<button type="button" class="chesky-chip">${escapeHtml(s)}</button>`).join('')}</div>`;
+    const items = [...QUICK_ACTIONS, ...STARTERS];
+    return `<div class="chesky-chips">${items.map((s) => `<button type="button" class="chesky-chip">${escapeHtml(s)}</button>`).join('')}</div>`;
   }
 
   function displayBotReply(question, result) {
@@ -213,11 +215,11 @@ const Chesky = (() => {
     if (!log) return;
     posts.forEach((post) => {
       const buttons = [`<a href="${escapeHtml(post.url)}" class="btn btn-sm">${escapeHtml(post.title)}</a>`];
-      if (post.contact?.phone?.tel) buttons.push(`<a href="${escapeHtml(post.contact.phone.tel)}" class="btn btn-sm btn-outline">Call</a>`);
-      if (post.contact?.email?.mailto) buttons.push(`<a href="${escapeHtml(post.contact.email.mailto)}" class="btn btn-sm btn-outline">Email</a>`);
-      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="btn btn-sm btn-outline" target="_blank" rel="noopener">Website</a>`);
-      if (post.directions?.google) buttons.push(`<a href="${escapeHtml(post.directions.google)}" class="btn btn-sm btn-outline" target="_blank" rel="noopener">Directions</a>`);
-      log.appendChild(el(`<div class="chesky-post-actions">${buttons.join('')}</div>`));
+      if (post.contact?.phone?.tel) buttons.push(`<a href="${escapeHtml(post.contact.phone.tel)}" class="btn btn-sm">Call</a>`);
+      if (post.contact?.email?.mailto) buttons.push(`<a href="${escapeHtml(post.contact.email.mailto)}" class="btn btn-sm">Email</a>`);
+      if (post.contact?.url?.href) buttons.push(`<a href="${escapeHtml(post.contact.url.href)}" class="btn btn-sm" target="_blank" rel="noopener">Website</a>`);
+      if (post.directions?.google) buttons.push(`<a href="${escapeHtml(post.directions.google)}" class="btn btn-sm" target="_blank" rel="noopener">Directions</a>`);
+      log.appendChild(el(`<div style="text-align:center;margin:4px 0">${buttons.join(' ')}</div>`));
     });
     scrollLog();
   }
@@ -251,7 +253,7 @@ const Chesky = (() => {
     const voice = pendingVoice;
     if (busy || (!question.trim() && !image && !voice)) return;
     busy = true;
-    document.querySelectorAll('.chesky-chip, .chesky-start-actions').forEach((c) => c.remove());
+    document.querySelectorAll('.chesky-chip').forEach((c) => c.remove());
     clearPendingAttachments();
     renderPendingAttachments();
 
@@ -623,16 +625,7 @@ const Chesky = (() => {
       <div id="cheskyFoot"></div>
     `;
     bubble('bot', "Hi, I'm Chesky! Ask me anything about posting, pricing, or how the site works.");
-    const log = document.getElementById('cheskyLog');
-    log.appendChild(el(`
-      <div class="chesky-start-actions">
-        <button type="button" class="btn btn-sm" id="cheskyStartClassified">Post a classified</button>
-        <button type="button" class="btn btn-sm btn-outline" id="cheskyStartSimcha">Post a simcha</button>
-      </div>
-    `));
-    document.getElementById('cheskyStartClassified').addEventListener('click', () => ask('I want to post a classified'));
-    document.getElementById('cheskyStartSimcha').addEventListener('click', () => ask('I want to post a simcha'));
-    log.appendChild(el(chipsHtml()));
+    document.getElementById('cheskyLog').appendChild(el(chipsHtml()));
     document.querySelectorAll('.chesky-chip').forEach((chip) => chip.addEventListener('click', () => ask(chip.textContent)));
     if (convId) enterHandoffMode();
     else renderAskFooter();

@@ -161,16 +161,6 @@
 .chesky-msg.from-admin .chesky-bubble { background: var(--gold-light); border: 1px solid var(--gold); border-bottom-left-radius: 5px; }
 .chesky-msg-who { font-size: 0.68rem; color: var(--ink-soft); margin: 0 4px 3px; }
 
-/* The two "post a classified"/"post a simcha" shortcuts shown with the
-   opening greeting, before the starter-question chips. */
-.chesky-start-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 4px; }
-
-/* A button row under a bot reply that named specific posts (search_posts
-   results it actually pointed to) - view it, reach the poster, get
-   directions - one row per post, left-aligned like a bot message. */
-.chesky-post-actions { display: flex; flex-wrap: wrap; gap: 6px; max-width: 86%; align-self: flex-start; margin: -4px 0 2px; }
-.chesky-post-actions .btn { font-size: 0.78rem; padding: 6px 11px; }
-
 .chesky-fb { display: flex; gap: 4px; margin-top: 4px; }
 .chesky-fb button {
   border: 1px solid var(--border);
