@@ -23,7 +23,7 @@ async function renderBookmarksPage() {
 
 function renderContactPage() {
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:640px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:640px">
       <div class="page-header"><h1>Contact Us</h1></div>
       <p class="hint">Questions, feedback, or an issue with a listing? Send us a message and we'll get back to you.</p>
       <form id="contactForm" class="form-card">
@@ -76,7 +76,7 @@ function renderTermsPage() {
   // same content everywhere else - just these couple of sections differ.
   const isUk = /\.co\.uk$/i.test(location.hostname);
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:820px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:820px">
       <h1 data-i18n="terms">Terms &amp; Conditions</h1>
       <p><em>Last updated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</em></p>
 
@@ -127,7 +127,7 @@ function renderTermsPage() {
 
 function renderRefundPolicyPage() {
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:820px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:820px">
       <h1 data-i18n="refund_policy">Refund Policy</h1>
       <p><em>Last updated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</em></p>
 
@@ -154,7 +154,7 @@ function renderPrivacyPolicyPage() {
   const isUk = /\.co\.uk$/i.test(location.hostname);
   const siteName = escapeHtml(window.SITE_CONFIG?.siteName || 'JListings');
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:820px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:820px">
       <h1 data-i18n="privacy_policy">Privacy Policy</h1>
       <p><em>Last updated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</em></p>
 
@@ -258,7 +258,7 @@ function renderPricingPage() {
   const simchaTiers = tiers.filter((t) => t.post_type === 'simcha');
 
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:900px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:900px">
       <div class="page-header"><h1>Pricing</h1></div>
       <p class="hint" style="margin-bottom:26px">Simple, transparent pricing for every way to post. Lost &amp; Found is always free.${isGbp ? ' Prices shown in £ where configured.' : ''}</p>
 

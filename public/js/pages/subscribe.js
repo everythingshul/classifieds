@@ -26,7 +26,7 @@ async function renderSubscribePage(params) {
     try {
       existing = await Api.subscriptionManage(manageToken);
     } catch (e) {
-      document.getElementById('app').innerHTML = `<div class="container" style="padding:40px 0;max-width:560px"><p class="error-list">This preferences link is invalid or has expired. <a href="/subscribe">Start a new subscription</a> instead.</p></div>`;
+      document.getElementById('app').innerHTML = `<div class="container" style="padding-top:40px;padding-bottom:40px;max-width:560px"><p class="error-list">This preferences link is invalid or has expired. <a href="/subscribe">Start a new subscription</a> instead.</p></div>`;
       setPageTitle('Email Updates');
       return;
     }
@@ -37,7 +37,7 @@ async function renderSubscribePage(params) {
   const sendHour = existing ? existing.sendHour : 8;
 
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:640px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:640px">
       <div class="page-header">
         <h1 data-i18n="subscribe_title">Daily Email Updates</h1>
         <p class="hint" data-i18n="subscribe_tagline">Pick what you want to hear about and when - one short email a day, only when there's something new.</p>
@@ -91,13 +91,13 @@ async function renderDigestAllPage(params) {
     const result = await Api.subscriptionDigestAll(token, ids);
     sections = result.sections || [];
   } catch (e) {
-    document.getElementById('app').innerHTML = `<div class="container" style="padding:40px 0;max-width:560px"><p class="error-list">This link is invalid or has expired. <a href="/subscribe">Manage your email updates</a> instead.</p></div>`;
+    document.getElementById('app').innerHTML = `<div class="container" style="padding-top:40px;padding-bottom:40px;max-width:560px"><p class="error-list">This link is invalid or has expired. <a href="/subscribe">Manage your email updates</a> instead.</p></div>`;
     setPageTitle('Email Updates');
     return;
   }
 
   document.getElementById('app').innerHTML = `
-    <div class="container" style="padding:30px 0 60px;max-width:700px">
+    <div class="container" style="padding-top:30px;padding-bottom:60px;max-width:700px">
       <div class="page-header">
         <h1>All Your Updates</h1>
         <p class="hint">Everything new in the topics you follow.</p>
