@@ -23,6 +23,15 @@ const Api = (() => {
   return {
     config: () => req('/config'),
     home: (params) => req(`/home?${qs(params)}`),
+    suggestions: (profile, extra = {}) => {
+      const p = new URLSearchParams();
+      (profile.c || []).forEach((v) => p.append('c', v));
+      (profile.p || []).forEach((v) => p.append('p', v));
+      (profile.t || []).forEach((v) => p.append('t', v));
+      (extra.exclude || []).forEach((v) => p.append('x', v));
+      if (extra.lat != null) { p.set('lat', extra.lat); p.set('lng', extra.lng); }
+      return req(`/suggestions?${p.toString()}`);
+    },
     classifieds: (params) => req(`/classifieds?${qs(params)}`),
     classifiedDetail: (id) => req(`/classifieds/${id}`),
     categoryCounts: () => req('/classifieds/category-counts'),

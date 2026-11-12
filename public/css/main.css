@@ -862,3 +862,14 @@ p { margin: 0 0 .7em; }
    number change. */
 @keyframes promo-pop { 0% { background: var(--gold-light); } 100% { background: transparent; } }
 .promo-line-new { animation: promo-pop .9s ease; }
+
+/* Home "Picked for you" strip */
+.picked-title { margin: 14px 0 6px; font-size: 1.05rem; }
+.picked-title .hint { font-weight: 400; font-size: 0.85rem; margin-inline-start: 6px; }
+
+/* Browse page: result count, removable filter chips, email prompt */
+.filter-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.filter-chip { display: inline-block; padding: 4px 12px; border: 1px solid var(--border, #d8d8d8); border-radius: 999px; font-size: 0.85rem; text-decoration: none; color: inherit; }
+.filter-chip:hover { border-color: currentColor; }
+.result-count { margin: 0 0 10px; color: var(--muted, #666); }
+.email-me-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; padding: 10px 14px; margin: 0 0 16px; border: 1px solid var(--border, #d8d8d8); border-radius: 10px; }

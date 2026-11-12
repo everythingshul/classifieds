@@ -5,7 +5,11 @@
 // Reports a typed search (the Search and City boxes on the browse pages) to
 // the admin Analytics page - first page of results only, so paging through
 // them doesn't count as searching again.
-function trackFilterSearch(section, query, page, total) {
+function trackFilterSearch(section, query, page, total, understood) {
+  if (page === 1 && typeof Interests !== 'undefined') {
+    const place = (understood && understood.place) || query.city || '';
+    if (query.q || place || query.category) Interests.note(query.q ? 'search' : 'browse', { category: query.category, place, term: (understood && understood.subject) || query.q });
+  }
   if (page !== 1 || typeof Analytics === 'undefined') return;
   const q = [query.q, query.city].filter(Boolean).join(' in ').trim().toLowerCase().slice(0, 60);
   if (q) Analytics.track('se', section, { v: total, p: location.pathname, x: { q, c: query.category || '' } });
@@ -20,6 +24,24 @@ function understoodHtml(u) {
   return `<p class="hint understood-line" style="margin:-4px 0 14px">Showing ${what}${also}</p>`;
 }
 
+// Browse-page touches borrowed from yiddit.com: a plain "how many" line,
+// filters shown as removable chips, and an "email me new ones" prompt.
+const FILTER_CHIP_LABELS = { q: 'Search', city: 'Place', jobType: 'Type', payPeriod: 'Pay', minPay: 'Min pay', maxPay: 'Max pay', minPrice: 'Min price', maxPrice: 'Max price', lostOrFound: 'Status' };
+function activeFilterChips(basePath, query) {
+  const chips = Object.keys(FILTER_CHIP_LABELS).filter((k) => query[k]).map((k) => {
+    const rest = { ...query }; delete rest[k]; delete rest.page;
+    return `<a class="filter-chip" href="${basePath}?${qs(rest)}" title="Remove this filter">${escapeHtml(FILTER_CHIP_LABELS[k])}: ${escapeHtml(String(query[k]).replace('_', ' '))} <span aria-hidden="true">&times;</span></a>`;
+  });
+  return chips.length ? `<div class="filter-chips">${chips.join('')}</div>` : '';
+}
+function resultCountHtml(total, label) {
+  return `<p class="result-count"><strong>${Number(total).toLocaleString()}</strong> ${escapeHtml(label)} ${total === 1 ? 'post' : 'posts'}</p>`;
+}
+function emailMePromptHtml(category, label) {
+  if (!category) return '';
+  return `<div class="email-me-prompt"><span>Want new <strong>${escapeHtml(label)}</strong> posts in your inbox?</span> <a class="btn btn-sm btn-outline" href="/subscribe?topic=${encodeURIComponent('classified:' + category)}">Email me new ones</a></div>`;
+}
+
 async function renderClassifiedsListPage({ query }) {
   const cfg = window.SITE_CONFIG;
   const category = query.category || '';
@@ -28,7 +50,7 @@ async function renderClassifiedsListPage({ query }) {
 
   const params = { ...query, page };
   const [listData] = await Promise.all([Api.classifieds(params)]);
-  trackFilterSearch('classifieds', query, page, listData.total);
+  trackFilterSearch('classifieds', query, page, listData.total, listData.understood);
 
   const pills = [{ key: '', label: I18N.t('view_all'), count: Object.values(listData.categoryCounts).reduce((a, b) => a + b, 0) }]
     .concat(cfg.categories.map((c) => ({ key: c.key, label: I18N.get() === 'he' ? c.labelHe : c.label, count: listData.categoryCounts[c.key] || 0 })));
@@ -87,7 +109,10 @@ async function renderClassifiedsListPage({ query }) {
         ` : ''}
         <button class="btn btn-sm" type="submit" data-i18n="filter">Filter</button>
       </form>
+      ${activeFilterChips('/classifieds', query.category ? query : { ...query, category: '' })}
       ${understoodHtml(listData.understood)}
+      ${resultCountHtml(listData.total, catDef ? catDef.label : 'classifieds')}
+      ${emailMePromptHtml(category, catDef ? catDef.label : '')}
 
       ${renderGrid(listData.posts)}
 
@@ -287,7 +312,7 @@ async function renderListingsListPage({ query }) {
 
   const params = { ...query, page };
   const [listData] = await Promise.all([Api.listings(params)]);
-  trackFilterSearch('listings', query, page, listData.total);
+  trackFilterSearch('listings', query, page, listData.total, listData.understood);
 
   document.getElementById('app').innerHTML = `
     <div class="container">

@@ -33,7 +33,7 @@ async function renderSubscribePage(params) {
   }
 
   const groups = subscriptionTopicGroups();
-  const selected = new Set(existing ? existing.categories : []);
+  const selected = new Set(existing ? existing.categories : (params.query.topic ? [].concat(params.query.topic) : []));
   const sendHour = existing ? existing.sendHour : 8;
 
   document.getElementById('app').innerHTML = `

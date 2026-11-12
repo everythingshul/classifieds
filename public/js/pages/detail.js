@@ -27,6 +27,7 @@ async function renderDetailPage(id, type) {
   const isBookmarked = Bookmarks.has(type, id);
   Api.registerImpressions([id]);
   Api.registerClicks([id]);
+  if (typeof Interests !== 'undefined' && type !== 'simcha') Interests.note('view', { category: type === 'classified' ? post.category : '', place: post.location?.city || post.location?.text });
 
   const fieldRows = [];
   if (post.taxonomyId) {
@@ -133,6 +134,7 @@ async function renderDetailPage(id, type) {
 
   document.getElementById('bookmarkBtn').addEventListener('click', () => {
     const active = Bookmarks.toggle(type, id);
+    if (active && typeof Interests !== 'undefined' && type !== 'simcha') Interests.note('save', { category: type === 'classified' ? post.category : '', place: post.location?.city || post.location?.text });
     const btn = document.getElementById('bookmarkBtn');
     btn.classList.toggle('active', active);
     document.getElementById('bookmarkLabel').textContent = I18N.t(active ? 'bookmarked' : 'bookmark');

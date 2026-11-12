@@ -76,6 +76,27 @@ function wireViewMoreButtons() {
   });
 }
 
+// "Picked for you": posts chosen from what this visitor looked at before
+// (kept in their own browser, see js/interests.js) and, when the browser
+// shared it, where they are. Quietly absent for a first-time visitor.
+async function renderPickedForYou(loc) {
+  const host = document.getElementById('pickedForYou');
+  if (!host) return;
+  const profile = Interests.profile();
+  if (Interests.isEmpty() && !loc) return;
+  try {
+    const res = await Api.suggestions(profile, { lat: loc ? loc.lat : null, lng: loc ? loc.lng : null });
+    if (!res.sections.length || !document.getElementById('pickedForYou')) return;
+    host.innerHTML = `
+      <div class="section-heading"><h2>Picked for you</h2>${Interests.isEmpty() ? '' : '<a href="#" id="clearInterests">Clear what you looked at</a>'}</div>
+      ${res.sections.map((s) => `
+        <h3 class="picked-title">${escapeHtml(s.title)} <span class="hint">${escapeHtml(s.reason)}</span></h3>
+        <div>${renderCarousel(s.posts)}</div>`).join('')}`;
+    const clear = document.getElementById('clearInterests');
+    if (clear) clear.addEventListener('click', (e) => { e.preventDefault(); Interests.clear(); host.innerHTML = ''; });
+  } catch (e) { /* suggestions are a bonus; never break the home page */ }
+}
+
 async function renderHomePage() {
   // An explicitly-picked location (via the location picker below) always
   // wins over the browser's auto-detected one, until reset. If neither is
@@ -95,6 +116,8 @@ async function renderHomePage() {
             <a href="/post" class="btn btn-gold" data-i18n="nav_post">Post an Ad</a>
             <span class="hint" style="margin-inline-start:10px">Lost &amp; Found posts are always free.</span>
           </div>
+
+          <div id="pickedForYou"></div>
 
           <div class="section-heading">
             <h2 data-i18n="recent_classifieds">Recent Classifieds</h2>
@@ -155,6 +178,8 @@ async function renderHomePage() {
     tzid: c.location.tzid,
     onChange: renderHomePage,
   });
+
+  renderPickedForYou(loc);
 
   if (typeof renderWeatherWidget === 'function') renderWeatherWidget();
   if (typeof Banners !== 'undefined') Banners.renderSidebar('home', 'sidebarBannerSlot');

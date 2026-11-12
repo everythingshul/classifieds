@@ -102,6 +102,7 @@ app.use('/api/banners', require('./routes/public/banners'));
 app.use('/api/bulk-post', require('./routes/public/bulkPost'));
 app.use('/api/category-manage', require('./routes/public/categoryManage'));
 app.use('/api/chat', require('./routes/public/chat'));
+app.use('/api/suggestions', require('./routes/public/suggestions'));
 app.use('/api/geocode', require('./routes/public/geocode'));
 
 app.use('/api/admin/auth', require('./routes/admin/auth'));
