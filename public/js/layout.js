@@ -25,7 +25,7 @@ function renderLayout(siteName) {
           <a href="/" data-i18n="nav_home">Home</a>
           <a href="/classifieds" data-i18n="nav_classifieds">Classifieds</a>
           <a href="/listings" data-i18n="nav_listings">Listings</a>
-          <a href="/simchas" data-i18n="nav_simchas">Simchas</a>
+          ${window.SITE_CONFIG && window.SITE_CONFIG.simchasEnabled ? '<a href="/simchas" data-i18n="nav_simchas">Simchas</a>' : ''}
           <a href="/editorials" class="nav-editorials"><span data-i18n="nav_editorials">Editorials</span> <span class="badge-new-pill" data-i18n="badge_new">${I18N.t('badge_new')}</span></a>
           <a href="/bookmarks" data-i18n="nav_bookmarks">Bookmarks</a>
           <a href="/subscribe" class="nav-subscribe"><span class="nav-subscribe-icon" aria-hidden="true">✉</span> <span data-i18n="subscribe_nav">Email Updates</span></a>
@@ -102,7 +102,7 @@ function wireSiteSearch() {
       [classifieds, listings, simchas] = await Promise.all([
         Api.classifieds({ q, pageSize: 4 }),
         Api.listings({ q, pageSize: 4 }),
-        Api.simchas({ q, pageSize: 3 }),
+        Api.simchasOn() ? Api.simchas({ q, pageSize: 3 }) : Promise.resolve({ posts: [], total: 0 }),
       ]);
     } catch (e) {
       if (myToken === searchToken) closeDropdown();

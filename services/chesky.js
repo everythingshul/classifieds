@@ -21,6 +21,7 @@ const { currencyForHost } = require('./currency');
 const { currentOrigin } = require('./requestContext');
 const { CURRENCIES } = require('../utils/constants');
 const { submitPost, ValidationError } = require('./postSubmit');
+const { simchasEnabled } = require('./features');
 const { buildContactLinks } = require('./postFormat');
 const { tokenWhere, fuzzyFilter, TEXT_COLUMNS } = require('./searchQuery');
 const { geocodeLocation } = require('./geocode');
@@ -117,10 +118,11 @@ async function queryPosts({ query, type, category, near } = {}, limit = 8) {
   const now = Date.now();
   const where = ["status = 'live'", '(expires_at IS NULL OR expires_at > ?)'];
   const params = [now];
-  if (['classified', 'listing', 'simcha'].includes(type)) {
+  if (['classified', 'listing', 'simcha'].includes(type) && (type !== 'simcha' || simchasEnabled())) {
     where.push('type = ?');
     params.push(type);
   }
+  if (!simchasEnabled()) where.push("type != 'simcha'");
   if (category) {
     where.push('category = ?');
     params.push(category);
@@ -241,12 +243,12 @@ function buildSiteContext() {
     .filter((a) => a.key.endsWith('_boost'))
     .map((a) => `- ${addonLabel(a)} (${addonSection(a)}s): ${price(a.price_cents, a.price_cents_gbp)}`);
 
-  const tiers = db.prepare("SELECT category, post_type, name, duration_days, price_cents, price_cents_gbp FROM pricing_tiers WHERE active = 1 ORDER BY post_type, sort_order").all();
+  const tiers = db.prepare("SELECT category, post_type, name, duration_days, price_cents, price_cents_gbp FROM pricing_tiers WHERE active = 1 ORDER BY post_type, sort_order").all().filter((t) => t.post_type !== 'simcha' || simchasEnabled());
   const tierLines = tiers.map((t) => `- ${t.post_type === 'listing' ? 'Listing' : t.post_type === 'simcha' ? 'Simcha' : 'Classified'}${t.category ? ` (${t.category})` : ''}: ${t.name}, ${t.duration_days} days, ${t.price_cents ? price(t.price_cents, t.price_cents_gbp) : 'free'}`);
 
   const classifiedKeys = getAllClassifiedCategories().map((c) => `${c.key} (${c.label})`);
   const listingKeys = getAllListingCategories().map((c) => `${c.key} (${c.label})`);
-  const simchaTax = db.prepare("SELECT name FROM taxonomies WHERE grp = 'simcha' AND active = 1 ORDER BY sort_order").all().map((t) => t.name);
+  const simchaTax = !simchasEnabled() ? [] : db.prepare("SELECT name FROM taxonomies WHERE grp = 'simcha' AND active = 1 ORDER BY sort_order").all().map((t) => t.name);
 
   const classifiedLimits = getClassifiedCharLimits();
   const listingLimits = getListingCharLimits();
@@ -260,8 +262,7 @@ Classifieds categories: ${classifiedCats.join(', ') || 'none configured'}
 Classifieds category keys (use these exact keys, not the labels, when calling create_post): ${classifiedKeys.join(', ') || 'none'}
 Listings categories: ${listingCats.join(', ') || 'none configured'}
 Listings category keys (use these exact keys, not the labels, when calling create_post): ${listingKeys.join(', ') || 'none'}
-Simcha categories (use the exact name, not a key, as simchaCategory when calling create_post): ${simchaTax.join(', ') || 'none configured'}
-
+${simchasEnabled() ? `Simcha categories (use the exact name, not a key, as simchaCategory when calling create_post): ${simchaTax.join(', ') || 'none configured'}\n` : ''}
 Posting durations & prices (exact tier names/prices/durations can change - these are what's configured right now, already converted to this visitor's own currency):
 ${tierLines.join('\n') || '(none configured)'}
 
@@ -276,7 +277,7 @@ Policies to know:
 - Lost & Found and any category marked "free" don't cost anything to post. A post's total price is its duration tier plus any add-ons chosen - always add them up and state the real total, in this visitor's own currency, before they confirm.
 - Every photo is reviewed by a human before it appears - this is mainly to keep photos of people off the site, a hard rule here.
 - Posts expire after their duration and stay on the site with an "Expired" stamp and no contact info shown, rather than disappearing - visitors can still see what was posted, just can't reach the poster anymore. The original poster can ask us to renew/repost.
-- Simchas (celebrations like a birth, bar/bat mitzvah, wedding) are a separate free-text section from Classifieds/Listings, and are always free (no tier/add-on choices apply to them).
+${simchasEnabled() ? '- Simchas (celebrations like a birth, bar/bat mitzvah, wedding) are a separate free-text section from Classifieds/Listings, and are always free (no tier/add-on choices apply to them).' : '- The Simchas section is paused for now. Do not offer, mention or create simcha posts; if someone asks, say it is taking a break and offer a classified instead.'}
 - Banner ad placements on the site are sold separately, outside any self-serve flow - if someone asks about advertising/banners (not boosting their own post), offer to pass their request to the team (forwardToTeam), don't quote a price for it.
 `.trim();
   contextCache.set(currency, { text, at: Date.now() });
@@ -355,7 +356,21 @@ const SUBSCRIBE_TOOL = {
   },
 };
 
-const TOOLS = [CREATE_POST_TOOL, SUBSCRIBE_TOOL, SEARCH_POSTS_TOOL, RESPOND_TOOL];
+// While simchas are paused the tools stop offering them at all.
+function currentTools() {
+  if (simchasEnabled()) return [CREATE_POST_TOOL, SUBSCRIBE_TOOL, SEARCH_POSTS_TOOL, RESPOND_TOOL];
+  const noSimcha = (tool, mutate) => {
+    const t = JSON.parse(JSON.stringify(tool));
+    mutate(t.input_schema.properties);
+    return t;
+  };
+  return [
+    noSimcha(CREATE_POST_TOOL, (pr) => { pr.type.enum = ['classified', 'listing']; delete pr.simchaCategory; }),
+    SUBSCRIBE_TOOL,
+    noSimcha(SEARCH_POSTS_TOOL, (pr) => { pr.type.enum = ['classified', 'listing']; }),
+    RESPOND_TOOL,
+  ];
+}
 
 function resolveTierId(tiers, categoryDef, tierName) {
   if (categoryDef.free) return null;
@@ -377,6 +392,7 @@ function resolveTierId(tiers, categoryDef, tierName) {
 async function execCreatePost(input, image) {
   try {
     const type = ['classified', 'listing', 'simcha'].includes(input.type) ? input.type : 'classified';
+    if (type === 'simcha' && !simchasEnabled()) return { status: 'error', errors: ['Simchas are paused right now. Offer a classified instead.'] };
     const body = {
       title: input.title,
       description: input.description,
@@ -491,11 +507,11 @@ async function executeTool(name, input, image) {
 function buildSystemPrompt(hasImage, hasVoice) {
   const name = siteName();
 
-  return `You are Chesky, the warm and genuinely helpful assistant for ${name}, a Jewish community classifieds, listings, and simchas (celebrations) website.
+  return `You are Chesky, the warm and genuinely helpful assistant for ${name}, a Jewish community classifieds and business listings website${simchasEnabled() ? ' (with a simchas/celebrations section)' : ''}.
 
 PERSONALITY - this matters a lot: talk like a kind, down-to-earth staff member texting a customer, not like a corporate bot. Use contractions (I'm, you'll, that's), vary your sentence openers, and let a little warmth and personality show. Never sound stiff, robotic, or like you're reading from a script. If someone seems confused, frustrated, or new to the site, be extra patient and reassuring - never curt, never cold. Treat every visitor like a valued member of the community, not a support ticket. You genuinely want to see people post - when it's natural (someone describes something they're selling, renting out, giving away, hiring for, or celebrating, or asks "can I post X"), warmly encourage them to post it. Make it easy: offer to just take a photo and/or a voice note describing it right here in chat and you'll take care of the rest (write it up, pick the category, handle payment if needed) - that's often the fastest way for them, especially for an item for sale/rent, a job offer, or a real estate listing. Don't be pushy about it - read the room, and never repeat the nudge if they've already said no or changed the subject.
 
-CLASSIFIEDS VS LISTINGS: this site is primarily a classifieds community - individual people posting what they're selling, renting out, giving away, hiring for, or looking for. Listings (the business directory) is a smaller, secondary feature. When you're the one bringing up posting, or the situation is ambiguous, default to talking about posting a classified (or a simcha, if that fits) - that's the far more natural thing for most visitors. Only steer toward Listings when someone is clearly describing an actual business, store, or company they run, not an individual item, job, or service.
+CLASSIFIEDS VS LISTINGS: this site is primarily a classifieds community - individual people posting what they're selling, renting out, giving away, hiring for, or looking for. Listings (the business directory) is a smaller, secondary feature. When you're the one bringing up posting, or the situation is ambiguous, default to talking about posting a classified${simchasEnabled() ? ' (or a simcha, if that fits)' : ''} - that's the far more natural thing for most visitors. Only steer toward Listings when someone is clearly describing an actual business, store, or company they run, not an individual item, job, or service.
 
 SCOPE: you only help with ${name} itself - how to post something, pricing, boosting/featuring a post, categories, editing or renewing a post, expired posts, contact/privacy on posts, advertising (see below), email updates (see below), general site navigation, and (via search_posts, see below) what's currently posted on the site. If someone asks about something unrelated to ${name} - general knowledge, other websites/companies, personal advice - don't answer it; warmly say that's outside what you can help with here, and set offTopic to true.
 
@@ -564,7 +580,7 @@ async function ask(question, transcript = [], image = null, hasVoice = false) {
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const response = await c.messages.create({ model, max_tokens: 1024, system, tools: TOOLS, messages });
+      const response = await c.messages.create({ model, max_tokens: 1024, system, tools: currentTools(), messages });
       const blocks = response.content || [];
       const toolUses = blocks.filter((b) => b.type === 'tool_use');
 

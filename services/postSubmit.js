@@ -12,6 +12,7 @@ const { buildClassifiedCharges, buildListingCharges, buildSimchaCharges, getClas
 const { findCategory } = require('./taxonomy');
 const { findListingCategory } = require('./listingCategories');
 const { getActivePromo, applyDiscount, recordUse, promoAppliesTo, promoAppliesToFeature } = require('./promoCodes');
+const { simchasEnabled } = require('./features');
 const { insertPost, attachImages, recordPayment, attachSimchaSurprises, finalizePostLive } = require('./postLifecycle');
 const { formatPostPublic } = require('./postFormat');
 const { createCheckoutSession } = require('./checkout');
@@ -120,6 +121,8 @@ async function finalizeOrCheckout({ post, payment, charges, posterEmail, type })
 // { status, body } shaped exactly like the former inline res.json calls.
 async function submitPost({ type: rawType, body, files, hostname }) {
   const type = rawType === 'simcha' ? 'simcha' : rawType === 'listing' ? 'listing' : 'classified';
+  // Paused section (Settings -> Site Sections): nothing public can post one.
+  if (type === 'simcha' && !simchasEnabled()) throw new ValidationError(['Simcha announcements are paused right now. Please check back soon.']);
   let parsedFields = {};
   try {
     parsedFields = body.fields ? (typeof body.fields === 'string' ? JSON.parse(body.fields) : body.fields) : {};

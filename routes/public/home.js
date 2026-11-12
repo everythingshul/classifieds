@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../../db');
+const { simchasEnabled } = require('../../services/features');
 const { getHomeCalendarData } = require('../../utils/hebrewCalendar');
 const { formatPostPublic } = require('../../services/postFormat');
 const { formatEditorialPublic } = require('../../services/editorial');
@@ -63,7 +64,7 @@ router.get('/', async (req, res, next) => {
          ORDER BY boosted_at DESC LIMIT 10`
       )
       .all(now);
-    const recentSimchas = db
+    const recentSimchas = !simchasEnabled() ? [] : db
       .prepare(
         `SELECT * FROM posts WHERE type = 'simcha' AND status = 'live' AND (expires_at IS NULL OR expires_at > ?)
          ORDER BY boosted_at DESC LIMIT 10`

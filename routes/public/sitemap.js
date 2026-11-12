@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { appUrl } = require('../../services/appUrl');
+const { simchasEnabled, hiddenTypesSql } = require('../../services/features');
 
 const router = express.Router();
 
@@ -13,13 +14,13 @@ router.get('/sitemap.xml', (req, res) => {
   const posts = db
     .prepare(
       `SELECT public_id, type, updated_at FROM posts
-       WHERE status = 'live' AND (expires_at IS NULL OR expires_at > ?)`
+       WHERE status = 'live' AND (expires_at IS NULL OR expires_at > ?) AND ${hiddenTypesSql()}`
     )
     .all(now);
 
   const urlSegment = (type) => (type === 'simcha' ? 'simchas' : type === 'listing' ? 'listings' : 'classifieds');
 
-  const staticEntries = STATIC_PATHS.map((p) => `  <url><loc>${base}${p}</loc></url>`);
+  const staticEntries = STATIC_PATHS.filter((p) => p !== '/simchas' || simchasEnabled()).map((p) => `  <url><loc>${base}${p}</loc></url>`);
   const postEntries = posts.map(
     (p) => `  <url><loc>${base}/${urlSegment(p.type)}/${p.public_id}</loc><lastmod>${new Date(p.updated_at).toISOString().slice(0, 10)}</lastmod></url>`
   );

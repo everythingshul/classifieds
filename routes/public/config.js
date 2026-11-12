@@ -7,6 +7,7 @@ const { getCountryList } = require('../../utils/countries');
 const { getAllClassifiedCategories, getOptionNames, getAllListingCategories, orderTaxonomyTree } = require('../../services/taxonomy');
 const { getPublishableKey } = require('../../utils/stripeClient');
 const { currencyForHost } = require('../../services/currency');
+const { simchasEnabled } = require('../../services/features');
 
 const router = express.Router();
 
@@ -43,6 +44,9 @@ router.get('/', (req, res) => {
     googleMapsApiKey: runtimeConfig.get('google_maps_api_key', 'GOOGLE_MAPS_API_KEY') || null,
     stripePublishableKey: getPublishableKey() || null,
     siteName: runtimeConfig.get('site_name', 'SITE_NAME') || 'JListings',
+    // False while the simcha section is paused (Settings -> Site Sections):
+    // the public pages hide every simcha link, page, and posting option.
+    simchasEnabled: simchasEnabled(),
   });
 });
 

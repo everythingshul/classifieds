@@ -3,7 +3,17 @@ const db = require('../../db');
 const { formatPostPublic } = require('../../services/postFormat');
 const { runBrowseQuery, parseGeo } = require('../../services/searchQuery');
 
+const { simchasEnabled } = require('../../services/features');
+
 const router = express.Router();
+
+// While the section is paused the list is empty and every detail is a 404,
+// so old links, cached pages and search engines all see nothing.
+router.use((req, res, next) => {
+  if (simchasEnabled()) return next();
+  if (req.path === '/') return res.json({ posts: [], page: 1, pageSize: 20, total: 0, totalPages: 1, paused: true });
+  res.status(404).json({ error: 'Post not found' });
+});
 
 router.get('/', (req, res, next) => {
   try {

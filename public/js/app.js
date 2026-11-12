@@ -15,8 +15,9 @@
   Router.add('/classifieds/:id', ({ id }) => renderDetailPage(id, 'classified'));
   Router.add('/listings', renderListingsListPage);
   Router.add('/listings/:id', ({ id }) => renderDetailPage(id, 'listing'));
-  Router.add('/simchas', renderSimchasListPage);
-  Router.add('/simchas/:id', ({ id }) => renderDetailPage(id, 'simcha'));
+  // Simchas are paused site-wide (Settings -> Site Sections): old links go home.
+  Router.add('/simchas', (p) => (Api.simchasOn() ? renderSimchasListPage(p) : Router.navigate('/')));
+  Router.add('/simchas/:id', ({ id }) => (Api.simchasOn() ? renderDetailPage(id, 'simcha') : Router.navigate('/')));
   Router.add('/search', renderSearchPage);
   Router.add('/editorials', renderEditorialsListPage);
   Router.add('/editorials/submit', renderEditorialSubmitPage);

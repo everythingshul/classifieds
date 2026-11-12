@@ -110,12 +110,13 @@ async function renderHomePage() {
           <div id="listingsCarousel">${renderCarousel(data.recentListings)}</div>
           ${data.recentListings.length ? renderSectionFooter(HOME_SECTIONS[1], data.recentListings.length >= 10) : ''}
 
+          ${Api.simchasOn() ? `
           <div class="section-heading">
             <h2 data-i18n="recent_simchas">Recent Simchas</h2>
             <a href="/simchas" data-i18n="view_all_simchas">View All Simchas</a>
           </div>
           <div id="simchasCarousel">${renderCarousel(data.recentSimchas)}</div>
-          ${data.recentSimchas.length ? renderSectionFooter(HOME_SECTIONS[2], data.recentSimchas.length >= 10) : ''}
+          ${data.recentSimchas.length ? renderSectionFooter(HOME_SECTIONS[2], data.recentSimchas.length >= 10) : ''}` : ''}
         </div>
 
         <aside class="home-sidebar">
@@ -144,7 +145,7 @@ async function renderHomePage() {
     </div>
   `;
   I18N.apply();
-  setPageTitle(null, 'Community classifieds, business listings, and simcha announcements. Post a job, sell an item, find a service, or share a simcha.');
+  setPageTitle(null, 'Community classifieds and business listings. Post a job, sell an item, or find a service.');
 
   initLocationPicker({
     root: document.getElementById('zmanimLocPicker'),

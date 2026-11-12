@@ -139,7 +139,7 @@
             <select data-field="type">
               <option value="classified">Classified</option>
               <option value="listing">Listing</option>
-              <option value="simcha">Simcha</option>
+              ${window.SITE_CONFIG.simchasEnabled ? '<option value="simcha">Simcha</option>' : ''}
             </select>
           </div>
           <div class="form-row" data-role="categoryRow"><label>Category</label>

@@ -40,6 +40,16 @@ router.get('/digest-all', (req, res) => {
   res.json({ sections: sectionsFromRefs(ids) });
 });
 
+// Topics the form no longer offers (a paused section such as Simchas) stay on
+// a subscriber's record when they save other changes, so the choice is still
+// there when the section comes back.
+function keepPausedTopics(existing, chosen, valid) {
+  let saved = [];
+  try { saved = JSON.parse(existing.categories || '[]'); } catch (e) { saved = []; }
+  const paused = saved.filter((t) => t === 'simcha' && !valid.has(t));
+  return [...new Set([...chosen, ...paused])];
+}
+
 router.post('/', subscribeLimiter, async (req, res, next) => {
   try {
     const token = req.body.token ? String(req.body.token) : null;
@@ -63,7 +73,7 @@ router.post('/', subscribeLimiter, async (req, res, next) => {
       const existing = findByToken(token);
       if (!existing) return res.status(404).json({ error: 'Subscription not found' });
       db.prepare('UPDATE email_subscriptions SET categories = ?, send_hour = ?, updated_at = ? WHERE id = ?')
-        .run(JSON.stringify(cleanCategories), sendHour, now, existing.id);
+        .run(JSON.stringify(keepPausedTopics(existing, cleanCategories, valid)), sendHour, now, existing.id);
       return res.json({ ok: true, status: 'updated' });
     }
 

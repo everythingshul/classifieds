@@ -11,7 +11,7 @@ async function renderSearchPage({ query }) {
   const [classifieds, listings, simchas] = await Promise.all([
     Api.classifieds({ q, pageSize: 12 }),
     Api.listings({ q, pageSize: 12 }),
-    Api.simchas({ q, pageSize: 12 }),
+    Api.simchasOn() ? Api.simchas({ q, pageSize: 12 }) : Promise.resolve({ posts: [], total: 0 }),
   ]);
 
   const totalResults = classifieds.total + listings.total + simchas.total;

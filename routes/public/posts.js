@@ -16,6 +16,7 @@ const { escapeHtml } = require('../../services/emailLayout');
 const { polishText } = require('../../services/aiAssist');
 const { submitPost, SECTION_LABELS } = require('../../services/postSubmit');
 const { appUrl } = require('../../services/appUrl');
+const { hiddenTypesSql } = require('../../services/features');
 
 const router = express.Router();
 
@@ -270,7 +271,7 @@ router.get('/by-ids', (req, res, next) => {
     // Bookmarks should keep showing a post the viewer saved even after it
     // expires (with an "expired" stamp - see formatPostPublic) instead of
     // just silently vanishing from their list.
-    const posts = db.prepare(`SELECT * FROM posts WHERE public_id IN (${placeholders}) AND status IN ('live', 'expired')`).all(...ids);
+    const posts = db.prepare(`SELECT * FROM posts WHERE public_id IN (${placeholders}) AND status IN ('live', 'expired') AND ${hiddenTypesSql()}`).all(...ids);
     const postIds = posts.map((p) => p.id);
     let imgMap = new Map();
     if (postIds.length) {

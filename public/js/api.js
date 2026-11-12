@@ -29,6 +29,7 @@ const Api = (() => {
     listings: (params) => req(`/listings?${qs(params)}`),
     listingDetail: (id) => req(`/listings/${id}`),
     listingCategoryCounts: () => req('/listings/category-counts'),
+    simchasOn: () => !!(window.SITE_CONFIG && window.SITE_CONFIG.simchasEnabled),
     simchas: (params) => req(`/simchas?${qs(params)}`),
     simchaDetail: (id) => req(`/simchas/${id}`),
     postsByIds: (ids) => req(`/posts/by-ids?ids=${ids.join(',')}`),

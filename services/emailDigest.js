@@ -16,6 +16,7 @@ const { DEFAULT_BROOKLYN_LOCATION } = require('../utils/constants');
 const { sendMail } = require('../utils/mailer');
 const { emailShell } = require('./emailLayout');
 const { appUrl } = require('./appUrl');
+const { simchasEnabled } = require('./features');
 
 const siteName = () => runtimeConfig.get('site_name', 'SITE_NAME') || 'JListings';
 
@@ -31,7 +32,7 @@ function escapeHtml(str) {
 function availableTopics() {
   const topics = [];
   getAllClassifiedCategories().forEach((c) => topics.push({ value: `classified:${c.key}`, label: c.label, labelHe: c.labelHe, group: 'classifieds' }));
-  topics.push({ value: 'simcha', label: 'Simchas', labelHe: 'שמחות', group: 'simchas' });
+  if (simchasEnabled()) topics.push({ value: 'simcha', label: 'Simchas', labelHe: 'שמחות', group: 'simchas' });
   topics.push({ value: 'editorial', label: 'Editorials', labelHe: 'מאמרים', group: 'editorials' });
   return topics;
 }
@@ -151,7 +152,9 @@ function collectDigestSections(sub, { since, until } = {}) {
   const classifieds = queryByCategory('classified', classifiedCats);
   if (classifieds.length) sections.push({ title: 'Classifieds', items: classifieds.map(toDigestItem) });
 
-  if (topics.includes('simcha')) {
+  // A subscriber who picked Simchas before the section was paused keeps the
+  // choice on file; it just contributes nothing until the section returns.
+  if (simchasEnabled() && topics.includes('simcha')) {
     const simchas = db
       .prepare(
         `SELECT * FROM posts WHERE type = 'simcha' AND status = 'live' AND published_at > ? AND published_at <= ?
@@ -194,7 +197,7 @@ function sectionsFromRefs(refKeys) {
     if (rows.length) sections.push({ title, items: rows.map(toDigestItem) });
   }
   postsSection('c', 'classified', 'Classifieds');
-  postsSection('s', 'simcha', 'Simchas');
+  if (simchasEnabled()) postsSection('s', 'simcha', 'Simchas');
   if (byType.e.length) {
     const placeholders = byType.e.map(() => '?').join(',');
     const rows = db.prepare(`SELECT * FROM editorials WHERE id IN (${placeholders}) AND status != 'removed'`).all(...byType.e);

@@ -110,6 +110,15 @@ async function renderSettingsPage() {
     </div>
 
     <div class="admin-card">
+      <h3 style="margin-top:0">Site Sections</h3>
+      <p class="hint">Turn a whole section on or off. Pausing hides it from visitors (pages, menus, search, Chesky, posting and email digests) without deleting anything, so everything is back exactly as it was when you turn it on again.</p>
+      <form id="sectionsForm">
+        <label class="addon-row" style="border:none;padding:4px 0"><input type="checkbox" name="simchas_enabled" ${s.simchas_enabled === true ? 'checked' : ''}> <span style="font-weight:400">Simchas section (currently ${s.simchas_enabled === true ? 'live' : 'paused'})</span></label>
+        <button class="btn btn-sm" type="submit" style="margin-top:8px">Save</button>
+      </form>
+    </div>
+
+    <div class="admin-card">
       <h3 style="margin-top:0">Google Maps</h3>
       <p class="hint">Enables address autocomplete on location fields. Without it, location stays a plain text field. Needs "Places API (New)" (or the older "Places API") and billing enabled on the Google Cloud project, and the key must not be restricted away from this domain.</p>
       <form id="mapsForm">
@@ -297,6 +306,7 @@ async function renderSettingsPage() {
   bindForm('editorialLimitsForm', (fd) => [
     ['editorial_char_limits', { title: Number(fd.editorial_title), body: Number(fd.editorial_body) }],
   ]);
+  bindForm('sectionsForm', (fd) => [['simchas_enabled', fd.simchas_enabled === 'on']], true);
   bindForm('rulesForm', (fd) => [
     ['simcha_retention_days', Number(fd.simcha_retention_days)],
     ['simcha_retention_max_days', Number(fd.simcha_retention_max_days)],

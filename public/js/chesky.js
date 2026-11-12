@@ -32,7 +32,7 @@ const Chesky = (() => {
   let recordCancelled = false;
   let recordMode = 'ask'; // 'ask' | 'handoff' - which footer to restore when done
 
-  const QUICK_ACTIONS = ['Post a classified', 'Post a simcha'];
+  const quickActions = () => (window.SITE_CONFIG && window.SITE_CONFIG.simchasEnabled ? ['Post a classified', 'Post a simcha'] : ['Post a classified']);
   const STARTERS = ['How do I post a listing?', 'How much does boosting or featuring cost?', 'What happens when my post expires?'];
   const MIC_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-2.08A7 7 0 0 0 19 11z"/></svg>';
   const CAMERA_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>';
@@ -198,7 +198,7 @@ const Chesky = (() => {
   // can clear it on first use without also wiping later chip rows
   // (post-reference/post-created buttons) that are meant to stay in the log.
   function chipsHtml() {
-    const items = [...QUICK_ACTIONS, ...STARTERS];
+    const items = [...quickActions(), ...STARTERS];
     return `<div class="chesky-chips chesky-starter-row">${items.map((s) => `<button type="button" class="chesky-chip">${escapeHtml(s)}</button>`).join('')}</div>`;
   }
 

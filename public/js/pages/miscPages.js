@@ -7,7 +7,7 @@ async function renderBookmarksPage() {
   const [classifieds, listings, simchas] = await Promise.all([
     grouped.classified.length ? Api.postsByIds(grouped.classified) : { posts: [] },
     grouped.listing.length ? Api.postsByIds(grouped.listing) : { posts: [] },
-    grouped.simcha.length ? Api.postsByIds(grouped.simcha) : { posts: [] },
+    grouped.simcha.length && Api.simchasOn() ? Api.postsByIds(grouped.simcha) : { posts: [] },
   ]);
   const posts = [...classifieds.posts, ...listings.posts, ...simchas.posts];
 
@@ -277,10 +277,10 @@ function renderPricingPage() {
         ${addonsHtml(cfg.addons?.listing)}
       </section>
 
-      <section class="pricing-section">
+      ${cfg.simchasEnabled ? `<section class="pricing-section">
         <div class="pricing-section-head"><h2>Simchas</h2><a href="/post">Share a Simcha &rarr;</a></div>
         ${tiersHtml(simchaTiers)}
-      </section>
+      </section>` : ''}
 
       <p class="hint" style="margin-top:10px">See our <a href="/refund-policy">Refund Policy</a> for details on cancellations and refunds.</p>
     </div>`;

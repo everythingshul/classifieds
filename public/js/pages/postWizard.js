@@ -149,7 +149,7 @@ function renderPostWizard() {
       <div class="category-grid">
         <button type="button" class="category-tile ${state.postType === 'classified' ? 'selected' : ''}" data-v="classified">Classified</button>
         <button type="button" class="category-tile ${state.postType === 'listing' ? 'selected' : ''}" data-v="listing">Listing</button>
-        <button type="button" class="category-tile ${state.postType === 'simcha' ? 'selected' : ''}" data-v="simcha">Simcha</button>
+        ${Api.simchasOn() ? `<button type="button" class="category-tile ${state.postType === 'simcha' ? 'selected' : ''}" data-v="simcha">Simcha</button>` : ''}
       </div>
     `);
     document.querySelectorAll('.category-tile').forEach((btn) => btn.addEventListener('click', () => {

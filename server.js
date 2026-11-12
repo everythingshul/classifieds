@@ -150,6 +150,12 @@ const DETAIL_PREFIXES = {
   '/simchas/': (id, urlPath) => getPostPreview(id, 'simcha', urlPath),
   '/editorials/': (id, urlPath) => id === 'submit' ? null : getEditorialPreview(id, urlPath),
 };
+// The simcha section is paused: its pages send visitors (and search
+// engines following old links) to the home page instead.
+app.get(['/simchas', '/simchas/*'], (req, res, next) => {
+  if (require('./services/features').simchasEnabled()) return next();
+  res.redirect(302, '/');
+});
 app.get(['/classifieds/*', '/listings/*', '/simchas/*', '/editorials/*'], (req, res) => {
   const prefix = Object.keys(DETAIL_PREFIXES).find((p) => req.path.startsWith(p));
   const id = prefix ? req.path.slice(prefix.length).split('/')[0] : null;

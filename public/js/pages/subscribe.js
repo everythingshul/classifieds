@@ -7,7 +7,7 @@ function subscriptionTopicGroups() {
   const heb = I18N.get() === 'he';
   return [
     { key: 'classifieds', label: 'Classifieds', topics: (cfg.categories || []).map((c) => ({ value: `classified:${c.key}`, label: heb && c.labelHe ? c.labelHe : c.label })) },
-    { key: 'simchas', label: 'Simchas', topics: [{ value: 'simcha', label: heb ? 'שמחות' : 'Simchas' }] },
+    ...(cfg.simchasEnabled ? [{ key: 'simchas', label: 'Simchas', topics: [{ value: 'simcha', label: heb ? 'שמחות' : 'Simchas' }] }] : []),
     { key: 'editorials', label: 'Editorials', topics: [{ value: 'editorial', label: heb ? 'מאמרים' : 'Editorials' }] },
   ].filter((g) => g.topics.length);
 }
@@ -73,7 +73,7 @@ async function renderSubscribePage(params) {
       </form>
     </div>`;
   I18N.apply();
-  setPageTitle('Daily Email Updates', 'Sign up for a daily email digest of new classifieds, simchas, and editorials - by category, at the time you choose.');
+  setPageTitle('Daily Email Updates', 'Sign up for a daily email digest of new classifieds and editorials - by category, at the time you choose.');
 
   wireSubscribeForm(existing, manageToken);
 }
