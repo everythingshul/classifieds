@@ -97,6 +97,38 @@ async function renderPickedForYou(loc) {
   } catch (e) { /* suggestions are a bonus; never break the home page */ }
 }
 
+// The home search covers the whole site. "Search in" narrows it to one
+// section; Classifieds and Listings then offer their own categories.
+function wireHomeSearch() {
+  const form = document.getElementById('homeSearchForm');
+  if (!form) return;
+  const cfg = window.SITE_CONFIG;
+  const heb = I18N.get() === 'he';
+  const label = (c) => (heb && c.labelHe ? c.labelHe : c.label);
+  const section = form.querySelector('[name="section"]');
+  const catSel = form.querySelector('[name="category"]');
+  const catField = form.querySelector('#homeCatField');
+  enhanceFiltersBar(form);
+  const syncCategory = () => {
+    const list = section.value === 'classifieds' ? cfg.categories : section.value === 'listings' ? cfg.listingCategories : null;
+    catField.style.display = list && list.length ? '' : 'none';
+    catSel.innerHTML = list ? `<option value="">Any category</option>${list.map((c) => `<option value="${escapeHtml(c.key)}">${escapeHtml(label(c))}</option>`).join('')}` : '';
+  };
+  section.addEventListener('change', syncCategory);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = (n) => (form.querySelector(`[name="${n}"]`).value || '').trim();
+    const q = v('q'); const city = v('city'); const cat = v('category');
+    const base = { ...(q ? { q } : {}), ...(city ? { city } : {}) };
+    let url;
+    if (section.value === 'classifieds') url = `/classifieds?${qs({ ...base, ...(cat ? { category: cat } : {}) })}`;
+    else if (section.value === 'listings' && cat) url = `/listings?${qs({ ...base, category: cat, loc: 'all' })}`;
+    else if (section.value === 'editorials') url = `/editorials?${qs(base)}`;
+    else url = `/search?${qs({ ...base, ...(section.value ? { only: section.value } : {}) })}`;
+    Router.navigate(url);
+  });
+}
+
 async function renderHomePage() {
   // An explicitly-picked location (via the location picker below) always
   // wins over the browser's auto-detected one, until reset. If neither is
@@ -116,6 +148,21 @@ async function renderHomePage() {
             <a href="/post" class="btn btn-gold" data-i18n="nav_post">Post an Ad</a>
             <span class="hint" style="margin-inline-start:10px">Lost &amp; Found posts are always free.</span>
           </div>
+
+          <form class="filters-bar home-search" id="homeSearchForm">
+            <div class="field"><input type="text" name="q"></div>
+            <div class="field"><input type="text" name="city"></div>
+            <div class="field"><label>Search in</label>
+              <select name="section">
+                <option value="">Everything</option>
+                <option value="classifieds">Classifieds</option>
+                <option value="listings">Listings (businesses)</option>
+                <option value="editorials">Editorials</option>
+              </select>
+            </div>
+            <div class="field" id="homeCatField" style="display:none"><label>Category</label><select name="category"></select></div>
+            <button class="btn btn-sm" type="submit">Search</button>
+          </form>
 
           <div id="pickedForYou"></div>
 
@@ -179,6 +226,7 @@ async function renderHomePage() {
     onChange: renderHomePage,
   });
 
+  wireHomeSearch();
   renderPickedForYou(loc);
 
   if (typeof renderWeatherWidget === 'function') renderWeatherWidget();

@@ -16,6 +16,8 @@ const {
 const { getSetting } = require('../../services/pricing');
 const { sanitizeRichText } = require('../../utils/htmlSanitize');
 
+const { tokenWhere, fuzzyFilter } = require('../../services/searchQuery');
+
 const router = express.Router();
 
 function imagesFor(editorialId) {
@@ -36,11 +38,23 @@ router.get('/', (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize, 10) || 12));
 
-  const total = db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'live'").get().c;
-  const rows = db
-    .prepare("SELECT * FROM editorials WHERE status = 'live' ORDER BY published_at DESC LIMIT ? OFFSET ?")
-    .all(pageSize, (page - 1) * pageSize);
-  const featuredRows = db
+  // Optional text search (title, body, pen name): every word must appear, with
+  // a typo-tolerant pass if that finds nothing - same rules as the posts search.
+  const q = String(req.query.q || '').trim();
+  const cols = ['title', 'body', 'pen_name'];
+  let matched = null;
+  if (q) {
+    const w = tokenWhere(q, cols);
+    if (w) {
+      matched = db.prepare(`SELECT * FROM editorials WHERE status = 'live' AND (${w.sql}) ORDER BY published_at DESC LIMIT 500`).all(...w.params);
+      if (!matched.length) matched = fuzzyFilter(db.prepare("SELECT * FROM editorials WHERE status = 'live' ORDER BY published_at DESC LIMIT 500").all(), q, cols);
+    }
+  }
+  const total = matched ? matched.length : db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'live'").get().c;
+  const rows = matched
+    ? matched.slice((page - 1) * pageSize, page * pageSize)
+    : db.prepare("SELECT * FROM editorials WHERE status = 'live' ORDER BY published_at DESC LIMIT ? OFFSET ?").all(pageSize, (page - 1) * pageSize);
+  const featuredRows = matched ? [] : db
     .prepare("SELECT * FROM editorials WHERE status = 'live' AND is_featured = 1 ORDER BY published_at DESC LIMIT 3")
     .all();
 

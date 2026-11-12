@@ -64,7 +64,8 @@ function editorialPagination(page, totalPages) {
 
 async function renderEditorialsListPage({ query }) {
   const page = parseInt(query.page, 10) || 1;
-  const data = await Api.editorials({ page, pageSize: 12 });
+  const searchQ = (query.q || '').trim();
+  const data = await Api.editorials({ page, pageSize: 12, ...(searchQ ? { q: searchQ } : {}) });
 
   if (data.posts.length) Api.registerEditorialImpressions(data.posts.map((p) => p.id));
 
@@ -83,7 +84,7 @@ async function renderEditorialsListPage({ query }) {
           ${data.featured.map((ed) => editorialCardHtml(ed, { large: true })).join('')}
         </div>
       ` : ''}
-      <h2 data-i18n="latest">${I18N.t('latest')}</h2>
+      ${searchQ ? `<p class="result-count"><strong>${data.total}</strong> ${data.total === 1 ? 'editorial' : 'editorials'} for "${escapeHtml(searchQ)}" <a href="/editorials">Clear</a></p>` : `<h2 data-i18n="latest">${I18N.t('latest')}</h2>`}
       ${data.posts.length
         ? `<div class="editorial-grid">${data.posts.map((ed) => editorialCardHtml(ed)).join('')}</div>`
         : `<p class="empty-state" data-i18n="no_results">${I18N.t('no_results')}</p>`}
