@@ -42,6 +42,48 @@ function emailMePromptHtml(category, label) {
   return `<div class="email-me-prompt"><span>Want new <strong>${escapeHtml(label)}</strong> posts in your inbox?</span> <a class="btn btn-sm btn-outline" href="/subscribe?topic=${encodeURIComponent('classified:' + category)}">Email me new ones</a></div>`;
 }
 
+// Turns the plain filter form into one clean search bar (what / where / go)
+// with every other filter tucked under "More filters". The inputs are moved,
+// not copied, so the page's own submit handler keeps working unchanged.
+const SEARCH_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+const PIN_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+function enhanceFiltersBar(form) {
+  if (!form || form.dataset.enhanced) return;
+  form.dataset.enhanced = '1';
+  const fields = [...form.querySelectorAll(':scope > .field')];
+  const take = (name) => fields.find((f) => f.querySelector(`[name="${name}"]`));
+  const qField = take('q');
+  const cityField = take('city');
+  const goBtn = form.querySelector(':scope > button[type="submit"]');
+  const others = fields.filter((f) => f !== qField && f !== cityField);
+  const qIn = qField && qField.querySelector('input');
+  const cityIn = cityField && cityField.querySelector('input');
+  if (qIn) qIn.placeholder = 'What are you looking for?';
+  if (cityIn) cityIn.placeholder = 'City or neighborhood';
+  const active = others.filter((f) => { const el = f.querySelector('input,select'); return el && el.value; }).length;
+
+  form.classList.add('search-form');
+  form.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'search-row';
+  const mk = (icon, input) => { const l = document.createElement('label'); l.className = 'search-box'; l.innerHTML = icon; l.appendChild(input); return l; };
+  if (qIn) row.appendChild(mk(SEARCH_ICON, qIn));
+  if (cityIn) row.appendChild(mk(PIN_ICON, cityIn));
+  if (goBtn) { goBtn.className = 'search-go'; goBtn.textContent = 'Search'; goBtn.removeAttribute('data-i18n'); row.appendChild(goBtn); }
+  form.appendChild(row);
+  if (others.length) {
+    const d = document.createElement('details');
+    d.className = 'more-filters';
+    if (active) d.open = true;
+    d.innerHTML = `<summary>More filters${active ? ` <span class="more-count">${active}</span>` : ''}</summary>`;
+    const grid = document.createElement('div');
+    grid.className = 'more-grid';
+    others.forEach((f) => grid.appendChild(f));
+    d.appendChild(grid);
+    form.appendChild(d);
+  }
+}
+
 async function renderClassifiedsListPage({ query }) {
   const cfg = window.SITE_CONFIG;
   const category = query.category || '';
@@ -120,6 +162,7 @@ async function renderClassifiedsListPage({ query }) {
     </div>
   `;
   I18N.apply();
+  enhanceFiltersBar(document.getElementById('filtersForm'));
   setPageTitle(catDef ? (I18N.get() === 'he' ? catDef.labelHe : catDef.label) : 'Classifieds', catDef ? `${catDef.label} classifieds on JListings.` : 'Browse all community classifieds on JListings.');
 
   document.getElementById('filtersForm').addEventListener('submit', (e) => {
@@ -345,6 +388,7 @@ async function renderListingsListPage({ query }) {
     </div>
   `;
   I18N.apply();
+  enhanceFiltersBar(document.getElementById('filtersForm'));
   setPageTitle(catDef ? (I18N.get() === 'he' ? catDef.labelHe : catDef.label) : 'Listings', catDef ? `${catDef.label} listings on JListings.` : 'Browse all community listings on JListings.');
 
   document.getElementById('filtersForm').addEventListener('submit', (e) => {
