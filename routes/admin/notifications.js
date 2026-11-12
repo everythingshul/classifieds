@@ -17,7 +17,8 @@ router.get('/', (req, res) => {
   const pendingEditorials = db.prepare("SELECT COUNT(*) AS c FROM editorials WHERE status = 'pending_approval'").get().c;
   const pendingEditorialComments = db.prepare("SELECT COUNT(*) AS c FROM editorial_comments WHERE status = 'pending_approval'").get().c;
   const unreadChats = db.prepare("SELECT COUNT(*) AS c FROM chat_conversations WHERE unread = 1 AND status = 'open'").get().c;
-  res.json({ reports, contactMessages, pendingApproval, pendingUrlApproval, pendingEditorials, pendingEditorialComments, unreadChats });
+  const locationQueue = db.prepare("SELECT COUNT(*) AS c FROM location_queue WHERE status = 'open'").get().c;
+  res.json({ locationQueue, reports, contactMessages, pendingApproval, pendingUrlApproval, pendingEditorials, pendingEditorialComments, unreadChats });
 });
 
 module.exports = router;

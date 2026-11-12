@@ -122,6 +122,7 @@ app.use('/api/admin/editorials', require('./routes/admin/editorials'));
 app.use('/api/admin/subscriptions', require('./routes/admin/subscriptions'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
 app.use('/api/admin/chat', require('./routes/admin/chat'));
+app.use('/api/admin/locations', require('./routes/admin/locations'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
@@ -182,5 +183,8 @@ app.listen(PORT, () => {
   const geoBackfill = require('./services/geoBackfill');
   geoBackfill.backfillMissingCoordinates()
     .then(() => geoBackfill.backfillMissingCities())
+    // Sort every existing post's address into a location category (new posts
+    // are routed as they are created).
+    .then(() => require('./services/locations').routeUnrouted(2000))
     .catch((e) => console.error('[geo-backfill] Unexpected failure:', e.message));
 });

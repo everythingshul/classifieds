@@ -86,6 +86,8 @@ function insertPost({ type, category, payload, hasImages }) {
   });
   const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(info.lastInsertRowid);
   queueSearchKeywords(post);
+  // Sort the address into a location category in the background.
+  require('./locations').routePost(post.id);
   return post;
 }
 

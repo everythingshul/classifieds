@@ -473,3 +473,32 @@ CREATE TABLE IF NOT EXISTS analytics_hits (
 CREATE INDEX IF NOT EXISTS idx_ahits_ts ON analytics_hits(ts);
 CREATE INDEX IF NOT EXISTS idx_ahits_type ON analytics_hits(type, ts);
 CREATE INDEX IF NOT EXISTS idx_ahits_sid ON analytics_hits(sid, ts);
+
+-- Location categories: every post's address is routed into one of these.
+-- aliases is a JSON array of other spellings/nicknames/streets that mean the
+-- same place; sorting an unknown address in admin adds it here, so the next
+-- post with that address routes itself.
+CREATE TABLE IF NOT EXISTS locations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  state TEXT,
+  lat REAL,
+  lng REAL,
+  aliases TEXT NOT NULL DEFAULT '[]',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
+-- One row per distinct address text that could not be routed on its own.
+-- The admin resolves it once (new location or an existing one) and every post
+-- with that text, now or later, follows.
+CREATE TABLE IF NOT EXISTS location_queue (
+  norm_text TEXT PRIMARY KEY,
+  sample_text TEXT NOT NULL,
+  ai_action TEXT,              -- 'assign' | 'new' | NULL (no AI available or unsure)
+  ai_location_id INTEGER,
+  ai_new_name TEXT,
+  ai_note TEXT,
+  status TEXT NOT NULL DEFAULT 'open',   -- open | resolved
+  created_at INTEGER NOT NULL
+);

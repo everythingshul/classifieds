@@ -20,6 +20,8 @@ function addColumnIfMissing(table, column, ddl) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
   if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 }
+addColumnIfMissing('posts', 'location_id', 'location_id INTEGER');
+addColumnIfMissing('posts', 'location_route', 'location_route TEXT');
 addColumnIfMissing('posts', 'click_count', 'click_count INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('pricing_tiers', 'post_type', "post_type TEXT NOT NULL DEFAULT 'classified'");
 addColumnIfMissing('contact_messages', 'archived', 'archived INTEGER NOT NULL DEFAULT 0');

@@ -45,6 +45,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '#/banners', label: 'Banners' },
   { href: '#/crm', label: 'CRM Search' },
   { href: '#/categories', label: 'Categories' },
+  { href: '#/locations', label: 'Locations', badge: 'badge-locations' },
   { href: '#/pricing', label: 'Pricing' },
   { href: '#/settings', label: 'Settings' },
   { href: '/tabadd137', label: 'Bulk Add', target: '_blank' },
@@ -123,6 +124,7 @@ async function refreshNotificationBadges() {
   setBadge('badge-contact', summary.contactMessages || 0);
   setBadge('badge-editorials', (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0));
   setBadge('badge-chat', summary.unreadChats || 0);
+  setBadge('badge-locations', summary.locationQueue || 0);
   const totalUnread = (summary.reports || 0) + (summary.pendingApproval || 0) + (summary.pendingUrlApproval || 0) + (summary.contactMessages || 0)
     + (summary.pendingEditorials || 0) + (summary.pendingEditorialComments || 0) + (summary.unreadChats || 0);
   document.title = totalUnread > 0 ? `(${totalUnread > 99 ? '99+' : totalUnread}) Admin — JListings` : 'Admin — JListings';
@@ -132,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/login', renderLoginPage);
   AdminRouter.add('#/dashboard', renderDashboardPage);
   AdminRouter.add('#/analytics', renderAnalyticsPage);
+  AdminRouter.add('#/locations', renderLocationsPage);
   AdminRouter.add('#/new-post', renderCreatePostPage);
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);
