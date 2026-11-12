@@ -68,10 +68,43 @@ const CANDIDATE_LIMIT = 5000;
 //   geo: { lat, lng, radius } to sort by distance within a radius, or null
 //   orderBy: SQL order for the non-geo case
 // Returns { posts, total } for the requested page.
-function runBrowseQuery({ where, params, q, city, geo, orderBy, page, pageSize }) {
+function runBrowseQuery({ where, params, q, city, geo, orderBy, page, pageSize, intent }) {
   const base = { where: [...where], params: [...params] };
-  const textWhere = q ? tokenWhere(q, TEXT_COLUMNS) : null;
-  const cityWhere = city ? tokenWhere(city, LOCATION_COLUMNS) : null;
+  // `intent` is what Claude understood (services/searchUnderstanding.js). It
+  // only ever widens what was typed: the typed words still match as before,
+  // and the alternatives / the place Claude recognised match as well.
+  let textWhere = q ? tokenWhere(q, TEXT_COLUMNS) : null;
+  let cityWhere = city ? tokenWhere(city, LOCATION_COLUMNS) : null;
+  let intentLocation = null;
+  if (intent) {
+    const alts = [intent.subject, ...(intent.terms || [])].filter(Boolean).map((t) => tokenWhere(t, TEXT_COLUMNS)).filter(Boolean);
+    if (intent.location) {
+      const ids = [intent.location.id];
+      const likes = intent.location.phrases.filter((p) => p.length >= 4).slice(0, 6);
+      const sql = `location_id IN (${ids.map(() => '?').join(',')})${likes.length ? ' OR ' + likes.map(() => '(' + LOCATION_COLUMNS.map((c) => `${c} LIKE ?`).join(' OR ') + ')').join(' OR ') : ''}`;
+      const ps = [...ids];
+      likes.forEach((p) => LOCATION_COLUMNS.forEach(() => ps.push(`%${p}%`)));
+      intentLocation = { sql, params: ps };
+    }
+    if (intent.location && intent.locationFromQuery) {
+      // The place was typed into the search words ("plumber in lakewood"):
+      // search for the subject, and filter by the place instead of requiring
+      // the word to appear in the post text.
+      const subj = intent.subject ? tokenWhere(intent.subject, TEXT_COLUMNS) : null;
+      const parts = [subj, ...alts.slice(1)].filter(Boolean);
+      textWhere = parts.length ? { sql: parts.map((a) => `(${a.sql})`).join(' OR '), params: parts.flatMap((a) => a.params) } : null;
+      cityWhere = intentLocation;
+    } else {
+      if (textWhere && alts.length) {
+        textWhere = { sql: [textWhere, ...alts].map((a) => `(${a.sql})`).join(' OR '), params: [textWhere, ...alts].flatMap((a) => a.params) };
+      }
+      if (cityWhere && intentLocation) {
+        cityWhere = { sql: `(${cityWhere.sql}) OR (${intentLocation.sql})`, params: [...cityWhere.params, ...intentLocation.params] };
+      } else if (!cityWhere && intentLocation && !q) {
+        cityWhere = intentLocation;
+      }
+    }
+  }
   const strict = { where: [...base.where], params: [...base.params] };
   for (const w of [cityWhere, textWhere]) {
     if (w) { strict.where.push(`(${w.sql})`); strict.params.push(...w.params); }
@@ -106,8 +139,8 @@ function runBrowseQuery({ where, params, q, city, geo, orderBy, page, pageSize }
   }
   if (!rows.length && (textWhere || cityWhere)) {
     rows = load(base);
-    if (cityWhere) rows = fuzzyFilter(rows, city, LOCATION_COLUMNS, { any: true });
-    if (textWhere) rows = fuzzyFilter(rows, q, TEXT_COLUMNS);
+    if (cityWhere && city) rows = fuzzyFilter(rows, city, LOCATION_COLUMNS, { any: true });
+    if (textWhere && q && !(intent && intent.location && intent.locationFromQuery)) rows = fuzzyFilter(rows, q, TEXT_COLUMNS);
   }
 
   if (geo) {
@@ -120,6 +153,15 @@ function runBrowseQuery({ where, params, q, city, geo, orderBy, page, pageSize }
   return { total: rows.length, posts: rows.slice((page - 1) * pageSize, page * pageSize) };
 }
 
+// What the page shows under the search form ("Showing: plumber in Flatbush").
+function describeIntent(intent) {
+  if (!intent) return null;
+  const subject = intent.subject || '';
+  const place = intent.location ? intent.location.name.split(',')[0] : '';
+  if (!subject && !place) return null;
+  return { subject, place, alternatives: (intent.terms || []).slice(0, 4), categoryKey: intent.categoryKey || '' };
+}
+
 function parseGeo(query) {
   const lat = query.lat !== undefined ? Number(query.lat) : null;
   const lng = query.lng !== undefined ? Number(query.lng) : null;
@@ -128,4 +170,4 @@ function parseGeo(query) {
   return { lat, lng, radius };
 }
 
-module.exports = { runBrowseQuery, parseGeo, tokenWhere, fuzzyFilter, TEXT_COLUMNS };
+module.exports = { describeIntent, runBrowseQuery, parseGeo, tokenWhere, fuzzyFilter, TEXT_COLUMNS };

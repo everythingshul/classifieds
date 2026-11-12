@@ -11,6 +11,15 @@ function trackFilterSearch(section, query, page, total) {
   if (q) Analytics.track('se', section, { v: total, p: location.pathname, x: { q, c: query.category || '' } });
 }
 
+// A one-line "here is what we searched for" under the filters, shown when
+// Claude read the search (see services/searchUnderstanding.js).
+function understoodHtml(u) {
+  if (!u || (!u.subject && !u.place)) return '';
+  const also = u.alternatives && u.alternatives.length ? ` <span class="hint">(also looked for ${u.alternatives.map(escapeHtml).join(', ')})</span>` : '';
+  const what = [u.subject ? `<strong>${escapeHtml(u.subject)}</strong>` : '', u.place ? `${u.subject ? 'in ' : 'near '}<strong>${escapeHtml(u.place)}</strong>` : ''].filter(Boolean).join(' ');
+  return `<p class="hint understood-line" style="margin:-4px 0 14px">Showing ${what}${also}</p>`;
+}
+
 async function renderClassifiedsListPage({ query }) {
   const cfg = window.SITE_CONFIG;
   const category = query.category || '';
@@ -78,6 +87,7 @@ async function renderClassifiedsListPage({ query }) {
         ` : ''}
         <button class="btn btn-sm" type="submit" data-i18n="filter">Filter</button>
       </form>
+      ${understoodHtml(listData.understood)}
 
       ${renderGrid(listData.posts)}
 
@@ -302,6 +312,7 @@ async function renderListingsListPage({ query }) {
         </div>
         <button class="btn btn-sm" type="submit" data-i18n="filter">Filter</button>
       </form>
+      ${understoodHtml(listData.understood)}
 
       ${renderGrid(listData.posts)}
 

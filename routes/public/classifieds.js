@@ -1,7 +1,8 @@
 const express = require('express');
 const db = require('../../db');
 const { formatPostPublic } = require('../../services/postFormat');
-const { runBrowseQuery, parseGeo } = require('../../services/searchQuery');
+const { runBrowseQuery, parseGeo, describeIntent } = require('../../services/searchQuery');
+const { understand } = require('../../services/searchUnderstanding');
 const { getClassifiedCategoryKeys } = require('../../services/taxonomy');
 
 const router = express.Router();
@@ -37,7 +38,7 @@ router.get('/category-counts', (req, res) => {
 });
 
 // GET /api/classifieds  (view-all when no category given, or filtered to one category)
-router.get('/', (req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const pageSize = Math.min(60, Math.max(1, parseInt(req.query.pageSize, 10) || 20));
@@ -100,7 +101,11 @@ router.get('/', (req, res, next) => {
 
     // Text search (q), the City filter and "near me" all live in
     // services/searchQuery.js - shared with listings, simchas and Chesky.
-    const { posts, total } = runBrowseQuery({ where, params, q: req.query.q, city: req.query.city, geo: parseGeo(req.query), orderBy, page, pageSize });
+    // Claude reads what was typed (search words and place field) so the search
+    // can find what they mean, not just the letters. Skipped for the header's
+    // as-you-type dropdown (noAi) and when Claude is not set up.
+    const intent = req.query.noAi ? null : await understand({ q: req.query.q, city: req.query.city, section: 'classifieds' });
+    const { posts, total } = runBrowseQuery({ where, params, q: req.query.q, city: req.query.city, geo: parseGeo(req.query), orderBy, page, pageSize, intent });
 
     const imgMap = imagesForPosts(posts.map((p) => p.id));
 
@@ -111,6 +116,7 @@ router.get('/', (req, res, next) => {
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
       categoryCounts: categoryCounts(),
+      understood: describeIntent(intent),
     });
   } catch (e) {
     next(e);

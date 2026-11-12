@@ -100,8 +100,8 @@ function wireSiteSearch() {
     let classifieds, listings, simchas;
     try {
       [classifieds, listings, simchas] = await Promise.all([
-        Api.classifieds({ q, pageSize: 4 }),
-        Api.listings({ q, pageSize: 4 }),
+        Api.classifieds({ q, pageSize: 4, noAi: 1 }),
+        Api.listings({ q, pageSize: 4, noAi: 1 }),
         Api.simchasOn() ? Api.simchas({ q, pageSize: 3 }) : Promise.resolve({ posts: [], total: 0 }),
       ]);
     } catch (e) {
