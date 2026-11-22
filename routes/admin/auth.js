@@ -8,7 +8,16 @@ const router = express.Router();
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
-router.post('/login', loginLimiter, (req, res) => {
+// Also throttle per account, so a botnet spreading guesses across many IPs
+// still cannot hammer a single admin login.
+const accountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 10, standardHeaders: false, legacyHeaders: false,
+  keyGenerator: (req) => `acct:${String(req.body?.email || '').toLowerCase().trim().slice(0, 200)}`,
+  skipSuccessfulRequests: true,
+  message: { error: 'Too many failed attempts for this account. Try again in a few minutes.' },
+});
+
+router.post('/login', loginLimiter, accountLimiter, (req, res) => {
   const email = String(req.body.email || '').toLowerCase().trim();
   const password = String(req.body.password || '');
   const admin = db.prepare('SELECT * FROM admin_users WHERE email = ?').get(email);

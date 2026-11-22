@@ -4,9 +4,10 @@ const { notifyAdmin } = require('../../utils/mailer');
 const { isValidEmail } = require('../../utils/validate');
 const { escapeHtml } = require('../../services/emailLayout');
 
+const { contactLimiter } = require('../../middleware/limits');
 const router = express.Router();
 
-router.post('/', async (req, res, next) => {
+router.post('/', contactLimiter, async (req, res, next) => {
   try {
     const name = String(req.body.name || '').trim().slice(0, 200);
     const email = String(req.body.email || '').trim().toLowerCase();

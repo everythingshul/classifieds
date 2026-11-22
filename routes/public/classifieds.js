@@ -3,6 +3,7 @@ const db = require('../../db');
 const { formatPostPublic } = require('../../services/postFormat');
 const { runBrowseQuery, parseGeo, describeIntent, rescueOptions } = require('../../services/searchQuery');
 const { understand } = require('../../services/searchUnderstanding');
+const { aiAllowed } = require('../../middleware/limits');
 const { getClassifiedCategoryKeys } = require('../../services/taxonomy');
 
 const router = express.Router();
@@ -104,7 +105,7 @@ router.get('/', async (req, res, next) => {
     // Claude reads what was typed (search words and place field) so the search
     // can find what they mean, not just the letters. Skipped for the header's
     // as-you-type dropdown (noAi) and when Claude is not set up.
-    const intent = req.query.noAi ? null : await understand({ q: req.query.q, city: req.query.city, section: 'classifieds' });
+    const intent = req.query.noAi || !(req.query.q || req.query.city) || !aiAllowed(req) ? null : await understand({ q: req.query.q, city: req.query.city, section: 'classifieds' });
     // Prices and job type Claude read out of the words ("under 2000", "part time")
     // apply only where the visitor did not set the filter themselves.
     const understoodFilters = [];

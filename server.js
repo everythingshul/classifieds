@@ -35,6 +35,10 @@ function sendShellWithPreview(res, lookup) {
   res.send(html);
 }
 
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.warn('[security] JWT_SECRET is missing or shorter than 32 characters. Set a long random value: it signs every admin session.');
+}
+
 const app = express();
 app.set('trust proxy', 1);
 
@@ -48,7 +52,9 @@ app.use(requestContext.middleware);
 
 app.use(
   helmet({
-    contentSecurityPolicy: false, // the static frontend loads Google Maps + Stripe from admin-configured origins
+    // A full script policy would break Google Maps / Stripe from admin-set origins, so only
+    // the protections that cannot: no plugins, no <base> tricks, no framing by other sites.
+    contentSecurityPolicy: { useDefaults: false, directives: { defaultSrc: helmet.contentSecurityPolicy.dangerouslyDisableDefaultSrc, objectSrc: ["'none'"], baseUri: ["'self'"], frameAncestors: ["'self'"] } },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
@@ -66,7 +72,11 @@ app.use('/api/webhook', express.raw({ type: 'application/json' }), require('./ro
 // a base64-encoded photo plus its JSON wrapper runs well past 2mb for a real
 // camera photo. Matches the existing per-image ceiling multer already
 // enforces for the regular post wizard's uploads (middleware/upload.js).
-app.use(express.json({ limit: '8mb' }));
+// Only the chat routes (photo + voice notes as base64) need a large body;
+// everything else is small JSON, so a big body is rejected early.
+app.use('/api/chat', express.json({ limit: '8mb' }));
+app.use('/api/bulk-post', express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 240, standardHeaders: true, legacyHeaders: false });

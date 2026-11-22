@@ -17,6 +17,7 @@ const { polishText } = require('../../services/aiAssist');
 const { submitPost, SECTION_LABELS } = require('../../services/postSubmit');
 const { appUrl } = require('../../services/appUrl');
 const { hiddenTypesSql } = require('../../services/features');
+const { reportLimiter, addonLimiter, counterLimiter, submitLimiter } = require('../../middleware/limits');
 
 const router = express.Router();
 
@@ -78,7 +79,7 @@ router.post('/polish', polishLimiter, async (req, res, next) => {
   }
 });
 
-router.post('/', upload.array('images', 6), async (req, res, next) => {
+router.post('/', submitLimiter, upload.array('images', 6), async (req, res, next) => {
   try {
     const result = await submitPost({ type: req.body.type, body: req.body, files: req.files, hostname: req.hostname });
     res.status(result.status).json(result.body);
@@ -120,7 +121,7 @@ router.get('/verify-session', async (req, res, next) => {
 });
 
 // Boost: enter the email used to post + pay to move the listing back to the top.
-router.post('/:publicId/boost', async (req, res, next) => {
+router.post('/:publicId/boost', addonLimiter, async (req, res, next) => {
   try {
     const post = db.prepare('SELECT * FROM posts WHERE public_id = ?').get(req.params.publicId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -157,7 +158,7 @@ router.post('/:publicId/boost', async (req, res, next) => {
 });
 
 // Strike: pay an additional fee to feature/highlight a listing.
-router.post('/:publicId/strike', async (req, res, next) => {
+router.post('/:publicId/strike', addonLimiter, async (req, res, next) => {
   try {
     const post = db.prepare('SELECT * FROM posts WHERE public_id = ?').get(req.params.publicId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -193,7 +194,7 @@ router.post('/:publicId/strike', async (req, res, next) => {
   }
 });
 
-router.post('/:publicId/report', async (req, res, next) => {
+router.post('/:publicId/report', reportLimiter, async (req, res, next) => {
   try {
     const post = db.prepare('SELECT * FROM posts WHERE public_id = ?').get(req.params.publicId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
@@ -235,7 +236,7 @@ function logPostEvents(type, ids, visitorId, domain) {
 
 // Views are counted as impressions (shown in a carousel/list/detail page),
 // not gated behind clicking through to the detail page.
-router.post('/impressions', (req, res, next) => {
+router.post('/impressions', counterLimiter, (req, res, next) => {
   try {
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String).slice(0, 100) : [];
     if (!ids.length) return res.json({ ok: true });
@@ -250,7 +251,7 @@ router.post('/impressions', (req, res, next) => {
 
 // Real clicks: opening a post's detail page, or clicking a contact link on it.
 // Tracked separately from impressions so admins can see engagement, not just reach.
-router.post('/clicks', (req, res, next) => {
+router.post('/clicks', counterLimiter, (req, res, next) => {
   try {
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String).slice(0, 100) : [];
     if (!ids.length) return res.json({ ok: true });

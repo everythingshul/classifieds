@@ -29,7 +29,7 @@
     "libphonenumber-js": "^1.13.9",
     "multer": "^2.0.0",
     "node-cron": "^4.0.6",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^10.6.1",
     "pdf-lib": "^1.17.1",
     "sharp": "^0.35.3",
     "stripe": "^16.8.0",

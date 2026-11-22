@@ -18,6 +18,7 @@ const { sanitizeRichText } = require('../../utils/htmlSanitize');
 
 const { tokenWhere, fuzzyFilter } = require('../../services/searchQuery');
 
+const { submitLimiter, counterLimiter } = require('../../middleware/limits');
 const router = express.Router();
 
 function imagesFor(editorialId) {
@@ -80,7 +81,7 @@ router.get('/:id', (req, res) => {
   });
 });
 
-router.post('/', upload.array('images', 6), async (req, res, next) => {
+router.post('/', submitLimiter, upload.array('images', 6), async (req, res, next) => {
   try {
     let body = req.body;
     if (req.body.videoUrls) {
@@ -108,7 +109,7 @@ router.post('/', upload.array('images', 6), async (req, res, next) => {
   }
 });
 
-router.post('/:id/comments', async (req, res, next) => {
+router.post('/:id/comments', submitLimiter, async (req, res, next) => {
   try {
     const editorial = db.prepare("SELECT * FROM editorials WHERE public_id = ? AND status = 'live'").get(req.params.id);
     if (!editorial) return res.status(404).json({ error: 'Not found' });
@@ -143,7 +144,7 @@ function logEditorialEvents(type, ids, visitorId, domain) {
 
 // Batched by public_id (matches /api/posts/impressions,/clicks) so a whole
 // card grid can register in one request instead of one per card.
-router.post('/impressions', (req, res) => {
+router.post('/impressions', counterLimiter, (req, res) => {
   const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String).slice(0, 100) : [];
   if (!ids.length) return res.json({ ok: true });
   const placeholders = ids.map(() => '?').join(',');
@@ -152,7 +153,7 @@ router.post('/impressions', (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/clicks', (req, res) => {
+router.post('/clicks', counterLimiter, (req, res) => {
   const ids = Array.isArray(req.body.ids) ? req.body.ids.map(String).slice(0, 100) : [];
   if (!ids.length) return res.json({ ok: true });
   const placeholders = ids.map(() => '?').join(',');
@@ -163,7 +164,7 @@ router.post('/clicks', (req, res) => {
 
 // Thumbs-up: a lightweight engagement signal, not shown as a public tally
 // (client only shows a toggled button state) but visible to admins.
-router.post('/:id/like', (req, res) => {
+router.post('/:id/like', counterLimiter, (req, res) => {
   const info = db.prepare("UPDATE editorials SET like_count = like_count + 1 WHERE public_id = ? AND status = 'live'").run(req.params.id);
   if (!info.changes) return res.status(404).json({ error: 'Not found' });
   res.json({ ok: true });

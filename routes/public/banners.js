@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../../db');
 const { PAGE_ZONE_KEYS, bannersForZone } = require('../../services/banners');
 
+const { counterLimiter } = require('../../middleware/limits');
 const router = express.Router();
 
 router.get('/', (req, res) => {
@@ -24,13 +25,13 @@ function logBannerEvents(type, ids, visitorId, domain) {
   banners.forEach((b) => stmt.run(type, b.id, visitorId, domain, now));
 }
 
-router.post('/impressions', (req, res) => {
+router.post('/impressions', counterLimiter, (req, res) => {
   const { ids, visitorId } = req.body;
   logBannerEvents('banner_view', Array.isArray(ids) ? ids : [], visitorId, String(req.get('host') || '').toLowerCase());
   res.json({ ok: true });
 });
 
-router.post('/clicks', (req, res) => {
+router.post('/clicks', counterLimiter, (req, res) => {
   const { ids, visitorId } = req.body;
   logBannerEvents('banner_click', Array.isArray(ids) ? ids : [], visitorId, String(req.get('host') || '').toLowerCase());
   res.json({ ok: true });
