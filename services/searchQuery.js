@@ -17,6 +17,7 @@
 const db = require('../db');
 const { tokenize, wordsMatch } = require('../utils/fuzzy');
 const { distanceMiles } = require('../utils/geo');
+const { expand } = require('./synonyms');
 
 const TEXT_COLUMNS = ['title', 'description', 'search_keywords', 'location_text', 'location_city'];
 const LOCATION_COLUMNS = ['location_city', 'location_text', 'location_state'];
@@ -76,8 +77,14 @@ function runBrowseQuery({ where, params, q, city, geo, orderBy, page, pageSize, 
   let textWhere = q ? tokenWhere(q, TEXT_COLUMNS) : null;
   let cityWhere = city ? tokenWhere(city, LOCATION_COLUMNS) : null;
   let intentLocation = null;
+  // Built-in community synonyms apply to every search, with or without Claude.
+  const builtin = q ? expand(q) : [];
+  if (builtin.length && !intent && textWhere) {
+    const alts = builtin.map((t) => tokenWhere(t, TEXT_COLUMNS)).filter(Boolean);
+    textWhere = { sql: [textWhere, ...alts].map((a) => `(${a.sql})`).join(' OR '), params: [textWhere, ...alts].flatMap((a) => a.params) };
+  }
   if (intent) {
-    const alts = [intent.subject, ...(intent.terms || [])].filter(Boolean).map((t) => tokenWhere(t, TEXT_COLUMNS)).filter(Boolean);
+    const alts = [intent.subject, ...(intent.terms || []), ...builtin].filter(Boolean).map((t) => tokenWhere(t, TEXT_COLUMNS)).filter(Boolean);
     if (intent.location) {
       const ids = [intent.location.id];
       const likes = intent.location.phrases.filter((p) => p.length >= 4).slice(0, 6);
@@ -150,7 +157,33 @@ function runBrowseQuery({ where, params, q, city, geo, orderBy, page, pageSize, 
       .sort((a, b) => a.dist - b.dist);
     return { total: withDist.length, posts: withDist.slice((page - 1) * pageSize, page * pageSize).map((x) => x.post) };
   }
+  if (q && rows.length > 1) rows = rankByRelevance(rows, q, intent, builtin);
   return { total: rows.length, posts: rows.slice((page - 1) * pageSize, page * pageSize) };
+}
+
+// Best matches first: the words in the title beat the words in the
+// description, an exact phrase beats scattered words, other words for the
+// same thing count a little, and Featured posts keep their lift. Ties keep
+// the order the page asked for (newest/boosted first).
+function rankByRelevance(rows, q, intent, builtin) {
+  const words = tokenize(q);
+  const alts = [...new Set([...(intent ? [intent.subject, ...(intent.terms || [])] : []), ...builtin].filter(Boolean).flatMap((t) => tokenize(t)))];
+  const phrase = String(q).toLowerCase().trim();
+  const scored = rows.map((r, i) => {
+    const title = String(r.title || '').toLowerCase();
+    const body = String(r.description || '').toLowerCase();
+    const kw = String(r.search_keywords || '').toLowerCase();
+    let s = 0;
+    if (phrase.length > 2 && title.includes(phrase)) s += 8;
+    else if (phrase.length > 2 && body.includes(phrase)) s += 3;
+    words.forEach((w) => { if (title.includes(w)) s += 4; if (kw.includes(w)) s += 2; if (body.includes(w)) s += 1; });
+    alts.forEach((w) => { if (title.includes(w)) s += 1.5; else if (body.includes(w) || kw.includes(w)) s += 0.5; });
+    if (r.is_featured_strike) s += 1;
+    if (r.status === 'expired') s -= 100;
+    return { r, s, i };
+  });
+  scored.sort((a, b) => b.s - a.s || a.i - b.i);
+  return scored.map((x) => x.r);
 }
 
 // What the page shows under the search form ("Showing: plumber in Flatbush").
@@ -158,8 +191,22 @@ function describeIntent(intent) {
   if (!intent) return null;
   const subject = intent.subject || '';
   const place = intent.location ? intent.location.name.split(',')[0] : '';
-  if (!subject && !place) return null;
-  return { subject, place, alternatives: (intent.terms || []).slice(0, 4), categoryKey: intent.categoryKey || '' };
+  if (!subject && !place && !intent.maxPrice && !intent.minPrice) return null;
+  return { subject, place, alternatives: (intent.terms || []).slice(0, 4), categoryKey: intent.categoryKey || '', maxPrice: intent.maxPrice || 0, minPrice: intent.minPrice || 0, jobType: intent.jobType || '' };
+}
+
+// When a search finds nothing: how many posts there would be with one
+// restriction taken away, so the page can offer a way out instead of a dead end.
+function rescueOptions({ where, params, q, city, categoryWhereIndex, intent, orderBy }) {
+  const out = [];
+  const count = (w, p, qq, cc) => runBrowseQuery({ where: w, params: p, q: qq, city: cc, geo: null, orderBy, page: 1, pageSize: 1, intent }).total;
+  if (city && q) { const n = count(where, params, q, ''); if (n) out.push({ kind: 'nocity', count: n }); }
+  if (categoryWhereIndex != null) {
+    const w = where.filter((_, i) => i !== categoryWhereIndex.where);
+    const p = params.filter((_, i) => i !== categoryWhereIndex.param);
+    const n = count(w, p, q, city); if (n) out.push({ kind: 'nocategory', count: n });
+  }
+  return out;
 }
 
 function parseGeo(query) {
@@ -170,4 +217,4 @@ function parseGeo(query) {
   return { lat, lng, radius };
 }
 
-module.exports = { describeIntent, runBrowseQuery, parseGeo, tokenWhere, fuzzyFilter, TEXT_COLUMNS };
+module.exports = { rescueOptions, describeIntent, runBrowseQuery, parseGeo, tokenWhere, fuzzyFilter, TEXT_COLUMNS };

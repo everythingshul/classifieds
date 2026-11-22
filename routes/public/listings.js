@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../../db');
 const { formatPostPublic } = require('../../services/postFormat');
-const { runBrowseQuery, parseGeo, describeIntent } = require('../../services/searchQuery');
+const { runBrowseQuery, parseGeo, describeIntent, rescueOptions } = require('../../services/searchQuery');
 const { understand } = require('../../services/searchUnderstanding');
 const { getListingCategoryKeys } = require('../../services/taxonomy');
 
@@ -79,7 +79,22 @@ router.get('/', async (req, res, next) => {
     // can find what they mean, not just the letters. Skipped for the header's
     // as-you-type dropdown (noAi) and when Claude is not set up.
     const intent = req.query.noAi ? null : await understand({ q: req.query.q, city: req.query.city, section: 'listings' });
-    const { posts, total } = runBrowseQuery({ where, params, q: req.query.q, city: req.query.city, geo: parseGeo(req.query), orderBy, page, pageSize, intent });
+    // Prices and job type Claude read out of the words ("under 2000", "part time")
+    // apply only where the visitor did not set the filter themselves.
+    const understoodFilters = [];
+    if (intent) {
+      if (intent.maxPrice && !req.query.maxPrice) { where.push("json_extract(fields, '$.price') <= ?"); params.push(intent.maxPrice); understoodFilters.push(`up to $${intent.maxPrice.toLocaleString('en-US')}`); }
+      if (intent.minPrice && !req.query.minPrice) { where.push("json_extract(fields, '$.price') >= ?"); params.push(intent.minPrice); understoodFilters.push(`from $${intent.minPrice.toLocaleString('en-US')}`); }
+      if ('listings' === 'classifieds' && intent.jobType && !req.query.jobType && req.query.category === 'job-offers') { where.push("json_extract(fields, '$.jobType') = ?"); params.push(intent.jobType); understoodFilters.push(intent.jobType.replace('_', ' ')); }
+    }
+    const result = runBrowseQuery({ where, params, q: req.query.q, city: req.query.city, geo: parseGeo(req.query), orderBy, page, pageSize, intent });
+    const { posts } = result;
+    let total = result.total;
+    let rescue = [];
+    if (total === 0 && (req.query.q || req.query.city) && !req.query.noAi) {
+      const ci = req.query.category ? where.indexOf('category = ?') : -1;
+      rescue = rescueOptions({ where, params, q: req.query.q, city: req.query.city, categoryWhereIndex: ci >= 0 ? { where: ci, param: params.indexOf(req.query.category) } : null, intent, orderBy });
+    }
 
     const imgMap = imagesForPosts(posts.map((p) => p.id));
 
@@ -90,7 +105,8 @@ router.get('/', async (req, res, next) => {
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
       categoryCounts: categoryCounts(),
-      understood: describeIntent(intent),
+      understood: describeIntent(intent) ? { ...describeIntent(intent), filters: understoodFilters } : null,
+      rescue,
     });
   } catch (e) {
     next(e);

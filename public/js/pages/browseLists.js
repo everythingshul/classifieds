@@ -18,10 +18,11 @@ function trackFilterSearch(section, query, page, total, understood) {
 // A one-line "here is what we searched for" under the filters, shown when
 // Claude read the search (see services/searchUnderstanding.js).
 function understoodHtml(u) {
-  if (!u || (!u.subject && !u.place)) return '';
+  if (!u || (!u.subject && !u.place && !(u.filters && u.filters.length))) return '';
   const also = u.alternatives && u.alternatives.length ? ` <span class="hint">(also looked for ${u.alternatives.map(escapeHtml).join(', ')})</span>` : '';
   const what = [u.subject ? `<strong>${escapeHtml(u.subject)}</strong>` : '', u.place ? `${u.subject ? 'in ' : 'near '}<strong>${escapeHtml(u.place)}</strong>` : ''].filter(Boolean).join(' ');
-  return `<p class="hint understood-line" style="margin:-4px 0 14px">Showing ${what}${also}</p>`;
+  const extra = u.filters && u.filters.length ? ` <span class="hint">(${u.filters.map(escapeHtml).join(', ')})</span>` : '';
+  return `<p class="hint understood-line" style="margin:-4px 0 14px">Showing ${what || 'matches'}${extra}${also}</p>`;
 }
 
 // Browse-page touches borrowed from yiddit.com: a plain "how many" line,
@@ -33,6 +34,16 @@ function activeFilterChips(basePath, query) {
     return `<a class="filter-chip" href="${basePath}?${qs(rest)}" title="Remove this filter">${escapeHtml(FILTER_CHIP_LABELS[k])}: ${escapeHtml(String(query[k]).replace('_', ' '))} <span aria-hidden="true">&times;</span></a>`;
   });
   return chips.length ? `<div class="filter-chips">${chips.join('')}</div>` : '';
+}
+// Nothing matched: offer the nearest way out (same search without the place,
+// or across every category) instead of a dead end.
+function rescueHtml(rescue, basePath, query) {
+  if (!rescue || !rescue.length) return '';
+  const link = (drop, text) => { const rest = { ...query }; delete rest[drop]; delete rest.page; return `<a href="${basePath}?${qs(rest)}">${text}</a>`; };
+  const items = rescue.map((r) => r.kind === 'nocity'
+    ? `${link('city', `Search everywhere without "${escapeHtml(query.city)}"`)} <span class="hint">(${r.count} found)</span>`
+    : `${link('category', 'Search every category')} <span class="hint">(${r.count} found)</span>`);
+  return `<div class="rescue"><strong>Nothing matched.</strong> Try: ${items.join(' &middot; ')}</div>`;
 }
 function resultCountHtml(total, label) {
   return `<p class="result-count"><strong>${Number(total).toLocaleString()}</strong> ${escapeHtml(label)} ${total === 1 ? 'post' : 'posts'}</p>`;
@@ -156,6 +167,7 @@ async function renderClassifiedsListPage({ query }) {
       ${resultCountHtml(listData.total, catDef ? catDef.label : 'classifieds')}
       ${emailMePromptHtml(category, catDef ? catDef.label : '')}
 
+      ${listData.posts.length ? '' : rescueHtml(listData.rescue, '/classifieds', query)}
       ${renderGrid(listData.posts)}
 
       ${renderPagination(listData.page, listData.totalPages, category)}
@@ -382,6 +394,7 @@ async function renderListingsListPage({ query }) {
       </form>
       ${understoodHtml(listData.understood)}
 
+      ${listData.posts.length ? '' : rescueHtml(listData.rescue, '/listings', query)}
       ${renderGrid(listData.posts)}
 
       ${renderListingsPagination(listData.page, listData.totalPages, category, locParams)}

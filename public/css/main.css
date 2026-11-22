@@ -898,3 +898,6 @@ p { margin: 0 0 .7em; }
   .search-box + .search-box { border-inline-start: 0; border-top: 1px solid var(--border); }
   .search-go { padding: 13px; }
 }
+
+.rescue { padding: 10px 14px; margin: 0 0 14px; border: 1px solid var(--gold-light); background: #fffaf0; font-size: .92rem; }
+.rescue a { font-weight: 600; }

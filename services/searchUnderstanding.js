@@ -37,15 +37,19 @@ const SCHEMA = {
     categoryKey: { type: 'string', description: 'Exact category key from the list that fits best, or empty.' },
     locationName: { type: 'string', description: 'The exact name from the location list they mean (from the search words or the place field), or empty.' },
     locationWasInSearchWords: { type: 'boolean', description: 'True if the place came from the search words rather than the place field.' },
+    maxPrice: { type: 'number', description: 'Highest price in dollars they said they would pay ("under 500", "up to 2k"). 0 if none.' },
+    minPrice: { type: 'number', description: 'Lowest price in dollars they asked for ("over 1000"). 0 if none.' },
+    jobType: { type: 'string', enum: ['', 'full_time', 'part_time', 'temporary'], description: 'Only for job searches, and only if they said it.' },
+    lookingFor: { type: 'string', enum: ['', 'buy_or_rent_or_hire', 'sell_or_offer'], description: 'Whether they want to take something or are offering it.' },
   },
-  required: ['subject', 'alternatives', 'categoryKey', 'locationName', 'locationWasInSearchWords'],
+  required: ['subject', 'alternatives', 'categoryKey', 'locationName', 'locationWasInSearchWords', 'maxPrice', 'minPrice', 'jobType', 'lookingFor'],
   additionalProperties: false,
 };
 
 function stableSystem(section) {
   const cats = (section === 'listings' ? getAllListingCategories() : getAllClassifiedCategories()).map((c) => `${c.key} (${c.label})`);
   const places = locations.loadAll().map((l) => l.name);
-  return `You turn a visitor's search into structured intent for a Jewish community ${section === 'listings' ? 'business directory' : 'classifieds'} site. Visitors write English, Hebrew, Yiddish in English letters, abbreviations and typos. Be literal about what they asked for: do not broaden or guess a different product. Only fill locationName when the text clearly names or nicknames one listed place. Copy categoryKey and locationName exactly from the lists.
+  return `You turn a visitor's search into structured intent for a Jewish community ${section === 'listings' ? 'business directory' : 'classifieds'} site. Visitors write English, Hebrew, Yiddish in English letters, abbreviations and typos. Understand prices written like 2k, $1,500 or "under 500". Be literal about what they asked for: do not broaden or guess a different product. Only fill locationName when the text clearly names or nicknames one listed place. Copy categoryKey and locationName exactly from the lists.
 
 Categories:
 ${cats.join('\n')}
@@ -80,6 +84,9 @@ function shape(raw) {
     categoryKey: raw.categoryKey || '',
     location: loc ? { id: loc.id, name: loc.name, phrases: loc.phrases } : null,
     locationFromQuery: !!raw.locationWasInSearchWords,
+    maxPrice: Number(raw.maxPrice) > 0 ? Number(raw.maxPrice) : 0,
+    minPrice: Number(raw.minPrice) > 0 ? Number(raw.minPrice) : 0,
+    jobType: raw.jobType || '',
   };
 }
 

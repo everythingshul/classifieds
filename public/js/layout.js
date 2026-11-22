@@ -74,6 +74,19 @@ function renderLayout(siteName) {
   I18N.apply();
 }
 
+// "Browse Job Offers" style shortcuts when the typed words look like a
+// category name, so someone typing "jobs" or "rent" can jump straight there.
+function quickCategoryLinks(q) {
+  const cfg = window.SITE_CONFIG || {};
+  const w = q.toLowerCase();
+  const hits = [
+    ...(cfg.categories || []).map((c) => ({ label: c.label, href: `/classifieds?category=${c.key}` })),
+    ...(cfg.listingCategories || []).map((c) => ({ label: c.label, href: `/listings?category=${c.key}` })),
+  ].filter((c) => c.label.toLowerCase().includes(w) || w.includes(c.label.toLowerCase().split(/\s+/)[0])).slice(0, 3);
+  if (!hits.length) return '';
+  return `<div class="search-dd-group"><div class="search-dd-group-label">Browse</div>${hits.map((h) => `<a class="search-dd-item" href="${h.href}"><span class="search-dd-item-title">${escapeHtml(h.label)}</span><span class="search-dd-item-meta">category</span></a>`).join('')}</div>`;
+}
+
 // Live-as-you-type results dropdown under the header search box, so visitors
 // see what's actually posted before committing to the full /search page.
 function wireSiteSearch() {
@@ -132,7 +145,8 @@ function wireSiteSearch() {
         `).join('')}
       </div>
     `).join('');
-    showDropdown(`${groupsHtml}<a class="search-dd-seeall" href="/search?q=${encodeURIComponent(q)}">${I18N.t('view_all')} (${total} ${I18N.t('results')})</a>`);
+    const catLinks = quickCategoryLinks(q);
+    showDropdown(`${catLinks}${groupsHtml}<a class="search-dd-seeall" href="/search?q=${encodeURIComponent(q)}">${I18N.t('view_all')} (${total} ${I18N.t('results')})</a>`);
   }
 
   const debouncedSearch = debounce((q) => {
