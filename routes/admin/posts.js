@@ -47,6 +47,14 @@ router.post('/create', upload.array('images', 6), async (req, res, next) => {
   }
 });
 
+// Used by the on-site admin buttons (public/js/adminTools.js), which only know
+// a post's public id from its URL.
+router.get('/lookup/:publicId', (req, res) => {
+  const p = db.prepare('SELECT id, public_id, type, status, expires_at, saved_forever, is_featured_strike FROM posts WHERE public_id = ?').get(req.params.publicId);
+  if (!p) return res.status(404).json({ error: 'Not found' });
+  res.json({ id: p.id, publicId: p.public_id, type: p.type, status: p.status, expiresAt: p.expires_at, savedForever: !!p.saved_forever, featured: !!p.is_featured_strike });
+});
+
 router.get('/', (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 25));
