@@ -39,6 +39,18 @@ const AdminApi = (() => {
     analyticsSession: (sid) => req(`/analytics/session?sid=${encodeURIComponent(sid)}`),
     analyticsReset: () => req('/analytics/reset', { method: 'POST' }),
     // A file download, so it can't go through req() (which parses JSON).
+    exportCatalog: () => req('/export'),
+    // Downloads an .xlsx (one dataset, or kind 'all' for every dataset as tabs).
+    exportXlsx: async (kind, params = {}) => {
+      const res = await fetch(`/api/admin/export/${encodeURIComponent(kind)}?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token()}` } });
+      if (!res.ok) throw new Error('Export failed');
+      const cd = res.headers.get('Content-Disposition') || '';
+      const name = (/filename="([^"]+)"/.exec(cd) || [])[1] || `jlistings-${kind}.xlsx`;
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    },
     analyticsExport: async (params) => {
       const res = await fetch(`/api/admin/analytics/export?${new URLSearchParams(params)}`, { headers: { Authorization: `Bearer ${token()}` } });
       if (!res.ok) throw new Error('Export failed');

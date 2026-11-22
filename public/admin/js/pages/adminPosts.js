@@ -15,6 +15,7 @@ async function renderPostsPage(query) {
 
   root.innerHTML = `
     <h1>All Posts (${data.total})</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="posts">Export to Excel</button></p>
     <form class="filters-bar" id="filterForm">
       <div class="field"><label>Search</label><input type="text" name="q" value="${escapeHtml(filters.q)}" placeholder="title, email, phone, name…"></div>
       <div class="field"><label>Status</label>

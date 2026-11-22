@@ -5,6 +5,7 @@ async function renderChatPage() {
   const root = document.getElementById('adminContent');
   root.innerHTML = `
     <h1>Chesky Chat</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="chats">Export to Excel</button></p>
     <div class="tabs">
       <button data-tab="conversations" class="${chatTab === 'conversations' ? 'active' : ''}">Conversations</button>
       <button data-tab="teach" class="${chatTab === 'teach' ? 'active' : ''}">Teach Chesky</button>

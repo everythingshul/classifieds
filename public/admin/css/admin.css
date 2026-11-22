@@ -426,3 +426,5 @@ table.admin-table tr:last-child td { border-bottom: none; }
   .chat-bubble-col { max-width: 92%; }
   .pagination { flex-wrap: wrap; }
 }
+
+.export-row { margin: -4px 0 12px; }

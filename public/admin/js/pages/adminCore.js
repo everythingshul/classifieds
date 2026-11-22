@@ -39,6 +39,7 @@ async function renderDashboardPage() {
 
   document.getElementById('adminContent').innerHTML = `
     <h1>Dashboard</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="all">Export everything to Excel</button></p>
 
     ${reports.length ? `
     <div class="admin-card" style="border-color:var(--danger)">

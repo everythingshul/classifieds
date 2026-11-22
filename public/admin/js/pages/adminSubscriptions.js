@@ -15,6 +15,7 @@ async function renderSubscriptionsPage(query) {
 
   root.innerHTML = `
     <h1>Email Subscribers (${data.total})</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="subscribers">Export to Excel</button></p>
     <p class="hint">
       ${counts.confirmed || 0} confirmed &middot; ${counts.pending || 0} pending confirmation &middot; ${counts.unsubscribed || 0} unsubscribed
     </p>

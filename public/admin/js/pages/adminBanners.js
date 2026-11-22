@@ -4,6 +4,7 @@ async function renderBannersPage() {
 
   root.innerHTML = `
     <h1>Banners</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="banners">Export to Excel</button></p>
     <p class="hint">Clickable ad/promo images shown at the top of the page and/or in the sidebar, on whichever pages you choose. A slot with no active banner shows nothing - no empty placeholder.</p>
     <div class="admin-card">
       <button class="btn" id="newBannerBtn">+ New Banner</button>

@@ -8,6 +8,7 @@ async function renderCategoriesPage() {
   const root = document.getElementById('adminContent');
   root.innerHTML = `
     <h1>Categories</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="categories">Export to Excel</button></p>
     <div class="tabs">
       <button data-tab="types" class="${_catTab === 'types' ? 'active' : ''}">Classifieds Types</button>
       <button data-tab="listing_types" class="${_catTab === 'listing_types' ? 'active' : ''}">Listing Categories</button>
@@ -268,6 +269,7 @@ async function renderContactMessagesPage() {
 
   root.innerHTML = `
     <h1>Contact Messages</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="contact_messages">Export to Excel</button></p>
     <div class="admin-card">
       <label style="display:inline-flex;align-items:center;gap:6px;margin-bottom:12px">
         <input type="checkbox" id="showArchived" ${_cmShowArchived ? 'checked' : ''}> Show archived / replied messages

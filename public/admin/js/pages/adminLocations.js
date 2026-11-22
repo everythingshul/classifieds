@@ -36,6 +36,7 @@ async function renderLocationsPage() {
 
   root.innerHTML = `
     <h1>Locations</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="locations">Export to Excel</button></p>
     <p class="hint">Every post's address is sorted into one of these places automatically. Claude helps with the tricky ones. When something does not fit any place, it shows up here for you to decide.</p>
 
     <h2>Needs sorting ${queue.length ? `<span class="nav-badge" style="display:inline-block;position:static">${queue.length}</span>` : ''}</h2>

@@ -134,6 +134,7 @@ app.use('/api/admin/subscriptions', require('./routes/admin/subscriptions'));
 app.use('/api/admin/banners', require('./routes/admin/banners'));
 app.use('/api/admin/chat', require('./routes/admin/chat'));
 app.use('/api/admin/locations', require('./routes/admin/locations'));
+app.use('/api/admin/export', require('./routes/admin/export'));
 
 app.get('/admin*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));

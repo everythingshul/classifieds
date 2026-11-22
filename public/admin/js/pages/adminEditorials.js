@@ -10,6 +10,7 @@ async function renderEditorialsPage(query) {
   root.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center">
       <h1>Editorials (${data.total})</h1>
+    <p class="export-row"><button type="button" class="btn btn-sm btn-outline" data-export="editorials">Export to Excel</button></p>
       <a href="#/editorials/new" class="btn btn-gold btn-sm">+ New Editorial</a>
     </div>
     <form class="filters-bar" id="filterForm">

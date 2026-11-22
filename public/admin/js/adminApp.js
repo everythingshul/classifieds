@@ -47,6 +47,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '#/categories', label: 'Categories' },
   { href: '#/locations', label: 'Locations', badge: 'badge-locations' },
   { href: '#/pricing', label: 'Pricing' },
+  { href: '#/export', label: 'Export to Excel' },
   { href: '#/settings', label: 'Settings' },
   { href: '/tabadd137', label: 'Bulk Add', target: '_blank' },
   { href: '/catmap924', label: 'Manage Categories', target: '_blank' },
@@ -135,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AdminRouter.add('#/dashboard', renderDashboardPage);
   AdminRouter.add('#/analytics', renderAnalyticsPage);
   AdminRouter.add('#/locations', renderLocationsPage);
+  AdminRouter.add('#/export', renderExportPage);
   AdminRouter.add('#/new-post', renderCreatePostPage);
   AdminRouter.add('#/moderation', renderModerationPage);
   AdminRouter.add('#/posts', renderPostsPage);
